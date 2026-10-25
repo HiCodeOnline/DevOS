@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>数据库</title>
+  <title data-i18n="db.app.title">数据库</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { theme: { extend: { fontFamily: {
@@ -13,6 +13,8 @@
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/ui.css?v=1" />
+  <script src="/assets/app-i18n.js?v=2"></script>
+  <script src="/assets/locales/apps/db.js?v=1"></script>
   <script src="/assets/secure-ui.js?v=2"></script>
   <style>
     .pane { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
@@ -63,16 +65,16 @@
       <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
     </span>
     <div class="mr-2 leading-tight">
-      <div class="text-[12px] font-semibold text-slate-800">数据库</div>
+      <div class="text-[12px] font-semibold text-slate-800" data-i18n="db.app.name">数据库</div>
       <div class="text-[10px] text-slate-400">MySQL · PostgreSQL · SQLite</div>
     </div>
-    <button id="newConnBtn" class="rounded-lg bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-slate-700">新建连接</button>
-    <button id="importBtn" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">导入连接</button>
-    <button id="exportBtn" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">导出连接</button>
+    <button id="newConnBtn" class="rounded-lg bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-slate-700" data-i18n="db.conn.new">新建连接</button>
+    <button id="importBtn" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50" data-i18n="db.conn.import">导入连接</button>
+    <button id="exportBtn" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50" data-i18n="db.conn.export">导出连接</button>
     <input id="importFile" type="file" accept=".json" class="hidden" />
     <span class="ml-auto flex items-center gap-1.5 text-[10px] text-slate-400">
       <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-      <span id="connCount">0 个连接</span>
+      <span id="connCount" data-i18n="db.conn.countZero">0 个连接</span>
     </span>
   </header>
 
@@ -81,7 +83,7 @@
       <div class="flex-none p-2">
         <div class="relative">
           <svg class="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input id="searchInput" placeholder="搜索连接…" class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-[11px] outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50" />
+          <input id="searchInput" placeholder="搜索连接…" data-i18n-placeholder="db.tree.searchPlaceholder" class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-[11px] outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50" />
         </div>
       </div>
       <div id="tree" class="min-h-0 flex-1 overflow-y-auto px-1 pb-3"></div>
@@ -95,10 +97,10 @@
           <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
         </span>
         <div>
-          <p class="text-[13px] font-medium text-slate-600">选择左侧连接开始使用</p>
-          <p class="mt-1 text-[11px] text-slate-400">双击表名浏览数据，或在连接上新建查询</p>
+          <p class="text-[13px] font-medium text-slate-600" data-i18n="db.empty.title">选择左侧连接开始使用</p>
+          <p class="mt-1 text-[11px] text-slate-400" data-i18n="db.empty.hint">双击表名浏览数据，或在连接上新建查询</p>
         </div>
-        <button id="emptyNewBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">新建数据库连接</button>
+        <button id="emptyNewBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50" data-i18n="db.empty.new">新建数据库连接</button>
       </div>
     </main>
   </div>
@@ -107,7 +109,7 @@
   <div id="connModal" class="modal hidden bg-slate-900/30 p-4 backdrop-blur-sm">
     <div class="max-h-[92vh] w-[600px] overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
       <div class="mb-4 flex items-center justify-between">
-        <h2 id="connTitle" class="text-sm font-semibold text-slate-900">新建连接</h2>
+        <h2 id="connTitle" class="text-sm font-semibold text-slate-900" data-i18n="db.conn.newTitle">新建连接</h2>
         <button id="closeConnModal" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
@@ -116,16 +118,16 @@
         <input type="hidden" id="fId" />
         <div class="grid grid-cols-3 gap-2">
           <label class="col-span-2 block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">连接名称</span>
-            <input id="fName" placeholder="例如：本地 MySQL" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.name">连接名称</span>
+            <input id="fName" placeholder="例如：本地 MySQL" data-i18n-placeholder="db.form.namePlaceholder" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
           </label>
           <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">分组</span>
-            <input id="fGroup" placeholder="未分组" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.group">分组</span>
+            <input id="fGroup" placeholder="未分组" data-i18n-placeholder="db.form.groupPlaceholder" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
           </label>
         </div>
         <div class="block">
-          <span class="mb-1 block text-[10.5px] font-medium text-slate-500">数据库类型</span>
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.driver">数据库类型</span>
           <div id="driverSelect">
             <button type="button" id="fDriverBtn" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
               <span id="fDriverLabel" class="ui-select-value"></span>
@@ -140,48 +142,48 @@
         <div id="serverFields" class="space-y-3">
           <div class="grid grid-cols-3 gap-2">
             <label class="col-span-2 block">
-              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">主机</span>
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.host">主机</span>
               <input id="fHost" placeholder="127.0.0.1" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
             </label>
             <label class="block">
-              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">端口</span>
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.port">端口</span>
               <input id="fPort" type="number" placeholder="3306" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
             </label>
           </div>
           <div class="grid grid-cols-2 gap-2">
             <label class="block">
-              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">用户名</span>
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.user">用户名</span>
               <input id="fUser" autocomplete="off" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
             </label>
             <label class="block">
-              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">密码</span>
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.password">密码</span>
               <input id="fPassword" type="password" autocomplete="new-password" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
             </label>
           </div>
           <label class="block" id="dbFieldWrap">
-            <span id="dbLabelText" class="mb-1 block text-[10.5px] font-medium text-slate-500">默认数据库（可选）</span>
-            <input id="fDatabase" placeholder="不填则连接后选择" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
+            <span id="dbLabelText" class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.type.dbLabel.default">默认数据库（可选）</span>
+            <input id="fDatabase" placeholder="不填则连接后选择" data-i18n-placeholder="db.form.databasePlaceholder" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
           </label>
         </div>
 
         <div id="sqliteFields" class="hidden">
           <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">数据库文件路径</span>
-            <input id="fFile" placeholder="D:\data\demo.db（不存在将自动创建）" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
-            <span class="mt-1 block text-[10px] text-slate-400">支持绝对路径；文件不存在时会在首次连接时自动创建。</span>
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.file">数据库文件路径</span>
+            <input id="fFile" placeholder="D:\data\demo.db（不存在将自动创建）" data-i18n-placeholder="db.form.filePlaceholder" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
+            <span class="mt-1 block text-[10px] text-slate-400" data-i18n="db.form.fileHint">支持绝对路径；文件不存在时会在首次连接时自动创建。</span>
           </label>
         </div>
 
         <details class="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
-          <summary class="cursor-pointer text-[11px] font-medium text-slate-600">高级选项</summary>
+          <summary class="cursor-pointer text-[11px] font-medium text-slate-600" data-i18n="db.form.advanced">高级选项</summary>
           <div class="mt-2 space-y-2">
             <div class="grid grid-cols-2 gap-2">
               <label id="charsetWrap" class="block">
-                <span class="mb-1 block text-[10.5px] font-medium text-slate-500">字符集</span>
+                <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.charset">字符集</span>
                 <input id="fCharset" placeholder="utf8mb4" class="w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-[11px] outline-none focus:border-emerald-400" />
               </label>
               <label id="sslWrap" class="block">
-                <span class="mb-1 block text-[10.5px] font-medium text-slate-500">SSL 模式</span>
+                <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.sslMode">SSL 模式</span>
                 <select id="fSSLMode" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] outline-none focus:border-emerald-400">
                   <option value="disable">disable</option>
                   <option value="require">require</option>
@@ -190,12 +192,12 @@
               </label>
             </div>
             <label class="block">
-              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">附加参数（k=v&amp;k2=v2）</span>
-              <input id="fParams" placeholder="例如 timezone=Local" class="w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-[11px] outline-none focus:border-emerald-400" />
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="db.form.params">附加参数（k=v&amp;k2=v2）</span>
+              <input id="fParams" placeholder="例如 timezone=Local" data-i18n-placeholder="db.form.paramsPlaceholder" class="w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-[11px] outline-none focus:border-emerald-400" />
             </label>
             <label class="flex items-center gap-2 pt-1">
               <input id="fReadOnly" type="checkbox" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-400" />
-              <span class="text-[11px] text-slate-600">只读模式（拒绝执行写操作）</span>
+              <span class="text-[11px] text-slate-600" data-i18n="db.form.readOnly">只读模式（拒绝执行写操作）</span>
             </label>
           </div>
         </details>
@@ -204,9 +206,9 @@
         <p id="connTestResult" class="hidden rounded-lg px-3 py-2 text-[11px]"></p>
 
         <div class="flex items-center gap-2 pt-1">
-          <button type="button" id="testConnBtn" class="rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] text-slate-600 hover:bg-slate-50">测试连接</button>
-          <button type="button" id="cancelConnBtn" class="ml-auto rounded-lg border border-slate-200 px-4 py-2 text-[11.5px] text-slate-600 hover:bg-slate-50">取消</button>
-          <button type="submit" class="rounded-lg bg-emerald-500 px-5 py-2 text-[11.5px] font-semibold text-white hover:bg-emerald-400">保存</button>
+          <button type="button" id="testConnBtn" class="rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] text-slate-600 hover:bg-slate-50" data-i18n="db.form.test">测试连接</button>
+          <button type="button" id="cancelConnBtn" class="ml-auto rounded-lg border border-slate-200 px-4 py-2 text-[11.5px] text-slate-600 hover:bg-slate-50" data-i18n="db.common.cancel">取消</button>
+          <button type="submit" class="rounded-lg bg-emerald-500 px-5 py-2 text-[11.5px] font-semibold text-white hover:bg-emerald-400" data-i18n="db.common.save">保存</button>
         </div>
       </form>
     </div>
@@ -216,9 +218,13 @@
 
 <script>
 const API = '/api/apps/db';
+const AppI18n = window.DevOSAppI18n;
+const tr = (key, params) => (AppI18n ? AppI18n.t(key, params) : key);
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const keyOf = (...parts) => JSON.stringify(parts);
+
+document.title = tr('db.app.title');
 
 const S = {
   connections: [],
@@ -253,6 +259,25 @@ function toast(msg, type = 'ok') {
     (type === 'err' ? 'bg-rose-600' : 'bg-slate-900');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
+}
+
+// 状态栏文案保存为可重新求值的函数，语言切换后按当前语言重算。
+function setStatus(tab, fn) {
+  tab.statusFn = fn;
+  refreshStatus(tab);
+}
+
+function refreshStatus(tab) {
+  if (!tab.el) return;
+  const node = $('.query-status', tab.el) || $('.data-status', tab.el);
+  if (!node) return;
+  node.textContent = tab.statusFn ? tab.statusFn() : tr('db.common.ready');
+}
+
+function renderConnCount() {
+  const node = $('#connCount');
+  if (!node) return;
+  node.textContent = S.connections.length ? tr('db.conn.count', { count: S.connections.length }) : tr('db.conn.countZero');
 }
 
 function iconSvg(name, cls = 'h-3.5 w-3.5') {
@@ -290,6 +315,35 @@ const FALLBACK_TYPES = [
 let TYPES = FALLBACK_TYPES;
 let TYPE_MAP = Object.fromEntries(FALLBACK_TYPES.map((t) => [t.id, t]));
 
+// 数据库类型的分组名与提示文案属于界面文案，按 id / 分组名映射到词典。
+const DRIVER_GROUP_KEYS = {
+  '常用': 'db.type.group.common',
+  'NoSQL': 'db.type.group.nosql',
+  '国产化': 'db.type.group.domestic',
+  '云与分布式': 'db.type.group.cloud',
+  '其他': 'db.type.group.other',
+};
+
+function driverGroupLabel(group) {
+  const key = DRIVER_GROUP_KEYS[group];
+  return key ? tr(key) : group;
+}
+
+function driverHint(t) {
+  if (!t || !t.id) return '';
+  const key = 'db.type.hint.' + t.id;
+  const text = tr(key);
+  return text === key ? (t.hint || '') : text;
+}
+
+function driverDatabaseLabel(t) {
+  if (!t) return tr('db.type.dbLabel.default');
+  if (t.family === 'redis') return tr('db.type.dbLabel.redisNum');
+  if (t.family === 'oracle') return t.id === 'dm' ? tr('db.type.dbLabel.schema') : tr('db.type.dbLabel.serviceName');
+  if (t.family === 'sqlserver') return tr('db.type.dbLabel.database');
+  return tr('db.type.dbLabel.default');
+}
+
 function typeOf(conn) {
   return TYPE_MAP[conn?.driver] || FALLBACK_TYPES[0];
 }
@@ -317,10 +371,10 @@ async function loadConnections() {
   try {
     S.connections = await api('/connections');
   } catch (err) {
-    toast('加载连接失败：' + err.message, 'err');
+    toast(tr('db.conn.loadFailed', { error: err.message }), 'err');
     S.connections = [];
   }
-  $('#connCount').textContent = `${S.connections.length} 个连接`;
+  renderConnCount();
   renderTree();
 }
 
@@ -329,7 +383,7 @@ function renderTree() {
   S.nodeMap.clear();
   const tree = $('#tree');
   if (!S.connections.length) {
-    tree.innerHTML = `<div class="px-3 py-10 text-center text-[11px] text-slate-400">暂无连接<br/>点击「新建连接」开始</div>`;
+    tree.innerHTML = `<div class="px-3 py-10 text-center text-[11px] text-slate-400">${esc(tr('db.tree.empty'))}<br/>${esc(tr('db.tree.emptyHint'))}</div>`;
     return;
   }
   const kw = S.search.toLowerCase();
@@ -338,12 +392,12 @@ function renderTree() {
     return [c.name, c.host, c.group, c.database, c.file, c.driver].filter(Boolean).some((v) => String(v).toLowerCase().includes(kw));
   });
   if (!visible.length) {
-    tree.innerHTML = `<div class="px-3 py-10 text-center text-[11px] text-slate-400">没有匹配的连接</div>`;
+    tree.innerHTML = `<div class="px-3 py-10 text-center text-[11px] text-slate-400">${esc(tr('db.tree.noMatch'))}</div>`;
     return;
   }
   const groups = new Map();
   for (const c of visible) {
-    const g = c.group || '未分组';
+    const g = c.group || tr('db.tree.ungrouped');
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g).push(c);
   }
@@ -359,7 +413,7 @@ function renderConn(conn) {
   const p = keyOf('conn', conn.id);
   S.nodeMap.set(p, { kind: 'conn', path: p, connId: conn.id });
   const t = typeOf(conn);
-  const consoleTitle = isNoSQL(conn) ? '命令控制台' : '新建查询';
+  const consoleTitle = isNoSQL(conn) ? tr('db.tree.console') : tr('db.tree.newQuery');
   const consoleIcon = isNoSQL(conn) ? 'terminal' : 'sql';
   const open = S.expanded.has(p);
   const loading = S.loading.has(p);
@@ -375,18 +429,18 @@ function renderConn(conn) {
       <span class="min-w-0 flex-1 truncate text-[11.5px] font-medium text-slate-700" data-act="toggle" title="${esc(conn.name)} · ${esc(t.name)}">${esc(conn.name)}</span>
       <span class="tree-actions flex-none items-center gap-0.5">
         <button data-act="query" title="${consoleTitle}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg(consoleIcon, 'h-3 w-3')}</button>
-        <button data-act="ping" title="测试连接" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-sky-600">${iconSvg('plug', 'h-3 w-3')}</button>
-        <button data-act="edit" title="编辑" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-slate-700">${iconSvg('edit', 'h-3 w-3')}</button>
-        <button data-act="dup" title="复制" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-slate-700">${iconSvg('copy', 'h-3 w-3')}</button>
-        <button data-act="del" title="删除" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-rose-600">${iconSvg('trash', 'h-3 w-3')}</button>
+        <button data-act="ping" title="${esc(tr('db.form.test'))}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-sky-600">${iconSvg('plug', 'h-3 w-3')}</button>
+        <button data-act="edit" title="${esc(tr('db.tree.edit'))}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-slate-700">${iconSvg('edit', 'h-3 w-3')}</button>
+        <button data-act="dup" title="${esc(tr('db.common.copy'))}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-slate-700">${iconSvg('copy', 'h-3 w-3')}</button>
+        <button data-act="del" title="${esc(tr('db.tree.delete'))}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-rose-600">${iconSvg('trash', 'h-3 w-3')}</button>
       </span>
     </div>
     ${open ? renderConnChildren(conn, dbs, loading) : ''}`;
 }
 
 function renderConnChildren(conn, dbs, loading) {
-  if (loading) return `<div class="pl-9 py-1 text-[10.5px] text-slate-400">加载中…</div>`;
-  if (!dbs || !dbs.length) return `<div class="pl-9 py-1 text-[10.5px] text-slate-400">${isRedis(conn) ? '无可用库' : '无数据库'}</div>`;
+  if (loading) return `<div class="pl-9 py-1 text-[10.5px] text-slate-400">${esc(tr('db.common.loading'))}</div>`;
+  if (!dbs || !dbs.length) return `<div class="pl-9 py-1 text-[10.5px] text-slate-400">${esc(isRedis(conn) ? tr('db.tree.noDb') : tr('db.tree.noDatabases'))}</div>`;
   return dbs.map((db) => renderDb(conn, db)).join('');
 }
 
@@ -399,11 +453,11 @@ function renderDb(conn, db) {
   const children = S.cache.get(p);
   let suffix = '';
   let icon = 'db';
-  if (t.schemaLevel) suffix = ' (数据库)';
-  else if (t.family === 'oracle') suffix = ' (模式)';
-  else if (t.family === 'redis') { suffix = ' (库)'; icon = 'key'; }
+  if (t.schemaLevel) suffix = ' ' + tr('db.tree.suffix.database');
+  else if (t.family === 'oracle') suffix = ' ' + tr('db.tree.suffix.schema');
+  else if (t.family === 'redis') { suffix = ' ' + tr('db.tree.suffix.redisDb'); icon = 'key'; }
   else if (t.family === 'mongo') icon = 'collection';
-  const consoleTitle = isNoSQL(conn) ? '在此库打开命令控制台' : '在此库新建查询';
+  const consoleTitle = isNoSQL(conn) ? tr('db.tree.consoleHere') : tr('db.tree.queryHere');
   return `
     <div class="tree-row mx-1 flex items-center gap-1 rounded-md py-0.5 pl-3 pr-1" data-node="${esc(p)}">
       <button data-act="toggle" class="grid h-4 w-4 flex-none place-items-center rounded text-slate-400 hover:bg-slate-200">
@@ -419,14 +473,14 @@ function renderDb(conn, db) {
 }
 
 function renderDbChildren(conn, db, children, loading) {
-  if (loading) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">加载中…</div>`;
+  if (loading) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">${esc(tr('db.common.loading'))}</div>`;
   if (isRedis(conn)) return renderRedisKeys(conn, db, children);
   if (isMongo(conn)) {
-    if (!children || !children.length) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">无集合</div>`;
+    if (!children || !children.length) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">${esc(tr('db.tree.noCollections'))}</div>`;
     return children.map((name) => renderCollection(conn, db, name)).join('');
   }
   if (typeOf(conn).schemaLevel) {
-    if (!children || !children.length) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">无模式</div>`;
+    if (!children || !children.length) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">${esc(tr('db.tree.noSchemas'))}</div>`;
     return children.map((s) => renderSchema(conn, db, s)).join('');
   }
   return renderObjects(conn, db, objectSchema(conn, db), children, 4);
@@ -434,7 +488,7 @@ function renderDbChildren(conn, db, children, loading) {
 
 /* Redis：键列表与 MongoDB：集合列表 */
 function renderRedisKeys(conn, db, data) {
-  if (!data) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">加载中…</div>`;
+  if (!data) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">${esc(tr('db.common.loading'))}</div>`;
   const rows = data.keys.map((item) => {
     const p = keyOf('rkey', conn.id, db, item.key);
     S.nodeMap.set(p, { kind: 'rkey', path: p, connId: conn.id, database: db, key: item.key });
@@ -447,12 +501,12 @@ function renderRedisKeys(conn, db, data) {
         ${ttl ? `<span class="flex-none text-[9px] text-amber-500">${esc(ttl)}</span>` : ''}
       </div>`;
   }).join('');
-  const empty = data.keys.length ? '' : `<div class="pl-12 py-1 text-[10.5px] text-slate-400">无匹配的键</div>`;
+  const empty = data.keys.length ? '' : `<div class="pl-12 py-1 text-[10.5px] text-slate-400">${esc(tr('db.tree.noKeys'))}</div>`;
   const morePath = keyOf('rmore', conn.id, db);
   S.nodeMap.set(morePath, { kind: 'more', path: morePath, connId: conn.id, database: db });
   const more = data.more ? `
     <div class="mx-1 flex items-center gap-1 rounded-md py-0.5 pl-7 pr-1" data-node="${esc(morePath)}" data-act="more">
-      <button class="text-[10.5px] text-sky-600 hover:underline">加载更多键…</button>
+      <button class="text-[10.5px] text-sky-600 hover:underline">${esc(tr('db.tree.loadMoreKeys'))}</button>
     </div>` : '';
   return empty + rows + more;
 }
@@ -480,15 +534,15 @@ function renderSchema(conn, db, schema) {
       ${iconSvg('schema', 'h-3.5 w-3.5 flex-none text-amber-500/70')}
       <span class="min-w-0 flex-1 truncate text-[11px] text-slate-600" data-act="toggle" title="${esc(schema)}">${esc(schema)}</span>
       <span class="tree-actions flex-none items-center">
-        <button data-act="query" title="在此模式新建查询" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
+        <button data-act="query" title="${esc(tr('db.tree.queryInSchema'))}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
       </span>
     </div>
     ${open ? renderObjects(conn, db, schema, S.cache.get(p), 6) : ''}`;
 }
 
 function renderObjects(conn, db, schema, objects, indent) {
-  if (!objects) return `<div class="pl-${indent * 3} py-1" style="padding-left:${indent * 12 + 20}px"><span class="text-[10.5px] text-slate-400">加载中…</span></div>`;
-  if (!objects.length) return `<div style="padding-left:${indent * 12 + 20}px" class="py-1 text-[10.5px] text-slate-400">无表</div>`;
+  if (!objects) return `<div class="pl-${indent * 3} py-1" style="padding-left:${indent * 12 + 20}px"><span class="text-[10.5px] text-slate-400">${esc(tr('db.common.loading'))}</span></div>`;
+  if (!objects.length) return `<div style="padding-left:${indent * 12 + 20}px" class="py-1 text-[10.5px] text-slate-400">${esc(tr('db.tree.noTables'))}</div>`;
   return objects.map((obj) => renderObject(conn, db, schema, obj, indent)).join('');
 }
 
@@ -506,14 +560,14 @@ function renderObject(conn, db, schema, obj, indent) {
       ${iconSvg(obj.type === 'view' ? 'view' : 'table', 'h-3.5 w-3.5 flex-none ' + (obj.type === 'view' ? 'text-violet-400' : 'text-emerald-500/80'))}
       <span class="min-w-0 flex-1 truncate text-[11px] text-slate-600" data-act="open" title="${esc(obj.name)}">${esc(obj.name)}</span>
       <span class="tree-actions flex-none items-center">
-        <button data-act="query" title="新建查询" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
+        <button data-act="query" title="${esc(tr('db.tree.newQuery'))}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
       </span>
     </div>
     ${open ? renderColumns(cols, indent + 1) : ''}`;
 }
 
 function renderColumns(cols, indent) {
-  if (!cols) return `<div style="padding-left:${indent * 12 + 30}px" class="py-0.5 text-[10.5px] text-slate-400">加载中…</div>`;
+  if (!cols) return `<div style="padding-left:${indent * 12 + 30}px" class="py-0.5 text-[10.5px] text-slate-400">${esc(tr('db.common.loading'))}</div>`;
   if (!cols.length) return '';
   return cols.map((col) => `
     <div class="mx-1 flex items-center gap-1 rounded-md py-0.5" style="padding-left:${indent * 12 + 20}px">
@@ -559,7 +613,7 @@ async function toggleNode(node) {
     }
     S.cache.set(p, data);
   } catch (err) {
-    toast('加载失败：' + err.message, 'err');
+    toast(tr('db.tree.loadFailed', { error: err.message }), 'err');
     S.expanded.delete(p);
   } finally {
     S.loading.delete(p);
@@ -585,7 +639,7 @@ async function loadMoreRedisKeys(node) {
     S.cache.set(cacheKey, { keys: [...current.keys, ...res.keys], cursor: res.cursor, more: res.more });
     renderTree();
   } catch (err) {
-    toast('加载失败：' + err.message, 'err');
+    toast(tr('db.tree.loadFailed', { error: err.message }), 'err');
   }
 }
 
@@ -623,12 +677,16 @@ $('#tree').addEventListener('click', async (ev) => {
     return;
   }
   if (act === 'ping') {
-    toast('正在测试连接…');
+    toast(tr('db.ping.testing'));
     try {
       const res = await api('/ping?id=' + encodeURIComponent(node.connId));
-      toast(res.ok ? `连接成功 · ${res.latencyMs}ms · ${res.version || ''}` : '连接失败');
+      toast(res.ok
+        ? (res.version
+          ? tr('db.ping.ok', { ms: res.latencyMs, version: res.version })
+          : tr('db.ping.okNoVersion', { ms: res.latencyMs }))
+        : tr('db.ping.failed'));
     } catch (err) {
-      toast('连接失败：' + err.message, 'err');
+      toast(tr('db.ping.failedWithError', { error: err.message }), 'err');
     }
     return;
   }
@@ -640,21 +698,21 @@ $('#tree').addEventListener('click', async (ev) => {
     try {
       await api('/connections/' + encodeURIComponent(conn.id) + '/duplicate', { method: 'POST' });
       await loadConnections();
-      toast('已复制连接');
+      toast(tr('db.conn.duplicated'));
     } catch (err) {
-      toast('复制失败：' + err.message, 'err');
+      toast(tr('db.conn.dupFailed', { error: err.message }), 'err');
     }
     return;
   }
   if (act === 'del') {
-    if (!confirm(`确定删除连接「${conn.name}」吗？`)) return;
+    if (!confirm(tr('db.conn.confirmDelete', { name: conn.name }))) return;
     try {
       await api('/connections/' + encodeURIComponent(conn.id), { method: 'DELETE' });
       S.cache.delete(keyOf('conn', conn.id));
       await loadConnections();
-      toast('已删除');
+      toast(tr('db.conn.deleted'));
     } catch (err) {
-      toast('删除失败：' + err.message, 'err');
+      toast(tr('db.conn.deleteFailed', { error: err.message }), 'err');
     }
   }
 });
@@ -664,7 +722,7 @@ function tabTitle(tab) {
   if (tab.type === 'query') {
     if (tab.fam === 'redis') return `Redis · ${tab.database || '0'}`;
     if (tab.fam === 'mongo') return `Mongo · ${tab.database || ''}`;
-    return `查询 · ${tab.database || (findConn(tab.connId)?.name ?? '')}`;
+    return tr('db.tab.query', { db: tab.database || (findConn(tab.connId)?.name ?? '') });
   }
   if (tab.type === 'rkey') return tab.key;
   if (tab.type === 'mongo') return `${tab.database}.${tab.table}`;
@@ -782,20 +840,20 @@ function createQueryPane(tab) {
   el.innerHTML = `
     <div class="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
       <select class="db-select rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-mono text-[11px] outline-none focus:border-emerald-400">
-        <option value="">（默认库）</option>
+        <option value="">${esc(tr('db.query.defaultDb'))}</option>
       </select>
       <button class="exec-btn flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-50">
-        ${iconSvg('play', 'h-3 w-3')} 执行 <span class="kbd !text-white/80 !border-white/30 !bg-white/10">Ctrl+Enter</span>
+        ${iconSvg('play', 'h-3 w-3')} ${esc(tr('db.query.exec'))} <span class="kbd !text-white/80 !border-white/30 !bg-white/10">Ctrl+Enter</span>
       </button>
-      <label class="flex items-center gap-1 text-[10.5px] text-slate-500">行数
+      <label class="flex items-center gap-1 text-[10.5px] text-slate-500"><span class="rows-label">${esc(tr('db.query.maxRows'))}</span>
         <input class="max-rows w-16 rounded-md border border-slate-200 px-1.5 py-1 font-mono text-[10.5px] outline-none focus:border-emerald-400" type="number" min="1" max="20000" value="1000" />
       </label>
-      <button class="export-btn flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${iconSvg('download', 'h-3 w-3')} 导出 CSV</button>
-      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制结果</button>
+      <button class="export-btn flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${iconSvg('download', 'h-3 w-3')} ${esc(tr('db.common.exportCsv'))}</button>
+      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${esc(tr('db.common.copyResult'))}</button>
       <span class="query-hint ml-auto text-[10px] text-slate-400"></span>
     </div>
-    <textarea class="sql-input min-h-0 flex-none resize-none border-b border-slate-200 bg-white p-3 font-mono text-[11.5px] leading-relaxed text-slate-700 outline-none" style="height:38%;flex:0 0 38%" spellcheck="false" placeholder="-- 输入 SQL，Ctrl+Enter 执行&#10;SELECT * FROM users LIMIT 100;"></textarea>
-    <div class="query-status flex-none border-b border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>
+    <textarea class="sql-input min-h-0 flex-none resize-none border-b border-slate-200 bg-white p-3 font-mono text-[11.5px] leading-relaxed text-slate-700 outline-none" style="height:38%;flex:0 0 38%" spellcheck="false" placeholder="${esc(tr('db.query.sqlPlaceholder'))}"></textarea>
+    <div class="query-status flex-none border-b border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">${esc(tr('db.common.ready'))}</div>
     <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>`;
   $('#panes').appendChild(el);
   tab.el = el;
@@ -823,7 +881,8 @@ function createQueryPane(tab) {
         select.value = tab.database;
       }
     } catch (err) {
-      $('.query-hint', el).textContent = '库列表加载失败：' + err.message;
+      tab.dbListError = err.message;
+      $('.query-hint', el).textContent = tr('db.query.dbListFailed', { error: err.message });
     }
   })();
 
@@ -844,11 +903,11 @@ async function execQuery(tab) {
   if (tab.busy) return;
   const el = tab.el;
   const sql = $('.sql-input', el).value;
-  if (!sql.trim()) { toast('请输入 SQL'); return; }
+  if (!sql.trim()) { toast(tr('db.query.emptySql')); return; }
   tab.busy = true;
   const btn = $('.exec-btn', el);
   btn.disabled = true;
-  $('.query-status', el).textContent = '执行中…';
+  setStatus(tab, () => tr('db.query.running'));
   $('.query-hint', el).textContent = '';
   try {
     const res = await api('/query', {
@@ -862,22 +921,38 @@ async function execQuery(tab) {
     });
     tab.result = res;
     tab.error = '';
-    const wrap = $('.grid-wrap', el);
-    if (res.kind === 'exec') {
-      wrap.innerHTML = `<div class="p-8 text-center text-[11.5px] text-slate-500">执行成功，影响行数 <b class="text-emerald-600">${res.affected}</b>${res.lastId ? ` · 自增 ID ${res.lastId}` : ''}</div>`;
-      $('.query-status', el).textContent = `影响 ${res.affected} 行 · ${res.durationMs} ms`;
-    } else {
-      wrap.innerHTML = renderGrid(res.columns, res.rows, {});
-      $('.query-status', el).textContent = `${res.rowCount} 行${res.truncated ? '（已截断）' : ''} · ${res.durationMs} ms`;
-    }
+    renderQueryOutput(tab);
   } catch (err) {
     tab.error = err.message;
     tab.result = null;
-    $('.grid-wrap', el).innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
-    $('.query-status', el).textContent = '执行失败';
+    renderQueryOutput(tab);
   } finally {
     tab.busy = false;
     btn.disabled = false;
+  }
+}
+
+// 按当前语言重绘查询结果与状态栏，语言切换时复用。
+function renderQueryOutput(tab) {
+  const el = tab.el;
+  if (!el) return;
+  const wrap = $('.grid-wrap', el);
+  if (tab.error) {
+    wrap.innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(tab.error)}</div>`;
+    setStatus(tab, () => tr('db.query.execFailed'));
+    return;
+  }
+  const res = tab.result;
+  if (!res) return;
+  if (res.kind === 'exec') {
+    const html = res.lastId
+      ? tr('db.query.execOkLastId', { affected: res.affected, lastId: res.lastId })
+      : tr('db.query.execOk', { affected: res.affected });
+    wrap.innerHTML = `<div class="p-8 text-center text-[11.5px] text-slate-500">${html}</div>`;
+    setStatus(tab, () => tr('db.query.affectedStatus', { rows: res.affected, ms: res.durationMs }));
+  } else {
+    wrap.innerHTML = renderGrid(res.columns, res.rows, {});
+    setStatus(tab, () => tr(res.truncated ? 'db.query.rowsStatusTruncated' : 'db.query.rowsStatus', { rows: res.rowCount, ms: res.durationMs }));
   }
 }
 
@@ -889,16 +964,16 @@ function createCommandPane(tab) {
   el.innerHTML = `
     <div class="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
       <select class="db-select rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-mono text-[11px] outline-none focus:border-emerald-400">
-        <option value="">（选择库）</option>
+        <option value="">${esc(tr('db.cmd.selectDb'))}</option>
       </select>
       <button class="exec-btn flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-50">
-        ${iconSvg('play', 'h-3 w-3')} 执行 <span class="kbd !text-white/80 !border-white/30 !bg-white/10">Ctrl+Enter</span>
+        ${iconSvg('play', 'h-3 w-3')} ${esc(tr('db.query.exec'))} <span class="kbd !text-white/80 !border-white/30 !bg-white/10">Ctrl+Enter</span>
       </button>
-      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制结果</button>
-      <span class="query-hint ml-auto text-[10px] text-slate-400">${redisMode ? '每行一条命令，按顺序执行' : '输入 JSON 命令，如 {"find":"users","limit":20}'}</span>
+      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${esc(tr('db.common.copyResult'))}</button>
+      <span class="query-hint ml-auto text-[10px] text-slate-400">${esc(redisMode ? tr('db.cmd.redisHint') : tr('db.cmd.mongoHint'))}</span>
     </div>
     <textarea class="cmd-input min-h-0 flex-none resize-none border-b border-slate-200 bg-white p-3 font-mono text-[11.5px] leading-relaxed text-slate-700 outline-none" style="height:38%;flex:0 0 38%" spellcheck="false"></textarea>
-    <div class="query-status flex-none border-b border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>
+    <div class="query-status flex-none border-b border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">${esc(tr('db.common.ready'))}</div>
     <pre class="cmd-result min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words bg-white p-3 font-mono text-[11px] leading-relaxed text-slate-700"></pre>`;
   $('#panes').appendChild(el);
   tab.el = el;
@@ -923,7 +998,8 @@ function createCommandPane(tab) {
       select.value = tab.database || '';
       renderTabs();
     } catch (err) {
-      $('.query-hint', el).textContent = '库列表加载失败：' + err.message;
+      tab.dbListError = err.message;
+      $('.query-hint', el).textContent = tr('db.query.dbListFailed', { error: err.message });
     }
   })();
 
@@ -937,8 +1013,8 @@ function createCommandPane(tab) {
   });
   $('.exec-btn', el).addEventListener('click', () => execCommand(tab));
   $('.copy-btn', el).addEventListener('click', () => {
-    if (!tab.output) { toast('没有可复制的结果'); return; }
-    navigator.clipboard.writeText(tab.output).then(() => toast('已复制结果')).catch(() => toast('复制失败', 'err'));
+    if (!tab.output) { toast(tr('db.common.noResult')); return; }
+    navigator.clipboard.writeText(tab.output).then(() => toast(tr('db.common.copiedResult'))).catch(() => toast(tr('db.common.copyFailed'), 'err'));
   });
 }
 
@@ -947,14 +1023,14 @@ async function execCommand(tab) {
   const el = tab.el;
   const command = $('.cmd-input', el).value;
   if (!command.trim()) {
-    toast(tab.fam === 'redis' ? '请输入 Redis 命令' : '请输入 JSON 命令');
+    toast(tr(tab.fam === 'redis' ? 'db.cmd.emptyRedis' : 'db.cmd.emptyJson'));
     return;
   }
   tab.busy = true;
   const btn = $('.exec-btn', el);
   const resultEl = $('.cmd-result', el);
   btn.disabled = true;
-  $('.query-status', el).textContent = '执行中…';
+  setStatus(tab, () => tr('db.query.running'));
   resultEl.classList.remove('text-rose-600');
   try {
     if (tab.fam === 'redis') {
@@ -969,7 +1045,7 @@ async function execCommand(tab) {
       }
       tab.output = lines.join('\n');
       resultEl.textContent = tab.output;
-      $('.query-status', el).textContent = `${res.results.length} 条命令 · ${res.durationMs} ms`;
+      setStatus(tab, () => tr('db.cmd.resultsStatus', { count: res.results.length, ms: res.durationMs }));
     } else {
       const res = await api('/mongo/command', {
         method: 'POST',
@@ -977,13 +1053,13 @@ async function execCommand(tab) {
       });
       tab.output = JSON.stringify(res.result, null, 2);
       resultEl.textContent = tab.output;
-      $('.query-status', el).textContent = `执行成功 · ${res.durationMs} ms`;
+      setStatus(tab, () => tr('db.cmd.successStatus', { ms: res.durationMs }));
     }
   } catch (err) {
     tab.output = err.message;
     resultEl.textContent = err.message;
     resultEl.classList.add('text-rose-600');
-    $('.query-status', el).textContent = '执行失败';
+    setStatus(tab, () => tr('db.query.execFailed'));
   } finally {
     tab.busy = false;
     btn.disabled = false;
@@ -998,8 +1074,8 @@ function formatRedisValue(v) {
 }
 
 function ttlLabel(ttl) {
-  if (ttl === -1) return '永久';
-  if (ttl === -2) return '已过期';
+  if (ttl === -1) return tr('db.redis.ttlForever');
+  if (ttl === -2) return tr('db.redis.ttlExpired');
   if (ttl === null || ttl === undefined) return '-';
   return `${ttl}s`;
 }
@@ -1036,80 +1112,87 @@ function createRedisKeyPane(tab) {
       <span class="key-name min-w-0 max-w-[360px] truncate font-mono text-[11.5px] font-medium text-slate-800"></span>
       <span class="key-type rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"></span>
       <span class="key-meta text-[10px] text-slate-500"></span>
-      <button class="refresh-btn grid h-6 w-6 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="刷新">${iconSvg('refresh', 'h-3 w-3')}</button>
-      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制</button>
-      <button class="del-btn ml-auto rounded-lg border border-rose-200 px-2 py-1.5 text-[10.5px] text-rose-600 hover:bg-rose-50">删除键</button>
+      <button class="refresh-btn grid h-6 w-6 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="${esc(tr('db.common.refresh'))}">${iconSvg('refresh', 'h-3 w-3')}</button>
+      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${esc(tr('db.common.copy'))}</button>
+      <button class="del-btn ml-auto rounded-lg border border-rose-200 px-2 py-1.5 text-[10.5px] text-rose-600 hover:bg-rose-50">${esc(tr('db.redis.deleteKey'))}</button>
     </div>
     <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>
-    <div class="data-status flex-none border-t border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>`;
+    <div class="data-status flex-none border-t border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">${esc(tr('db.common.ready'))}</div>`;
   $('#panes').appendChild(el);
   tab.el = el;
   $('.key-name', el).textContent = tab.key;
 
   $('.refresh-btn', el).addEventListener('click', () => loadRedisKey(tab));
   $('.copy-btn', el).addEventListener('click', () => {
-    if (!tab.output) { toast('没有可复制的内容'); return; }
-    navigator.clipboard.writeText(tab.output).then(() => toast('已复制')).catch(() => toast('复制失败', 'err'));
+    if (!tab.output) { toast(tr('db.common.noContent')); return; }
+    navigator.clipboard.writeText(tab.output).then(() => toast(tr('db.common.copied'))).catch(() => toast(tr('db.common.copyFailed'), 'err'));
   });
   $('.del-btn', el).addEventListener('click', async () => {
-    if (!confirm(`确定删除键「${tab.key}」吗？`)) return;
+    if (!confirm(tr('db.redis.confirmDelete', { key: tab.key }))) return;
     try {
       await api(`/redis/key?id=${encodeURIComponent(tab.connId)}&db=${encodeURIComponent(tab.database)}&key=${encodeURIComponent(tab.key)}`, { method: 'DELETE' });
       const cacheKey = keyOf('db', tab.connId, tab.database);
       const cached = S.cache.get(cacheKey);
       if (cached) S.cache.set(cacheKey, { ...cached, keys: cached.keys.filter((k) => k.key !== tab.key) });
-      toast('键已删除');
+      toast(tr('db.redis.deleted'));
       closeTab(tab.id);
       renderTree();
     } catch (err) {
-      toast('删除失败：' + err.message, 'err');
+      toast(tr('db.redis.deleteFailed', { error: err.message }), 'err');
     }
   });
 }
 
 async function loadRedisKey(tab) {
   const el = tab.el;
-  const wrap = $('.grid-wrap', el);
-  $('.data-status', el).textContent = '加载中…';
+  setStatus(tab, () => tr('db.common.loading'));
   try {
     const params = new URLSearchParams({ id: tab.connId, db: tab.database, key: tab.key });
     const res = await api('/redis/key?' + params.toString());
     tab.detail = res;
-    $('.key-type', el).textContent = res.type;
-    $('.key-meta', el).textContent = `TTL ${ttlLabel(res.ttl)}${res.length >= 0 ? ` · 长度 ${res.length}` : ''}`;
-
-    const value = res.value;
-    let html = '';
-    if (res.type === 'string') {
-      tab.output = String(value ?? '');
-      html = `<pre class="whitespace-pre-wrap break-words p-3 font-mono text-[11.5px] leading-relaxed text-slate-700">${esc(tab.output)}</pre>`;
-    } else if (res.type === 'hash') {
-      tab.output = JSON.stringify(value || {}, null, 2);
-      html = renderGrid(['字段', '值'], Object.entries(value || {}), {});
-    } else if (res.type === 'list') {
-      tab.output = JSON.stringify(value || [], null, 2);
-      html = renderGrid(['序号', '值'], (value || []).map((v, i) => [i + 1, v]), {});
-    } else if (res.type === 'set') {
-      tab.output = JSON.stringify(value || [], null, 2);
-      html = renderGrid(['成员'], (value || []).map((v) => [v]), {});
-    } else if (res.type === 'zset') {
-      tab.output = JSON.stringify(value || [], null, 2);
-      html = renderGrid(['成员', '分值'], value || [], {});
-    } else if (res.type === 'stream') {
-      tab.output = JSON.stringify(value || [], null, 2);
-      html = renderGrid(['ID', '字段值'], (value || []).map((m) => [m.id, JSON.stringify(m.values)]), {});
-    } else {
-      tab.output = JSON.stringify(value, null, 2);
-      html = `<pre class="whitespace-pre-wrap break-words p-3 font-mono text-[11.5px] leading-relaxed text-slate-700">${esc(tab.output)}</pre>`;
-    }
-    wrap.innerHTML = html;
-    $('.data-status', el).textContent =
-      `类型 ${res.type} · TTL ${ttlLabel(res.ttl)}${res.length >= 0 ? ` · 长度 ${res.length}` : ''}`;
+    renderRedisKeyDetail(tab);
   } catch (err) {
     tab.detail = null;
-    wrap.innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
-    $('.data-status', el).textContent = '加载失败';
+    $('.grid-wrap', el).innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
+    setStatus(tab, () => tr('db.common.loadFailedShort'));
   }
+}
+
+// 按当前语言重绘 Redis 键详情，语言切换时复用。
+function renderRedisKeyDetail(tab) {
+  const el = tab.el;
+  const res = tab.detail;
+  if (!el || !res) return;
+  const value = res.value;
+  const lengthSuffix = res.length >= 0 ? ' · ' + tr('db.redis.length', { length: res.length }) : '';
+  $('.key-type', el).textContent = res.type;
+  $('.key-meta', el).textContent = `TTL ${ttlLabel(res.ttl)}${lengthSuffix}`;
+
+  let html = '';
+  if (res.type === 'string') {
+    tab.output = String(value ?? '');
+    html = `<pre class="whitespace-pre-wrap break-words p-3 font-mono text-[11.5px] leading-relaxed text-slate-700">${esc(tab.output)}</pre>`;
+  } else if (res.type === 'hash') {
+    tab.output = JSON.stringify(value || {}, null, 2);
+    html = renderGrid([tr('db.grid.field'), tr('db.grid.value')], Object.entries(value || {}), {});
+  } else if (res.type === 'list') {
+    tab.output = JSON.stringify(value || [], null, 2);
+    html = renderGrid([tr('db.grid.index'), tr('db.grid.value')], (value || []).map((v, i) => [i + 1, v]), {});
+  } else if (res.type === 'set') {
+    tab.output = JSON.stringify(value || [], null, 2);
+    html = renderGrid([tr('db.grid.member')], (value || []).map((v) => [v]), {});
+  } else if (res.type === 'zset') {
+    tab.output = JSON.stringify(value || [], null, 2);
+    html = renderGrid([tr('db.grid.member'), tr('db.grid.score')], value || [], {});
+  } else if (res.type === 'stream') {
+    tab.output = JSON.stringify(value || [], null, 2);
+    html = renderGrid(['ID', tr('db.grid.fieldValue')], (value || []).map((m) => [m.id, JSON.stringify(m.values)]), {});
+  } else {
+    tab.output = JSON.stringify(value, null, 2);
+    html = `<pre class="whitespace-pre-wrap break-words p-3 font-mono text-[11.5px] leading-relaxed text-slate-700">${esc(tab.output)}</pre>`;
+  }
+  $('.grid-wrap', el).innerHTML = html;
+  setStatus(tab, () => tr('db.redis.status', { type: res.type, ttl: ttlLabel(res.ttl) }) + lengthSuffix);
 }
 
 /* ---------- MongoDB 文档 ---------- */
@@ -1146,24 +1229,24 @@ function createMongoPane(tab) {
   el.innerHTML = `
     <div class="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
       <span class="table-title min-w-0 max-w-[240px] truncate font-mono text-[11.5px] font-medium text-slate-800">${esc(tab.database + '.' + tab.table)}</span>
-      <input class="filter-input min-w-[160px] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-[10.5px] outline-none focus:border-emerald-400" placeholder='过滤 JSON，如 {"status":"active"}' spellcheck="false" />
-      <button class="apply-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">应用</button>
-      <button class="refresh-btn grid h-6 w-6 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="刷新">${iconSvg('refresh', 'h-3 w-3')}</button>
+      <input class="filter-input min-w-[160px] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-[10.5px] outline-none focus:border-emerald-400" placeholder='${esc(tr('db.mongo.filterPlaceholder'))}' spellcheck="false" />
+      <button class="apply-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${esc(tr('db.common.apply'))}</button>
+      <button class="refresh-btn grid h-6 w-6 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="${esc(tr('db.common.refresh'))}">${iconSvg('refresh', 'h-3 w-3')}</button>
       <div class="pager flex items-center gap-1 text-[10.5px] text-slate-500">
         <select class="page-size rounded-md border border-slate-200 bg-white px-1 py-1 text-[10px] outline-none focus:border-emerald-400">
-          <option value="50">50 条</option>
-          <option value="100" selected>100 条</option>
-          <option value="200">200 条</option>
-          <option value="500">500 条</option>
+          <option value="50">${esc(tr('db.mongo.rowsOption', { count: 50 }))}</option>
+          <option value="100" selected>${esc(tr('db.mongo.rowsOption', { count: 100 }))}</option>
+          <option value="200">${esc(tr('db.mongo.rowsOption', { count: 200 }))}</option>
+          <option value="500">${esc(tr('db.mongo.rowsOption', { count: 500 }))}</option>
         </select>
-        <button class="prev-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">上一页</button>
+        <button class="prev-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">${esc(tr('db.common.prev'))}</button>
         <span class="page-label">1 / 1</span>
-        <button class="next-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">下一页</button>
+        <button class="next-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">${esc(tr('db.common.next'))}</button>
       </div>
-      <button class="copy-btn ml-auto rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制</button>
+      <button class="copy-btn ml-auto rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${esc(tr('db.common.copy'))}</button>
     </div>
     <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>
-    <div class="data-status flex-none border-t border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>`;
+    <div class="data-status flex-none border-t border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">${esc(tr('db.common.ready'))}</div>`;
   $('#panes').appendChild(el);
   tab.el = el;
 
@@ -1198,17 +1281,17 @@ function createMongoPane(tab) {
     loadMongoDocs(tab);
   });
   $('.copy-btn', el).addEventListener('click', () => {
-    if (!tab.data) { toast('没有可复制的结果'); return; }
+    if (!tab.data) { toast(tr('db.common.noResult')); return; }
     const { columns, rows } = tab.data;
     const text = [columns.join('\t'), ...rows.map((r) => r.map((v) => v === null ? 'NULL' : (typeof v === 'object' ? JSON.stringify(v) : String(v))).join('\t'))].join('\n');
-    navigator.clipboard.writeText(text).then(() => toast(`已复制 ${rows.length} 条`)).catch(() => toast('复制失败', 'err'));
+    navigator.clipboard.writeText(text).then(() => toast(tr('db.mongo.copied', { count: rows.length }))).catch(() => toast(tr('db.common.copyFailed'), 'err'));
   });
 }
 
 async function loadMongoDocs(tab) {
   const el = tab.el;
   const wrap = $('.grid-wrap', el);
-  $('.data-status', el).textContent = '加载中…';
+  setStatus(tab, () => tr('db.common.loading'));
   try {
     const params = new URLSearchParams({
       id: tab.connId,
@@ -1224,12 +1307,15 @@ async function loadMongoDocs(tab) {
     wrap.innerHTML = renderGrid(res.columns, res.rows, {});
     const pages = res.total >= 0 ? Math.max(1, Math.ceil(res.total / tab.pageSize)) : '?';
     $('.page-label', el).textContent = `${tab.page} / ${pages}`;
-    $('.data-status', el).textContent =
-      `共 ${res.total >= 0 ? res.total : '未知'} 条 · 本页 ${res.rowCount} 条 · ${res.durationMs} ms`;
+    setStatus(tab, () => tr('db.mongo.status', {
+      total: res.total >= 0 ? res.total : tr('db.common.unknown'),
+      rows: res.rowCount,
+      ms: res.durationMs,
+    }));
   } catch (err) {
     tab.data = null;
     wrap.innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
-    $('.data-status', el).textContent = '加载失败';
+    setStatus(tab, () => tr('db.common.loadFailedShort'));
   }
 }
 
@@ -1241,26 +1327,26 @@ function createDataPane(tab) {
     <div class="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
       <span class="table-title min-w-0 max-w-[280px] truncate font-mono text-[11.5px] font-medium text-slate-800"></span>
       <div class="flex overflow-hidden rounded-lg border border-slate-200">
-        <button data-view="data" class="view-btn px-2.5 py-1 text-[10.5px] font-medium">数据</button>
-        <button data-view="structure" class="view-btn border-l border-slate-200 px-2.5 py-1 text-[10.5px] font-medium">结构</button>
+        <button data-view="data" class="view-btn px-2.5 py-1 text-[10.5px] font-medium">${esc(tr('db.data.tabData'))}</button>
+        <button data-view="structure" class="view-btn border-l border-slate-200 px-2.5 py-1 text-[10.5px] font-medium">${esc(tr('db.data.tabStructure'))}</button>
       </div>
-      <button class="refresh-btn grid h-6 w-6 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="刷新">${iconSvg('refresh', 'h-3 w-3')}</button>
+      <button class="refresh-btn grid h-6 w-6 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="${esc(tr('db.common.refresh'))}">${iconSvg('refresh', 'h-3 w-3')}</button>
       <div class="pager flex items-center gap-1 text-[10.5px] text-slate-500">
         <select class="page-size rounded-md border border-slate-200 bg-white px-1 py-1 text-[10px] outline-none focus:border-emerald-400">
-          <option value="50">50 行</option>
-          <option value="100" selected>100 行</option>
-          <option value="200">200 行</option>
-          <option value="500">500 行</option>
+          <option value="50">${esc(tr('db.data.rowsOption', { count: 50 }))}</option>
+          <option value="100" selected>${esc(tr('db.data.rowsOption', { count: 100 }))}</option>
+          <option value="200">${esc(tr('db.data.rowsOption', { count: 200 }))}</option>
+          <option value="500">${esc(tr('db.data.rowsOption', { count: 500 }))}</option>
         </select>
-        <button class="prev-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">上一页</button>
+        <button class="prev-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">${esc(tr('db.common.prev'))}</button>
         <span class="page-label">1 / 1</span>
-        <button class="next-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">下一页</button>
+        <button class="next-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">${esc(tr('db.common.next'))}</button>
       </div>
-      <button class="export-btn ml-auto flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${iconSvg('download', 'h-3 w-3')} 导出 CSV</button>
-      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制</button>
+      <button class="export-btn ml-auto flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${iconSvg('download', 'h-3 w-3')} ${esc(tr('db.common.exportCsv'))}</button>
+      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${esc(tr('db.common.copy'))}</button>
     </div>
     <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>
-    <div class="data-status flex-none border-t border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>`;
+    <div class="data-status flex-none border-t border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">${esc(tr('db.common.ready'))}</div>`;
   $('#panes').appendChild(el);
   tab.el = el;
 
@@ -1316,7 +1402,7 @@ function updateDataToolbar(tab) {
 async function loadTableData(tab) {
   const el = tab.el;
   const wrap = $('.grid-wrap', el);
-  $('.data-status', el).textContent = '加载中…';
+  setStatus(tab, () => tr('db.common.loading'));
   try {
     const params = new URLSearchParams({
       id: tab.connId,
@@ -1336,33 +1422,49 @@ async function loadTableData(tab) {
     bindSortHeaders(tab);
     const pages = res.total >= 0 ? Math.max(1, Math.ceil(res.total / tab.pageSize)) : '?';
     $('.page-label', el).textContent = `${tab.page} / ${pages}`;
-    $('.data-status', el).textContent =
-      `共 ${res.total >= 0 ? res.total : '未知'} 行 · 本页 ${res.rowCount} 行 · ${res.durationMs} ms` +
-      (res.total >= 0 ? ` · 第 ${(tab.page - 1) * tab.pageSize + 1}-${(tab.page - 1) * tab.pageSize + res.rowCount} 行` : '');
+    setStatus(tab, () => tr('db.data.status', {
+      total: res.total >= 0 ? res.total : tr('db.common.unknown'),
+      rows: res.rowCount,
+      ms: res.durationMs,
+    }) + (res.total >= 0
+      ? ' · ' + tr('db.data.range', { from: (tab.page - 1) * tab.pageSize + 1, to: (tab.page - 1) * tab.pageSize + res.rowCount })
+      : ''));
   } catch (err) {
     tab.data = null;
     wrap.innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
-    $('.data-status', el).textContent = '加载失败';
+    setStatus(tab, () => tr('db.common.loadFailedShort'));
   }
 }
 
 function bindSortHeaders(tab) {
   tab.el.querySelectorAll('.grid-table th[data-col]').forEach((th) => {
     th.classList.add('cursor-pointer');
-    th.addEventListener('click', () => {
+    th.onclick = () => {
       const col = th.dataset.col;
       if (tab.sort === col) tab.dir = tab.dir === 'asc' ? 'desc' : 'asc';
       else { tab.sort = col; tab.dir = 'asc'; }
       tab.page = 1;
       loadTableData(tab);
-    });
+    };
   });
+}
+
+function structureColumns() {
+  return [
+    tr('db.grid.field'),
+    tr('db.grid.type'),
+    tr('db.grid.nullable'),
+    tr('db.grid.key'),
+    tr('db.grid.default'),
+    tr('db.grid.extra'),
+    tr('db.grid.comment'),
+  ];
 }
 
 async function loadStructure(tab) {
   const el = tab.el;
   const wrap = $('.grid-wrap', el);
-  $('.data-status', el).textContent = '加载中…';
+  setStatus(tab, () => tr('db.common.loading'));
   try {
     const params = new URLSearchParams({
       id: tab.connId,
@@ -1373,19 +1475,19 @@ async function loadStructure(tab) {
     const cols = await api('/columns?' + params.toString());
     tab.structure = cols;
     const rows = cols.map((c) => [c.name, c.type, c.nullable, c.key || '', c.default || '', c.extra || '', c.comment || '']);
-    wrap.innerHTML = renderGrid(['字段', '类型', '可空', '键', '默认值', '额外', '备注'], rows, {});
-    $('.data-status', el).textContent = `共 ${cols.length} 个字段`;
+    wrap.innerHTML = renderGrid(structureColumns(), rows, {});
+    setStatus(tab, () => tr('db.structure.status', { count: cols.length }));
   } catch (err) {
     tab.structure = null;
     wrap.innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
-    $('.data-status', el).textContent = '加载失败';
+    setStatus(tab, () => tr('db.common.loadFailedShort'));
   }
 }
 
 /* ---------- 结果表格 ---------- */
 function renderGrid(columns, rows, opts = {}) {
   if (!columns || !columns.length) {
-    return `<div class="p-8 text-center text-[11px] text-slate-400">无结果集</div>`;
+    return `<div class="p-8 text-center text-[11px] text-slate-400">${esc(tr('db.grid.empty'))}</div>`;
   }
   const head = columns.map((c) => {
     let arrow = '';
@@ -1419,14 +1521,14 @@ function copyResult(tab) {
     columns = tab.data.columns;
     rows = tab.data.rows;
   } else if (tab.type === 'data' && tab.structure) {
-    columns = ['字段', '类型', '可空', '键', '默认值', '额外', '备注'];
+    columns = structureColumns();
     rows = tab.structure.map((c) => [c.name, c.type, c.nullable, c.key || '', c.default || '', c.extra || '', c.comment || '']);
   }
-  if (!columns.length) { toast('没有可复制的结果'); return; }
+  if (!columns.length) { toast(tr('db.common.noResult')); return; }
   const text = [columns.join('\t'), ...rows.map((r) => r.map((v) => v === null ? 'NULL' : String(v)).join('\t'))].join('\n');
   navigator.clipboard.writeText(text)
-    .then(() => toast(`已复制 ${rows.length} 行`))
-    .catch(() => toast('复制失败', 'err'));
+    .then(() => toast(tr('db.data.copiedRows', { count: rows.length })))
+    .catch(() => toast(tr('db.common.copyFailed'), 'err'));
 }
 
 async function exportCSV(tab) {
@@ -1437,11 +1539,11 @@ async function exportCSV(tab) {
     if (tab.sort) { body.sort = tab.sort; body.dir = tab.dir; }
   } else {
     const sql = $('.sql-input', tab.el).value;
-    if (!sql.trim()) { toast('请输入 SQL'); return; }
+    if (!sql.trim()) { toast(tr('db.query.emptySql')); return; }
     body.database = tab.database;
     body.sql = sql;
   }
-  toast('正在导出…');
+  toast(tr('db.export.exporting'));
   try {
     const res = await fetch(API + '/export', {
       method: 'POST',
@@ -1462,9 +1564,9 @@ async function exportCSV(tab) {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 3000);
-    toast('导出完成');
+    toast(tr('db.export.done'));
   } catch (err) {
-    toast('导出失败：' + err.message, 'err');
+    toast(tr('db.export.failed', { error: err.message }), 'err');
   }
 }
 
@@ -1479,7 +1581,7 @@ function fillDriverOptions() {
     groups.get(t.group).push(t);
   }
   menu.innerHTML = [...groups.entries()].map(([group, items]) =>
-    `<div class="ui-select-group">${esc(group)}</div>` +
+    `<div class="ui-select-group">${esc(driverGroupLabel(group))}</div>` +
     items.map((t) => `
       <button type="button" class="ui-select-item" data-driver="${esc(t.id)}">
         <span class="ui-select-dot" style="background:${esc(t.color || '#94a3b8')}"></span>
@@ -1495,6 +1597,7 @@ function fillDriverOptions() {
     });
   });
   syncDriverLabel();
+  applyDriverLabels();
 }
 
 // 同步下拉按钮文案与列表选中态。
@@ -1556,13 +1659,28 @@ function currentFormConn() {
   };
 }
 
+// 同步按当前语言生成的驱动提示、默认库标签与占位符。
+function applyDriverLabels() {
+  const t = TYPE_MAP[editingDriver] || FALLBACK_TYPES[0];
+  $('#fDriverLabel').textContent = t.name;
+  $('#driverHint').textContent = driverHint(t);
+  $('#dbLabelText').textContent = driverDatabaseLabel(t);
+  if (t.family === 'oracle') {
+    $('#fDatabase').placeholder = t.id === 'dm' ? tr('db.form.dbPlaceholderSchema') : tr('db.form.dbPlaceholderService');
+  } else if (t.family === 'redis') {
+    $('#fDatabase').placeholder = '0';
+  } else {
+    $('#fDatabase').placeholder = tr('db.form.databasePlaceholder');
+  }
+}
+
 function setDriver(driver) {
   const t = TYPE_MAP[driver] || FALLBACK_TYPES[0];
   const prevDefault = TYPE_MAP[editingDriver]?.defaultPort ? String(TYPE_MAP[editingDriver].defaultPort) : '';
   editingDriver = t.id;
   $('#fDriver').value = t.id;
-  $('#driverHint').textContent = t.hint || '';
   syncDriverLabel();
+  applyDriverLabels();
 
   const isFile = !!t.file;
   $('#serverFields').classList.toggle('hidden', isFile);
@@ -1570,14 +1688,6 @@ function setDriver(driver) {
   $('#sqliteFields').classList.toggle('hidden', !isFile);
   $('#charsetWrap').classList.toggle('hidden', t.family !== 'mysql');
   $('#sslWrap').classList.toggle('hidden', !['postgres', 'redis', 'mongo'].includes(t.family));
-  $('#dbLabelText').textContent = t.databaseLabel || '默认数据库（可选）';
-  if (t.family === 'oracle') {
-    $('#fDatabase').placeholder = t.id === 'dm' ? '默认模式，如 SYSDBA' : '服务名，如 ORCL';
-  } else if (t.family === 'redis') {
-    $('#fDatabase').placeholder = '0';
-  } else {
-    $('#fDatabase').placeholder = '不填则连接后选择';
-  }
 
   const portText = t.defaultPort ? String(t.defaultPort) : '';
   $('#fPort').placeholder = portText;
@@ -1586,6 +1696,7 @@ function setDriver(driver) {
 }
 
 function openConnModal(conn) {
+  connTestState = null;
   $('#connError').classList.add('hidden');
   $('#connTestResult').classList.add('hidden');
   const f = $('#connForm');
@@ -1604,7 +1715,7 @@ function openConnModal(conn) {
   $('#fParams').value = conn?.params || '';
   $('#fReadOnly').checked = !!conn?.readOnly;
   setDriver(conn?.driver || 'mysql');
-  $('#connTitle').textContent = conn ? '编辑连接' : '新建连接';
+  $('#connTitle').textContent = conn ? tr('db.conn.editTitle') : tr('db.conn.newTitle');
   $('#connModal').classList.remove('hidden');
   setTimeout(() => $('#fName').focus(), 30);
 }
@@ -1640,24 +1751,41 @@ $('#connModal').addEventListener('keydown', (ev) => {
   closeConnModal();
 });
 
-$('#testConnBtn').addEventListener('click', async () => {
+let connTestState = null;
+
+// 按当前语言重绘连接测试结果，语言切换时复用。
+function renderConnTestResult() {
+  if (!connTestState) return;
   const box = $('#connTestResult');
-  box.className = 'rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500';
-  box.textContent = '正在测试…';
+  if (connTestState.kind === 'pending') {
+    box.className = 'rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500';
+    box.textContent = tr('db.test.testing');
+  } else if (connTestState.kind === 'ok') {
+    box.className = 'rounded-lg bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700';
+    box.textContent = connTestState.version
+      ? tr('db.test.okWithVersion', { ms: connTestState.ms, version: connTestState.version })
+      : tr('db.test.ok', { ms: connTestState.ms });
+  } else {
+    box.className = 'rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-600';
+    box.textContent = connTestState.error || tr('db.test.failed');
+  }
   box.classList.remove('hidden');
+}
+
+$('#testConnBtn').addEventListener('click', async () => {
+  connTestState = { kind: 'pending' };
+  renderConnTestResult();
   try {
     const res = await api('/test', { method: 'POST', body: JSON.stringify({ connection: currentFormConn() }) });
     if (res.ok) {
-      box.className = 'rounded-lg bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700';
-      box.textContent = `连接成功 · ${res.latencyMs} ms${res.version ? ' · ' + res.version : ''}`;
+      connTestState = { kind: 'ok', ms: res.latencyMs, version: res.version || '' };
     } else {
-      box.className = 'rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-600';
-      box.textContent = res.error || '连接失败';
+      connTestState = { kind: 'failed', error: res.error || '' };
     }
   } catch (err) {
-    box.className = 'rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-600';
-    box.textContent = err.message;
+    connTestState = { kind: 'failed', error: err.message };
   }
+  renderConnTestResult();
 });
 
 $('#connForm').addEventListener('submit', async (ev) => {
@@ -1670,7 +1798,7 @@ $('#connForm').addEventListener('submit', async (ev) => {
     await api('/connections', { method: 'POST', body: JSON.stringify(conn) });
     closeConnModal();
     await loadConnections();
-    toast('连接已保存');
+    toast(tr('db.conn.saved'));
   } catch (err) {
     errBox.textContent = err.message;
     errBox.classList.remove('hidden');
@@ -1687,7 +1815,7 @@ $('#exportBtn').addEventListener('click', async () => {
     const res = await api('/connections/export', { method: 'POST' });
     await DevOSSecure.showExport(res);
   } catch (err) {
-    toast('导出失败：' + err.message, 'err');
+    toast(tr('db.conn.exportFailed', { error: err.message }), 'err');
   }
 });
 $('#importBtn').addEventListener('click', () => $('#importFile').click());
@@ -1704,19 +1832,19 @@ $('#importFile').addEventListener('change', async (ev) => {
     }
     let key = '';
     if (DevOSSecure.isEncryptedEnvelope(parsed)) {
-      key = await DevOSSecure.askKey({ title: '导入加密连接' });
+      key = await DevOSSecure.askKey({ title: tr('db.conn.importEncryptedTitle') });
       if (!key) return;
     } else if (!Array.isArray(parsed)) {
-      throw new Error('文件应为连接数组或加密导出文件');
+      throw new Error(tr('db.conn.invalidImportFile'));
     }
     const res = await api('/connections/import', {
       method: 'POST',
       body: JSON.stringify({ content: text, key }),
     });
-    toast(`已导入 ${res.imported} 个连接`);
+    toast(tr('db.conn.imported', { count: res.imported }));
     await loadConnections();
   } catch (err) {
-    toast('导入失败：' + err.message, 'err');
+    toast(tr('db.conn.importFailed', { error: err.message }), 'err');
   }
   ev.target.value = '';
 });
@@ -1727,6 +1855,94 @@ $('#importFile').addEventListener('change', async (ev) => {
   fillDriverOptions();
   await loadConnections();
 })();
+
+/* ---------- 语言切换后重绘动态区域 ---------- */
+function refreshPaneTexts(tab) {
+  const el = tab.el;
+  if (!el) return;
+  refreshStatus(tab);
+  if (tab.type === 'query') {
+    $('.exec-btn', el).innerHTML = `${iconSvg('play', 'h-3 w-3')} ${esc(tr('db.query.exec'))} <span class="kbd !text-white/80 !border-white/30 !bg-white/10">Ctrl+Enter</span>`;
+    if (tab.fam === 'sql') {
+      $('.sql-input', el).placeholder = tr('db.query.sqlPlaceholder');
+      $('.rows-label', el).textContent = tr('db.query.maxRows');
+      $('.export-btn', el).innerHTML = `${iconSvg('download', 'h-3 w-3')} ${esc(tr('db.common.exportCsv'))}`;
+      $('.copy-btn', el).textContent = tr('db.common.copyResult');
+      const opt = $('.db-select option[value=""]', el);
+      if (opt) opt.textContent = tr('db.query.defaultDb');
+      if (tab.dbListError) $('.query-hint', el).textContent = tr('db.query.dbListFailed', { error: tab.dbListError });
+      if (tab.result || tab.error) renderQueryOutput(tab);
+    } else {
+      $('.copy-btn', el).textContent = tr('db.common.copyResult');
+      $('.query-hint', el).textContent = tab.dbListError
+        ? tr('db.query.dbListFailed', { error: tab.dbListError })
+        : (tab.fam === 'redis' ? tr('db.cmd.redisHint') : tr('db.cmd.mongoHint'));
+      const opt = $('.db-select option[value=""]', el);
+      if (opt) opt.textContent = tr('db.cmd.selectDb');
+    }
+    return;
+  }
+  if (tab.type === 'rkey') {
+    $('.refresh-btn', el).title = tr('db.common.refresh');
+    $('.copy-btn', el).textContent = tr('db.common.copy');
+    $('.del-btn', el).textContent = tr('db.redis.deleteKey');
+    if (tab.detail) renderRedisKeyDetail(tab);
+    return;
+  }
+  if (tab.type === 'mongo') {
+    $('.filter-input', el).placeholder = tr('db.mongo.filterPlaceholder');
+    $('.apply-btn', el).textContent = tr('db.common.apply');
+    $('.refresh-btn', el).title = tr('db.common.refresh');
+    $('.prev-btn', el).textContent = tr('db.common.prev');
+    $('.next-btn', el).textContent = tr('db.common.next');
+    $('.copy-btn', el).textContent = tr('db.common.copy');
+    el.querySelectorAll('.page-size option').forEach((opt) => {
+      opt.textContent = tr('db.mongo.rowsOption', { count: Number(opt.value) });
+    });
+    if (tab.data) {
+      $('.grid-wrap', el).innerHTML = renderGrid(tab.data.columns, tab.data.rows, {});
+    }
+    return;
+  }
+  if (tab.type === 'data') {
+    el.querySelectorAll('.view-btn').forEach((b) => {
+      b.textContent = b.dataset.view === 'structure' ? tr('db.data.tabStructure') : tr('db.data.tabData');
+    });
+    $('.refresh-btn', el).title = tr('db.common.refresh');
+    $('.export-btn', el).innerHTML = `${iconSvg('download', 'h-3 w-3')} ${esc(tr('db.common.exportCsv'))}`;
+    $('.copy-btn', el).textContent = tr('db.common.copy');
+    $('.prev-btn', el).textContent = tr('db.common.prev');
+    $('.next-btn', el).textContent = tr('db.common.next');
+    el.querySelectorAll('.page-size option').forEach((opt) => {
+      opt.textContent = tr('db.data.rowsOption', { count: Number(opt.value) });
+    });
+    if (tab.view === 'structure' && tab.structure) {
+      const rows = tab.structure.map((c) => [c.name, c.type, c.nullable, c.key || '', c.default || '', c.extra || '', c.comment || '']);
+      $('.grid-wrap', el).innerHTML = renderGrid(structureColumns(), rows, {});
+    } else if (tab.data) {
+      $('.grid-wrap', el).innerHTML = renderGrid(tab.data.columns, tab.data.rows, { sortable: true, sort: tab.sort, dir: tab.dir });
+      bindSortHeaders(tab);
+    }
+  }
+}
+
+function refreshAppTexts() {
+  document.title = tr('db.app.title');
+  if (AppI18n) AppI18n.apply(document);
+  renderConnCount();
+  renderTree();
+  renderTabs();
+  fillDriverOptions();
+  applyDriverLabels();
+  $('#connTitle').textContent = $('#fId').value ? tr('db.conn.editTitle') : tr('db.conn.newTitle');
+  renderConnTestResult();
+  for (const tab of S.tabs) refreshPaneTexts(tab);
+}
+
+document.addEventListener('devos:locale-changed', (ev) => {
+  if (!ev || !ev.detail || !ev.detail.changed) return;
+  refreshAppTexts();
+});
 </script>
 </body>
 </html>

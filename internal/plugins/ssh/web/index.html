@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -13,6 +13,8 @@
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/ui.css?v=1" />
+  <script src="/assets/app-i18n.js?v=2"></script>
+  <script src="/assets/locales/apps/ssh.js?v=1"></script>
   <script src="/assets/secure-ui.js?v=2"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
   <style>
@@ -33,12 +35,12 @@
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9l3 3-3 3"/><path d="M13 15h4"/></svg>
       </span>
       <div class="min-w-0">
-        <div class="text-sm font-semibold text-slate-900">会话库</div>
-        <div class="text-[10px] text-slate-400">与 SFTP 应用共享</div>
+        <div class="text-sm font-semibold text-slate-900" data-i18n="ssh.app.sessionsTitle">会话库</div>
+        <div class="text-[10px] text-slate-400" data-i18n="ssh.app.sessionsSubtitle">与 SFTP 应用共享</div>
       </div>
       <div class="ml-auto flex items-center gap-1">
-        <button id="newBtn" class="rounded-md bg-slate-900 px-2 py-1 text-[10.5px] font-medium text-white hover:bg-slate-700" title="新建会话">新建</button>
-        <button id="moreBtn" class="rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50" title="导入 / 导出">
+        <button id="newBtn" class="rounded-md bg-slate-900 px-2 py-1 text-[10.5px] font-medium text-white hover:bg-slate-700" title="新建会话" data-i18n-title="ssh.app.newSession" data-i18n="ssh.app.new">新建</button>
+        <button id="moreBtn" class="rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50" title="导入 / 导出" data-i18n-title="ssh.app.importExport">
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>
         </button>
       </div>
@@ -47,11 +49,11 @@
     <div class="space-y-2 px-3 py-2.5">
       <div class="relative">
         <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input id="search" placeholder="搜索会话 / 主机…" class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-[11px] outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100" />
+        <input id="search" placeholder="搜索会话 / 主机…" data-i18n-placeholder="ssh.search.placeholder" class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-[11px] outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100" />
       </div>
       <div class="flex gap-1.5">
-        <input id="quickInput" placeholder="快速连接 user@host:port" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-mono text-[10.5px] outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100" />
-        <button id="quickBtn" class="rounded-lg bg-sky-600 px-2.5 py-1.5 text-[10.5px] font-medium text-white hover:bg-sky-500">连接</button>
+        <input id="quickInput" placeholder="快速连接 user@host:port" data-i18n-placeholder="ssh.quick.placeholder" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-mono text-[10.5px] outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100" />
+        <button id="quickBtn" class="rounded-lg bg-sky-600 px-2.5 py-1.5 text-[10.5px] font-medium text-white hover:bg-sky-500" data-i18n="ssh.quick.connect">连接</button>
       </div>
     </div>
 
@@ -59,8 +61,8 @@
 
     <div class="flex items-center justify-between border-t border-slate-200 px-3 py-2 text-[10px] text-slate-400">
       <span id="profileCount">—</span>
-      <button id="importBtn" class="hover:text-slate-700">导入</button>
-      <button id="exportBtn" class="hover:text-slate-700">导出</button>
+      <button id="importBtn" class="hover:text-slate-700" data-i18n="ssh.common.import">导入</button>
+      <button id="exportBtn" class="hover:text-slate-700" data-i18n="ssh.common.export">导出</button>
       <input id="importFile" type="file" accept="application/json,.json" class="hidden" />
     </div>
   </aside>
@@ -68,36 +70,36 @@
   <section class="flex min-w-0 flex-1 flex-col">
     <div class="flex h-10 flex-none items-end gap-1 border-b border-slate-200 bg-white/70 px-2 pt-1.5">
       <div id="tabbar" class="flex min-w-0 flex-1 items-end gap-1 overflow-x-auto no-scrollbar"></div>
-      <button id="newTabBtn" class="mb-1 grid h-7 w-7 flex-none place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="新建会话">
+      <button id="newTabBtn" class="mb-1 grid h-7 w-7 flex-none place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="新建会话" data-i18n-title="ssh.app.newSession">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
       </button>
     </div>
 
     <div class="flex h-11 flex-none items-center gap-2 border-b border-slate-200 bg-white/60 px-3">
-      <span id="crumb" class="min-w-0 truncate text-[11.5px] text-slate-500">未打开会话</span>
-      <span id="statusPill" class="flex-none rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">空闲</span>
+      <span id="crumb" class="min-w-0 truncate text-[11.5px] text-slate-500" data-i18n="ssh.term.noSession">未打开会话</span>
+      <span id="statusPill" class="flex-none rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500" data-i18n="ssh.status.idle">空闲</span>
       <div id="tools" class="ml-auto flex flex-none items-center gap-0.5 text-slate-500">
-        <button data-act="reconnect" class="tool-btn" title="重新连接">重连</button>
+        <button data-act="reconnect" class="tool-btn" title="重新连接" data-i18n-title="ssh.toolbar.reconnectTitle" data-i18n="ssh.toolbar.reconnect">重连</button>
         <span class="mx-1 h-4 w-px bg-slate-200"></span>
-        <button data-act="copy" class="tool-btn" title="复制选中 (Ctrl+Shift+C)">复制</button>
-        <button data-act="paste" class="tool-btn" title="粘贴 (Ctrl+Shift+V)">粘贴</button>
-        <button data-act="search" class="tool-btn" title="查找 (Ctrl+Shift+F)">查找</button>
-        <button data-act="clear" class="tool-btn" title="清屏">清屏</button>
+        <button data-act="copy" class="tool-btn" title="复制选中 (Ctrl+Shift+C)" data-i18n-title="ssh.toolbar.copyTitle" data-i18n="ssh.toolbar.copy">复制</button>
+        <button data-act="paste" class="tool-btn" title="粘贴 (Ctrl+Shift+V)" data-i18n-title="ssh.toolbar.pasteTitle" data-i18n="ssh.toolbar.paste">粘贴</button>
+        <button data-act="search" class="tool-btn" title="查找 (Ctrl+Shift+F)" data-i18n-title="ssh.toolbar.searchTitle" data-i18n="ssh.toolbar.search">查找</button>
+        <button data-act="clear" class="tool-btn" title="清屏" data-i18n-title="ssh.toolbar.clearTitle" data-i18n="ssh.toolbar.clear">清屏</button>
         <span class="mx-1 h-4 w-px bg-slate-200"></span>
-        <button data-act="fontDown" class="tool-btn w-7" title="缩小字号">A-</button>
-        <button data-act="fontUp" class="tool-btn w-7" title="放大字号">A+</button>
+        <button data-act="fontDown" class="tool-btn w-7" title="缩小字号" data-i18n-title="ssh.toolbar.fontDown">A-</button>
+        <button data-act="fontUp" class="tool-btn w-7" title="放大字号" data-i18n-title="ssh.toolbar.fontUp">A+</button>
         <span class="mx-1 h-4 w-px bg-slate-200"></span>
-        <button data-act="sftp" class="tool-btn" title="用 SFTP 打开当前服务器">SFTP</button>
-        <button data-act="settings" class="tool-btn" title="当前会话属性">设置</button>
+        <button data-act="sftp" class="tool-btn" title="用 SFTP 打开当前服务器" data-i18n-title="ssh.toolbar.sftpTitle">SFTP</button>
+        <button data-act="settings" class="tool-btn" title="当前会话属性" data-i18n-title="ssh.toolbar.settingsTitle" data-i18n="ssh.toolbar.settings">设置</button>
       </div>
     </div>
 
     <div id="searchbar" class="hidden h-10 flex-none items-center gap-2 border-b border-slate-200 bg-amber-50/60 px-3">
       <svg class="h-3.5 w-3.5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input id="searchInput" placeholder="在终端中查找（区分大小写可选）" class="min-w-0 flex-1 rounded-md border border-amber-200 bg-white px-2 py-1 text-[11px] outline-none focus:border-amber-400" />
-      <label class="flex items-center gap-1 text-[10.5px] text-amber-700"><input id="searchCase" type="checkbox" class="rounded border-amber-300" />区分大小写</label>
-      <button id="searchPrev" class="rounded-md border border-amber-200 bg-white px-2 py-0.5 text-[10.5px] text-amber-700 hover:bg-amber-50">上一个</button>
-      <button id="searchNext" class="rounded-md border border-amber-200 bg-white px-2 py-0.5 text-[10.5px] text-amber-700 hover:bg-amber-50">下一个</button>
+      <input id="searchInput" placeholder="在终端中查找（区分大小写可选）" data-i18n-placeholder="ssh.search.termPlaceholder" class="min-w-0 flex-1 rounded-md border border-amber-200 bg-white px-2 py-1 text-[11px] outline-none focus:border-amber-400" />
+      <label class="flex items-center gap-1 text-[10.5px] text-amber-700"><input id="searchCase" type="checkbox" class="rounded border-amber-300" /><span data-i18n="ssh.search.caseSensitive">区分大小写</span></label>
+      <button id="searchPrev" class="rounded-md border border-amber-200 bg-white px-2 py-0.5 text-[10.5px] text-amber-700 hover:bg-amber-50" data-i18n="ssh.search.prev">上一个</button>
+      <button id="searchNext" class="rounded-md border border-amber-200 bg-white px-2 py-0.5 text-[10.5px] text-amber-700 hover:bg-amber-50" data-i18n="ssh.search.next">下一个</button>
       <button id="searchClose" class="rounded-md p-1 text-amber-700 hover:bg-amber-100">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
@@ -109,13 +111,13 @@
         <div class="grid h-16 w-16 place-items-center rounded-2xl border border-slate-700 bg-slate-800/60 text-sky-400">
           <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9l3 3-3 3"/><path d="M13 15h4"/></svg>
         </div>
-        <p class="text-xs">从左侧选择会话，或使用上方快速连接</p>
-        <p class="text-[10.5px] text-slate-500">支持多标签、跳板机、GBK 编码、会话日志</p>
+        <p class="text-xs" data-i18n="ssh.empty.title">从左侧选择会话，或使用上方快速连接</p>
+        <p class="text-[10.5px] text-slate-500" data-i18n="ssh.empty.hint">支持多标签、跳板机、GBK 编码、会话日志</p>
       </div>
     </div>
 
     <footer class="flex h-7 flex-none items-center gap-4 border-t border-slate-200 bg-white/80 px-3 text-[10.5px] text-slate-500">
-      <span id="statText">就绪</span>
+      <span id="statText" data-i18n="ssh.status.ready">就绪</span>
       <span id="statSize" class="hidden font-mono"></span>
       <span id="statUptime" class="hidden font-mono"></span>
       <span id="statLatency" class="hidden font-mono"></span>
@@ -128,8 +130,8 @@
     <div class="absolute right-0 top-0 flex h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-2xl">
       <div class="flex flex-none items-center justify-between border-b border-slate-200 px-5 py-3.5">
         <div>
-          <h2 id="formTitle" class="text-sm font-semibold text-slate-900">新建会话</h2>
-          <p class="text-[10.5px] text-slate-400">连接、认证、终端与高级选项</p>
+          <h2 id="formTitle" class="text-sm font-semibold text-slate-900" data-i18n="ssh.form.title.create">新建会话</h2>
+          <p class="text-[10.5px] text-slate-400" data-i18n="ssh.form.subtitle">连接、认证、终端与高级选项</p>
         </div>
         <button id="closeForm" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -137,10 +139,10 @@
       </div>
 
       <div class="flex flex-none gap-1 border-b border-slate-200 px-4 pt-2">
-        <button data-ftab="conn" class="ftab">连接</button>
-        <button data-ftab="auth" class="ftab">认证</button>
-        <button data-ftab="term" class="ftab">终端</button>
-        <button data-ftab="adv" class="ftab">高级</button>
+        <button data-ftab="conn" class="ftab" data-i18n="ssh.form.tab.conn">连接</button>
+        <button data-ftab="auth" class="ftab" data-i18n="ssh.form.tab.auth">认证</button>
+        <button data-ftab="term" class="ftab" data-i18n="ssh.form.tab.term">终端</button>
+        <button data-ftab="adv" class="ftab" data-i18n="ssh.form.tab.adv">高级</button>
       </div>
 
       <form id="profileForm" class="flex min-h-0 flex-1 flex-col">
@@ -149,65 +151,65 @@
 
           <div data-fpanel="conn" class="space-y-3">
             <label class="block">
-              <span class="field-label">会话名称</span>
-              <input id="fName" required placeholder="生产环境" class="field" />
+              <span class="field-label" data-i18n="ssh.form.name">会话名称</span>
+              <input id="fName" required placeholder="生产环境" data-i18n-placeholder="ssh.form.namePlaceholder" class="field" />
             </label>
             <div class="grid grid-cols-2 gap-2">
               <label class="block">
-                <span class="field-label">分组</span>
-                <input id="fGroup" placeholder="默认分组" list="groupOptions" class="field" />
+                <span class="field-label" data-i18n="ssh.form.group">分组</span>
+                <input id="fGroup" placeholder="默认分组" data-i18n-placeholder="ssh.form.groupPlaceholder" list="groupOptions" class="field" />
                 <datalist id="groupOptions"></datalist>
               </label>
               <label class="block">
-                <span class="field-label">描述（可选）</span>
-                <input id="fDesc" placeholder="备注信息" class="field" />
+                <span class="field-label" data-i18n="ssh.form.desc">描述（可选）</span>
+                <input id="fDesc" placeholder="备注信息" data-i18n-placeholder="ssh.form.descPlaceholder" class="field" />
               </label>
             </div>
             <div class="grid grid-cols-3 gap-2">
               <label class="col-span-2 block">
-                <span class="field-label">主机</span>
+                <span class="field-label" data-i18n="ssh.form.host">主机</span>
                 <input id="fHost" required placeholder="127.0.0.1" class="field" />
               </label>
               <label class="block">
-                <span class="field-label">端口</span>
+                <span class="field-label" data-i18n="ssh.form.port">端口</span>
                 <input id="fPort" type="number" value="22" class="field" />
               </label>
             </div>
             <label class="block">
-              <span class="field-label">用户名</span>
+              <span class="field-label" data-i18n="ssh.form.user">用户名</span>
               <input id="fUser" required placeholder="root" class="field" />
             </label>
             <label class="block">
-              <span class="field-label">跳板机（可选）</span>
+              <span class="field-label" data-i18n="ssh.form.jump">跳板机（可选）</span>
               <select id="fJump" class="field"></select>
             </label>
           </div>
 
           <div data-fpanel="auth" class="hidden space-y-3">
             <label class="block">
-              <span class="field-label">认证方式</span>
+              <span class="field-label" data-i18n="ssh.form.authMethod">认证方式</span>
               <select id="fAuth" class="field">
-                <option value="password">密码</option>
-                <option value="key">公钥 / 私钥</option>
+                <option value="password" data-i18n="ssh.form.authPassword">密码</option>
+                <option value="key" data-i18n="ssh.form.authKey">公钥 / 私钥</option>
               </select>
             </label>
             <div id="passwordBox">
               <label class="block">
-                <span class="field-label">密码</span>
+                <span class="field-label" data-i18n="ssh.form.password">密码</span>
                 <input id="fPassword" type="password" autocomplete="off" class="field" />
               </label>
             </div>
             <div id="keyBox" class="hidden space-y-3">
               <label class="block">
-                <span class="field-label">私钥内容</span>
+                <span class="field-label" data-i18n="ssh.form.privateKey">私钥内容</span>
                 <textarea id="fKey" rows="7" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" class="field resize-none font-mono text-[10.5px]"></textarea>
               </label>
               <label class="block">
-                <span class="field-label">私钥口令（可选）</span>
+                <span class="field-label" data-i18n="ssh.form.passphrase">私钥口令（可选）</span>
                 <input id="fPassphrase" type="password" class="field" />
               </label>
             </div>
-            <p class="rounded-lg bg-slate-50 px-3 py-2 text-[10.5px] leading-relaxed text-slate-500">
+            <p class="rounded-lg bg-slate-50 px-3 py-2 text-[10.5px] leading-relaxed text-slate-500" data-i18n="ssh.form.credentialNote">
               凭据仅保存在本机数据目录（profiles.json），导出会话时请妥善保管。
             </p>
           </div>
@@ -215,7 +217,7 @@
           <div data-fpanel="term" class="hidden space-y-3">
             <div class="grid grid-cols-2 gap-2">
               <label class="block">
-                <span class="field-label">终端类型</span>
+                <span class="field-label" data-i18n="ssh.form.termType">终端类型</span>
                 <select id="fTermType" class="field">
                   <option value="xterm-256color">xterm-256color</option>
                   <option value="xterm">xterm</option>
@@ -224,7 +226,7 @@
                 </select>
               </label>
               <label class="block">
-                <span class="field-label">编码</span>
+                <span class="field-label" data-i18n="ssh.form.encoding">编码</span>
                 <select id="fEncoding" class="field">
                   <option value="utf-8">UTF-8</option>
                   <option value="gbk">GBK</option>
@@ -235,41 +237,41 @@
                 </select>
               </label>
               <label class="block">
-                <span class="field-label">字号</span>
+                <span class="field-label" data-i18n="ssh.form.fontSize">字号</span>
                 <input id="fFontSize" type="number" min="9" max="22" value="13" class="field" />
               </label>
               <label class="block">
-                <span class="field-label">配色方案</span>
+                <span class="field-label" data-i18n="ssh.form.colorScheme">配色方案</span>
                 <select id="fScheme" class="field">
-                  <option value="devos">DevOS 深色</option>
+                  <option value="devos" data-i18n="ssh.form.schemeDevos">DevOS 深色</option>
                   <option value="dracula">Dracula</option>
                   <option value="solarized">Solarized Dark</option>
-                  <option value="light">高对比亮色</option>
+                  <option value="light" data-i18n="ssh.form.schemeLight">高对比亮色</option>
                 </select>
               </label>
             </div>
             <label class="block">
-              <span class="field-label">登录后执行命令（可选）</span>
-              <input id="fStartup" placeholder="例如 cd /var/www && ls" class="field" />
+              <span class="field-label" data-i18n="ssh.form.startup">登录后执行命令（可选）</span>
+              <input id="fStartup" placeholder="例如 cd /var/www && ls" data-i18n-placeholder="ssh.form.startupPlaceholder" class="field" />
             </label>
           </div>
 
           <div data-fpanel="adv" class="hidden space-y-3">
             <div class="grid grid-cols-2 gap-2">
               <label class="block">
-                <span class="field-label">保活间隔（秒，0 关闭）</span>
+                <span class="field-label" data-i18n="ssh.form.keepAlive">保活间隔（秒，0 关闭）</span>
                 <input id="fKeepAlive" type="number" min="0" max="600" value="30" class="field" />
               </label>
               <div class="space-y-2 pt-5">
                 <label class="flex items-center gap-2 text-[11px] text-slate-600">
-                  <input id="fLog" type="checkbox" class="rounded border-slate-300" />记录会话日志
+                  <input id="fLog" type="checkbox" class="rounded border-slate-300" /><span data-i18n="ssh.form.log">记录会话日志</span>
                 </label>
                 <label class="flex items-center gap-2 text-[11px] text-slate-600">
-                  <input id="fReconnect" type="checkbox" class="rounded border-slate-300" />断线自动重连
+                  <input id="fReconnect" type="checkbox" class="rounded border-slate-300" /><span data-i18n="ssh.form.reconnect">断线自动重连</span>
                 </label>
               </div>
             </div>
-            <p class="rounded-lg bg-slate-50 px-3 py-2 text-[10.5px] leading-relaxed text-slate-500">
+            <p class="rounded-lg bg-slate-50 px-3 py-2 text-[10.5px] leading-relaxed text-slate-500" data-i18n="ssh.form.logNote">
               会话日志保存在 DevOS 数据目录的 apps/ssh/logs 下，按会话名与时间命名。
             </p>
           </div>
@@ -278,11 +280,11 @@
         </div>
 
         <div class="flex flex-none items-center gap-2 border-t border-slate-200 px-5 py-3">
-          <button type="button" id="testBtn" class="rounded-lg border border-slate-200 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50">测试连接</button>
+          <button type="button" id="testBtn" class="rounded-lg border border-slate-200 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50" data-i18n="ssh.form.test">测试连接</button>
           <div class="ml-auto flex gap-2">
-            <button type="button" id="cancelForm" class="rounded-lg border border-slate-200 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50">取消</button>
-            <button type="submit" class="rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-medium text-white hover:bg-slate-700">保存</button>
-            <button type="button" id="saveConnectBtn" class="rounded-lg bg-sky-600 px-3 py-2 text-[11px] font-medium text-white hover:bg-sky-500">保存并连接</button>
+            <button type="button" id="cancelForm" class="rounded-lg border border-slate-200 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50" data-i18n="ssh.form.cancel">取消</button>
+            <button type="submit" class="rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-medium text-white hover:bg-slate-700" data-i18n="ssh.form.save">保存</button>
+            <button type="button" id="saveConnectBtn" class="rounded-lg bg-sky-600 px-3 py-2 text-[11px] font-medium text-white hover:bg-sky-500" data-i18n="ssh.form.saveConnect">保存并连接</button>
           </div>
         </div>
       </form>
@@ -298,6 +300,9 @@
   <script>
     const API = "/api/apps/ssh";
     const $ = (id) => document.getElementById(id);
+    const AppI18n = window.DevOSAppI18n;
+    const tr = (key, params) => (AppI18n ? AppI18n.t(key, params) : key);
+    document.title = tr("ssh.app.title");
     const state = {
       profiles: [],
       tabs: new Map(),
@@ -368,7 +373,7 @@
       const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
       const resp = await fetch(API + path, { ...options, headers });
       if (!resp.ok) {
-        let message = `请求失败 (${resp.status})`;
+        let message = tr("ssh.error.requestFailed", { status: resp.status });
         try {
           const data = await resp.json();
           message = data.message || data.error || message;
@@ -383,10 +388,18 @@
     async function loadProfiles() {
       state.profiles = await api("/profiles");
       renderSessions();
-      $("profileCount").textContent = `${state.profiles.length} 个会话`;
-      const groups = [...new Set(state.profiles.map((p) => p.group || "默认分组"))];
-      $("groupOptions").innerHTML = groups.map((g) => `<option value="${esc(g)}"></option>`).join("");
+      updateProfileCount();
+      renderGroupOptions();
       renderJumpOptions();
+    }
+
+    function renderGroupOptions() {
+      const groups = [...new Set(state.profiles.map((p) => p.group || tr("ssh.group.default")))];
+      $("groupOptions").innerHTML = groups.map((g) => `<option value="${esc(g)}"></option>`).join("");
+    }
+
+    function updateProfileCount() {
+      $("profileCount").textContent = tr("ssh.sessions.count", { count: state.profiles.length });
     }
 
     function renderJumpOptions() {
@@ -395,7 +408,7 @@
         .filter((p) => p.id !== current)
         .map((p) => `<option value="${esc(p.id)}">${esc(p.name)}（${esc(p.user)}@${esc(p.host)}）</option>`)
         .join("");
-      $("fJump").innerHTML = `<option value="">不使用跳板机</option>` + options;
+      $("fJump").innerHTML = `<option value="">${esc(tr("ssh.form.noJump"))}</option>` + options;
     }
 
     function renderSessions() {
@@ -404,14 +417,14 @@
       for (const p of state.profiles) {
         const hay = `${p.name} ${p.host} ${p.user} ${p.group} ${p.description}`.toLowerCase();
         if (keyword && !hay.includes(keyword)) continue;
-        const key = p.group || "默认分组";
+        const key = p.group || tr("ssh.group.default");
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(p);
       }
 
       const list = $("sessionList");
       if (groups.size === 0) {
-        list.innerHTML = `<div class="mt-6 rounded-xl border border-dashed border-slate-200 px-3 py-8 text-center text-[11px] leading-relaxed text-slate-400">${keyword ? "没有匹配的会话" : "还没有会话<br/>点击「新建」或使用快速连接"}</div>`;
+        list.innerHTML = `<div class="mt-6 rounded-xl border border-dashed border-slate-200 px-3 py-8 text-center text-[11px] leading-relaxed text-slate-400">${keyword ? esc(tr("ssh.sessions.emptyFiltered")) : tr("ssh.sessions.empty")}</div>`;
         return;
       }
 
@@ -432,19 +445,19 @@
             <span class="min-w-0 flex-1">
               <span class="flex items-center gap-1">
                 <span class="truncate text-[11.5px] font-medium text-slate-800">${esc(p.name)}</span>
-                ${p.jumpProfileId ? '<span class="flex-none rounded bg-violet-50 px-1 text-[8.5px] text-violet-600">跳板</span>' : ""}
-                ${p.logEnabled ? '<span class="flex-none rounded bg-amber-50 px-1 text-[8.5px] text-amber-600">日志</span>' : ""}
+                ${p.jumpProfileId ? `<span class="flex-none rounded bg-violet-50 px-1 text-[8.5px] text-violet-600">${esc(tr("ssh.sessions.badgeJump"))}</span>` : ""}
+                ${p.logEnabled ? `<span class="flex-none rounded bg-amber-50 px-1 text-[8.5px] text-amber-600">${esc(tr("ssh.sessions.badgeLog"))}</span>` : ""}
               </span>
               <span class="block truncate font-mono text-[9.5px] text-slate-400">${esc(p.user)}@${esc(p.host)}:${esc(p.port)}</span>
             </span>
             <span class="flex flex-none items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
-              <button data-act="edit" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="编辑">
+              <button data-act="edit" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="${esc(tr("ssh.sessions.editTitle"))}">
                 <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4l10-10-4-4L4 16v4Z"/></svg>
               </button>
-              <button data-act="copy" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="复制会话">
+              <button data-act="copy" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="${esc(tr("ssh.sessions.copyTitle"))}">
                 <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/></svg>
               </button>
-              <button data-act="delete" class="rounded p-1 text-slate-400 hover:bg-white hover:text-rose-600" title="删除">
+              <button data-act="delete" class="rounded p-1 text-slate-400 hover:bg-white hover:text-rose-600" title="${esc(tr("ssh.sessions.deleteTitle"))}">
                 <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/></svg>
               </button>
             </span>
@@ -492,7 +505,7 @@
     function openSession(profileId) {
       const profile = state.profiles.find((p) => p.id === profileId);
       if (!profile) {
-        toast("会话不存在：" + profileId, "error");
+        toast(tr("ssh.toast.sessionNotFound", { id: profileId }), "error");
         return;
       }
       const existing = [...state.tabs.values()].find((t) => t.profileId === profileId);
@@ -605,7 +618,7 @@
         }`;
         btn.innerHTML = `<span class="tab-dot h-1.5 w-1.5 flex-none rounded-full ${dotColor}"></span>
           <span class="max-w-[160px] truncate">${esc(tab.profile.name)}</span>
-          <button class="ml-1 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700" title="关闭">
+          <button class="ml-1 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700" title="${esc(tr("ssh.tab.closeTitle"))}">
             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>`;
         btn.addEventListener("click", (event) => {
@@ -662,19 +675,19 @@
         btn.classList.toggle("cursor-not-allowed", !tab);
       });
       if (!tab) {
-        $("crumb").textContent = "未打开会话";
-        pill.textContent = "空闲";
+        $("crumb").textContent = tr("ssh.term.noSession");
+        pill.textContent = tr("ssh.status.idle");
         pill.className = "flex-none rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500";
         return;
       }
       const p = tab.profile;
       $("crumb").textContent = `${p.name} · ${p.user}@${p.host}:${p.port}`;
       const map = {
-        idle: ["未连接", "bg-slate-100 text-slate-500"],
-        connecting: ["连接中…", "bg-amber-50 text-amber-600"],
-        ok: ["已连接", "bg-emerald-50 text-emerald-600"],
-        error: ["连接失败", "bg-rose-50 text-rose-600"],
-        closed: ["已断开", "bg-slate-100 text-slate-500"],
+        idle: [tr("ssh.status.disconnected"), "bg-slate-100 text-slate-500"],
+        connecting: [tr("ssh.status.connecting"), "bg-amber-50 text-amber-600"],
+        ok: [tr("ssh.status.connected"), "bg-emerald-50 text-emerald-600"],
+        error: [tr("ssh.status.failed"), "bg-rose-50 text-rose-600"],
+        closed: [tr("ssh.status.closed"), "bg-slate-100 text-slate-500"],
       };
       const info = map[tab.status] || map.idle;
       pill.textContent = info[0];
@@ -752,7 +765,7 @@
         const auto = tab.profile.autoReconnect;
         if (auto && tab.attempts < 5) {
           tab.attempts += 1;
-          tab.term.writeln(`\r\n\x1b[33m连接已断开，${1.5 * tab.attempts}s 后进行第 ${tab.attempts} 次重连…\x1b[0m`);
+          tab.term.writeln(`\r\n\x1b[33m${tr("ssh.term.reconnectNotice", { delay: 1.5 * tab.attempts, attempt: tab.attempts })}\x1b[0m`);
           setTimeout(() => {
             if (!tab.closed && !tab.ws) connectTab(tab);
           }, 1500 * tab.attempts);
@@ -783,7 +796,7 @@
           renderTabs();
           break;
         case "exit":
-          tab.term.writeln(`\r\n\x1b[33m会话已结束（退出码 ${msg.code ?? 0}）\x1b[0m`);
+          tab.term.writeln(`\r\n\x1b[33m${tr("ssh.term.sessionEnded", { code: msg.code ?? 0 })}\x1b[0m`);
           tab.status = "closed";
           updateToolbar();
           renderTabs();
@@ -829,32 +842,32 @@
     function updateStatusBar() {
       const tab = getActiveTab();
       if (!tab) {
-        $("statText").textContent = "就绪";
+        $("statText").textContent = tr("ssh.status.ready");
         ["statSize", "statUptime", "statLatency", "statLog"].forEach((id) => $(id).classList.add("hidden"));
         return;
       }
       const statusMap = {
-        idle: "未连接", connecting: "正在连接…", ok: "已连接",
-        error: "连接失败", closed: "已断开",
+        idle: tr("ssh.status.disconnected"), connecting: tr("ssh.status.connectingLong"), ok: tr("ssh.status.connected"),
+        error: tr("ssh.status.failed"), closed: tr("ssh.status.closed"),
       };
-      $("statText").textContent = `${statusMap[tab.status] || "就绪"} · ${tab.encoding.toUpperCase()}`;
+      $("statText").textContent = `${statusMap[tab.status] || tr("ssh.status.ready")} · ${tab.encoding.toUpperCase()}`;
       $("statSize").textContent = `${tab.term.cols}×${tab.term.rows}`;
       $("statSize").classList.remove("hidden");
       if (tab.startedAt && tab.status === "ok") {
         const secs = Math.floor((Date.now() - tab.startedAt) / 1000);
-        $("statUptime").textContent = `在线 ${fmtDuration(secs)}`;
+        $("statUptime").textContent = tr("ssh.status.uptime", { duration: fmtDuration(secs) });
         $("statUptime").classList.remove("hidden");
       } else {
         $("statUptime").classList.add("hidden");
       }
       if (tab.latency != null) {
-        $("statLatency").textContent = `延迟 ${tab.latency}ms`;
+        $("statLatency").textContent = tr("ssh.status.latency", { ms: tab.latency });
         $("statLatency").classList.remove("hidden");
       } else {
         $("statLatency").classList.add("hidden");
       }
       if (tab.logPath) {
-        $("statLog").textContent = `日志 ${tab.logPath}`;
+        $("statLog").textContent = tr("ssh.status.log", { path: tab.logPath });
         $("statLog").title = tab.logPath;
         $("statLog").classList.remove("opacity-0");
       } else {
@@ -892,14 +905,14 @@
     async function copySelection(tab) {
       const text = tab.term.getSelection();
       if (!text) {
-        toast("请先在终端中选择要复制的文本");
+        toast(tr("ssh.toast.noSelection"));
         return;
       }
       try {
         await navigator.clipboard.writeText(text);
-        toast("已复制 " + text.length + " 个字符");
+        toast(tr("ssh.toast.copiedChars", { count: text.length }));
       } catch (_) {
-        toast("复制失败，请使用 Ctrl+Shift+C", "error");
+        toast(tr("ssh.toast.copyFailed"), "error");
       }
     }
 
@@ -908,7 +921,7 @@
         const text = await navigator.clipboard.readText();
         if (text) sendInput(tab, text);
       } catch (_) {
-        toast("浏览器拒绝读取剪贴板，请使用 Ctrl+Shift+V", "error");
+        toast(tr("ssh.toast.pasteDenied"), "error");
       }
     }
 
@@ -933,7 +946,7 @@
       const bar = $("searchbar");
       const tab = getActiveTab();
       if (!tab || !tab.search) {
-        toast("当前环境未加载查找插件");
+        toast(tr("ssh.toast.searchUnavailable"));
         return;
       }
       if (!show) {
@@ -1016,7 +1029,7 @@
       state.editing = profile || null;
       state.connectAfterSave = false;
       $("formPanel").classList.remove("hidden");
-      $("formTitle").textContent = profile ? "编辑会话" : "新建会话";
+      $("formTitle").textContent = profile ? tr("ssh.form.title.edit") : tr("ssh.form.title.create");
       $("formNote").classList.add("hidden");
       $("fId").value = profile ? profile.id : "";
       $("fName").value = profile ? profile.name : (quick ? quick.name : "");
@@ -1090,7 +1103,7 @@
     async function saveProfile(connectAfter) {
       const payload = collectForm();
       if (!payload.name || !payload.host || !payload.user) {
-        showFormNote("请填写会话名称、主机与用户名", "error");
+        showFormNote(tr("ssh.form.requireBasics"), "error");
         return;
       }
       try {
@@ -1098,9 +1111,9 @@
         closeForm();
         await loadProfiles();
         if (connectAfter) openSession(saved.id);
-        else toast("会话已保存");
+        else toast(tr("ssh.toast.saved"));
       } catch (err) {
-        showFormNote("保存失败：" + err.message, "error");
+        showFormNote(tr("ssh.form.saveFailed", { error: err.message }), "error");
       }
     }
 
@@ -1108,23 +1121,23 @@
       try {
         await api(`/profiles/${encodeURIComponent(profile.id)}/duplicate`, { method: "POST" });
         await loadProfiles();
-        toast("已复制会话");
+        toast(tr("ssh.toast.duplicated"));
       } catch (err) {
-        toast("复制失败：" + err.message, "error");
+        toast(tr("ssh.toast.duplicateFailed", { error: err.message }), "error");
       }
     }
 
     async function deleteProfile(profile) {
-      if (!confirm(`确定删除会话「${profile.name}」？`)) return;
+      if (!confirm(tr("ssh.confirm.deleteSession", { name: profile.name }))) return;
       try {
         await api(`/profiles/${encodeURIComponent(profile.id)}`, { method: "DELETE" });
         for (const tab of [...state.tabs.values()]) {
           if (tab.profileId === profile.id) closeTab(tab.id);
         }
         await loadProfiles();
-        toast("会话已删除");
+        toast(tr("ssh.toast.deleted"));
       } catch (err) {
-        toast("删除失败：" + err.message, "error");
+        toast(tr("ssh.toast.deleteFailed", { error: err.message }), "error");
       }
     }
 
@@ -1142,23 +1155,23 @@
     $("testBtn").addEventListener("click", async () => {
       const payload = collectForm();
       if (!payload.host || !payload.user) {
-        showFormNote("请填写主机与用户名", "error");
+        showFormNote(tr("ssh.form.requireHostUser"), "error");
         return;
       }
       $("testBtn").disabled = true;
-      $("testBtn").textContent = "测试中…";
+      $("testBtn").textContent = tr("ssh.form.testing");
       try {
         const data = await api("/test", { method: "POST", body: JSON.stringify({ id: payload.id, profile: payload }) });
         if (data.ok) {
-          showFormNote(`连接成功 · ${data.latencyMs}ms · 回显 ${data.echo || "ok"}`, "ok");
+          showFormNote(tr("ssh.form.testOk", { ms: data.latencyMs, echo: data.echo || "ok" }), "ok");
         } else {
-          showFormNote("连接失败：" + (data.error || "未知错误"), "error");
+          showFormNote(tr("ssh.form.testFailed", { error: data.error || tr("ssh.error.unknown") }), "error");
         }
       } catch (err) {
-        showFormNote("测试失败：" + err.message, "error");
+        showFormNote(tr("ssh.form.testError", { error: err.message }), "error");
       } finally {
         $("testBtn").disabled = false;
-        $("testBtn").textContent = "测试连接";
+        $("testBtn").textContent = tr("ssh.form.test");
       }
     });
 
@@ -1186,7 +1199,7 @@
     $("quickBtn").addEventListener("click", () => {
       const parsed = parseQuick($("quickInput").value);
       if (!parsed) {
-        toast("请输入 user@host:port", "error");
+        toast(tr("ssh.toast.quickInvalid"), "error");
         return;
       }
       if (!parsed.user) parsed.user = "root";
@@ -1210,7 +1223,7 @@
         const data = await api("/export", { method: "POST" });
         await DevOSSecure.showExport(data);
       } catch (err) {
-        toast("导出失败：" + err.message, "error");
+        toast(tr("ssh.toast.exportFailed", { error: err.message }), "error");
       }
     });
 
@@ -1229,19 +1242,19 @@
         }
         let key = "";
         if (DevOSSecure.isEncryptedEnvelope(parsed)) {
-          key = await DevOSSecure.askKey({ title: "导入加密会话" });
+          key = await DevOSSecure.askKey({ title: tr("ssh.import.askKeyTitle") });
           if (!key) return;
         } else if (!Array.isArray(parsed)) {
-          throw new Error("文件格式不正确，应为会话数组或加密导出文件");
+          throw new Error(tr("ssh.import.invalidFormat"));
         }
         const data = await api("/import", {
           method: "POST",
           body: JSON.stringify({ content: text, key }),
         });
         await loadProfiles();
-        toast(`已导入 ${data.imported} 个会话`);
+        toast(tr("ssh.toast.imported", { count: data.imported }));
       } catch (err) {
-        toast("导入失败：" + err.message, "error");
+        toast(tr("ssh.toast.importFailed", { error: err.message }), "error");
       }
     });
 
@@ -1256,8 +1269,8 @@
       menu.style.left = rect.left - 80 + "px";
       menu.style.top = rect.bottom + 6 + "px";
       menu.innerHTML = `
-        <button data-m="import" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-50">导入会话</button>
-        <button data-m="export" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-50">导出会话</button>`;
+        <button data-m="import" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-50">${esc(tr("ssh.menu.import"))}</button>
+        <button data-m="export" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-50">${esc(tr("ssh.menu.export"))}</button>`;
       menu.classList.remove("hidden");
       menu.querySelectorAll("[data-m]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -1276,7 +1289,7 @@
       try {
         await loadProfiles();
       } catch (err) {
-        toast("加载会话失败：" + err.message, "error");
+        toast(tr("ssh.toast.loadFailed", { error: err.message }), "error");
       }
       renderTabs();
       updateToolbar();
@@ -1284,6 +1297,26 @@
       const target = new URLSearchParams(location.search).get("profile");
       if (target) openSession(target);
     }
+
+    // ---------- 国际化 ----------
+    document.addEventListener("devos:locale-changed", () => {
+      document.title = tr("ssh.app.title");
+      if (AppI18n) AppI18n.apply(document);
+      updateProfileCount();
+      renderGroupOptions();
+      const jumpValue = $("fJump").value;
+      renderJumpOptions();
+      $("fJump").value = jumpValue;
+      renderSessions();
+      renderTabs();
+      updateToolbar();
+      updateStatusBar();
+      if (!$("formPanel").classList.contains("hidden")) {
+        $("formTitle").textContent = state.editing ? tr("ssh.form.title.edit") : tr("ssh.form.title.create");
+      }
+      if (!$("testBtn").disabled) $("testBtn").textContent = tr("ssh.form.test");
+      $("menu").classList.add("hidden");
+    });
 
     init();
   </script>

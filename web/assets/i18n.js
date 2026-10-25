@@ -2,7 +2,7 @@
 (function () {
   if (window.DevOSI18n) return;
 
-  var FALLBACK = "zh-CN";
+  var FALLBACK = "en";
   var SUPPORTED = ["zh-CN", "en", "zh-TW"];
   var BCP47 = { "zh-CN": "zh-CN", "en": "en-US", "zh-TW": "zh-TW" };
   var dicts = Object.create(null);
@@ -74,7 +74,7 @@
 
   function onChange(fn) { if (typeof fn === "function") listeners.push(fn); }
 
-  function bcp47() { return BCP47[locale] || "zh-CN"; }
+  function bcp47() { return BCP47[locale] || "en-US"; }
 
   window.DevOSI18n = {
     supported: SUPPORTED.slice(),

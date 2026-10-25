@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>插件管理 · DevOS</title>
+  <title data-i18n="plugin.app.title">插件管理 · DevOS</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -21,6 +21,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/ui.css?v=1" />
+  <script src="/assets/app-i18n.js?v=2"></script>
+  <script src="/assets/locales/apps/plugin.js?v=1"></script>
   <style>
     html, body { height: 100%; }
     ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -43,14 +45,14 @@
         </svg>
       </div>
       <div>
-        <h1 class="text-base font-semibold tracking-tight text-slate-900">插件管理</h1>
-        <p class="text-[11px] text-slate-500">离线安装 Web 插件 · 规范 v1 · 冲突时可选覆盖、保留或另存</p>
+        <h1 class="text-base font-semibold tracking-tight text-slate-900" data-i18n="plugin.app.heading">插件管理</h1>
+        <p class="text-[11px] text-slate-500" data-i18n="plugin.app.subtitle">离线安装 Web 插件 · 规范 v1 · 冲突时可选覆盖、保留或另存</p>
       </div>
       <div class="ml-auto flex items-center gap-2">
-        <button id="refreshBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+        <button id="refreshBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 transition hover:bg-slate-50 hover:text-slate-900" data-i18n="plugin.header.refresh">
           刷新
         </button>
-        <button id="installBtn" class="rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-slate-800">
+        <button id="installBtn" class="rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-slate-800" data-i18n="plugin.header.install">
           安装 ZIP
         </button>
         <input id="fileInput" type="file" accept=".zip,application/zip" class="hidden" />
@@ -62,8 +64,8 @@
         <svg class="h-8 w-8 text-slate-300 transition group-hover:text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
         </svg>
-        <div class="mt-2 text-sm font-medium text-slate-700">拖拽 ZIP 插件包到此处，或点击选择文件</div>
-        <div class="mt-1 text-[11px] text-slate-400">单包上限 64MB · 自动校验目录结构与清单</div>
+        <div class="mt-2 text-sm font-medium text-slate-700" data-i18n="plugin.drop.title">拖拽 ZIP 插件包到此处，或点击选择文件</div>
+        <div class="mt-1 text-[11px] text-slate-400" data-i18n="plugin.drop.hint">单包上限 64MB · 自动校验目录结构与清单</div>
       </div>
 
       <div id="stats" class="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-slate-500"></div>
@@ -84,32 +86,32 @@
           </svg>
         </span>
         <div class="min-w-0">
-          <h2 class="text-sm font-semibold text-slate-900">插件已安装</h2>
+          <h2 class="text-sm font-semibold text-slate-900" data-i18n="plugin.conflict.title">插件已安装</h2>
           <p id="conflictHint" class="mt-1 text-xs text-slate-500"></p>
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-3 px-6 py-4">
         <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-          <div class="text-[11px] font-medium text-slate-400">现有版本</div>
+          <div class="text-[11px] font-medium text-slate-400" data-i18n="plugin.conflict.existing">现有版本</div>
           <div id="existingBox" class="mt-1.5 space-y-1 text-xs text-slate-700"></div>
         </div>
         <div class="rounded-xl border border-sky-200 bg-sky-50/60 p-3">
-          <div class="text-[11px] font-medium text-sky-500">待安装版本</div>
+          <div class="text-[11px] font-medium text-sky-500" data-i18n="plugin.conflict.incoming">待安装版本</div>
           <div id="incomingBox" class="mt-1.5 space-y-1 text-xs text-slate-700"></div>
         </div>
       </div>
 
       <div class="border-t border-slate-100 px-6 py-4">
         <div id="copyRow" class="mb-3 hidden items-center gap-2">
-          <label class="text-xs text-slate-500" for="copyId">新插件 id</label>
+          <label class="text-xs text-slate-500" for="copyId" data-i18n="plugin.conflict.copyId">新插件 id</label>
           <input id="copyId" type="text" class="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
         </div>
         <div class="flex flex-wrap items-center justify-end gap-2">
-          <button id="cancelBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 transition hover:bg-slate-50">取消</button>
-          <button id="keepBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 transition hover:bg-slate-50">保留现有</button>
-          <button id="copyBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 transition hover:bg-slate-50">另存为新插件</button>
-          <button id="overwriteBtn" class="rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-medium text-white transition hover:bg-slate-800">覆盖安装</button>
+          <button id="cancelBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 transition hover:bg-slate-50" data-i18n="plugin.conflict.cancel">取消</button>
+          <button id="keepBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 transition hover:bg-slate-50" data-i18n="plugin.conflict.keep">保留现有</button>
+          <button id="copyBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 transition hover:bg-slate-50" data-i18n="plugin.conflict.copy">另存为新插件</button>
+          <button id="overwriteBtn" class="rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-medium text-white transition hover:bg-slate-800" data-i18n="plugin.conflict.overwrite">覆盖安装</button>
         </div>
       </div>
     </div>
@@ -125,6 +127,9 @@
       copyMode: false,
       busy: false,
     };
+
+    const I18N = window.DevOSAppI18n;
+    const t = (key, params) => (I18N ? I18N.t(key, params) : key);
 
     const $ = (sel) => document.querySelector(sel);
     const listEl = $("#list");
@@ -170,7 +175,7 @@
       if (!value) return "";
       const d = new Date(value);
       if (Number.isNaN(d.getTime())) return value;
-      return d.toLocaleString("zh-CN", { hour12: false });
+      return d.toLocaleString(I18N ? I18N.bcp47() : "en-US", { hour12: false });
     }
 
     function renderStats() {
@@ -178,12 +183,12 @@
       const installed = state.plugins.filter((p) => p.source === "installed").length;
       const external = state.plugins.filter((p) => p.source === "external").length;
       const chips = [
-        `共 ${state.plugins.length} 个插件`,
-        `内置 ${builtin}`,
-        `已安装 ${installed}`,
+        t("plugin.stats.total", { count: state.plugins.length }),
+        t("plugin.stats.builtin", { count: builtin }),
+        t("plugin.stats.installed", { count: installed }),
       ];
-      if (external) chips.push(`外部目录 ${external}`);
-      chips.push("规范版本 v1");
+      if (external) chips.push(t("plugin.stats.external", { count: external }));
+      chips.push(t("plugin.stats.spec"));
       statsEl.innerHTML = chips
         .map((text) => `<span class="rounded-full border border-slate-200 bg-white px-2.5 py-1">${esc(text)}</span>`)
         .join("");
@@ -192,33 +197,33 @@
     function renderList() {
       listEl.innerHTML = "";
       if (state.plugins.length === 0) {
-        listEl.innerHTML = `<div class="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center text-xs text-slate-400">暂无插件</div>`;
+        listEl.innerHTML = `<div class="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center text-xs text-slate-400">${esc(t("plugin.list.empty"))}</div>`;
         return;
       }
       for (const p of state.plugins) {
         const card = document.createElement("article");
         card.className = "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md";
         const badgeMap = {
-          builtin: `<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">内置</span>`,
-          installed: `<span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-600">已安装</span>`,
-          external: `<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] text-amber-600">外部目录</span>`,
+          builtin: `<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">${esc(t("plugin.source.builtin"))}</span>`,
+          installed: `<span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-600">${esc(t("plugin.source.installed"))}</span>`,
+          external: `<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] text-amber-600">${esc(t("plugin.source.external"))}</span>`,
         };
         const sourceBadge = badgeMap[p.source] || badgeMap.external;
         const meta = [];
         if (p.category) meta.push(p.category);
         if (p.version) meta.push("v" + p.version);
         meta.push("id: " + p.id);
-        if (p.dataDir) meta.push("数据: " + p.dataDir);
-        if (p.dir) meta.push("目录: " + p.dir);
-        if (p.installedAt && p.source === "installed") meta.push("安装于 " + fmtTime(p.installedAt));
+        if (p.dataDir) meta.push(t("plugin.meta.dataDir", { path: p.dataDir }));
+        if (p.dir) meta.push(t("plugin.meta.dir", { path: p.dir }));
+        if (p.installedAt && p.source === "installed") meta.push(t("plugin.meta.installedAt", { time: fmtTime(p.installedAt) }));
 
         let action;
         if (p.source === "installed") {
-          action = `<button data-remove="${esc(p.id)}" class="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-[11px] text-rose-600 transition hover:bg-rose-50">卸载</button>`;
+          action = `<button data-remove="${esc(p.id)}" class="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-[11px] text-rose-600 transition hover:bg-rose-50">${esc(t("plugin.action.remove"))}</button>`;
         } else if (p.source === "external") {
-          action = `<span class="text-[11px] text-slate-300">外部只读</span>`;
+          action = `<span class="text-[11px] text-slate-300">${esc(t("plugin.action.readonly"))}</span>`;
         } else {
-          action = `<span class="text-[11px] text-slate-300">随内核编译</span>`;
+          action = `<span class="text-[11px] text-slate-300">${esc(t("plugin.action.builtin"))}</span>`;
         }
 
         card.innerHTML = `
@@ -228,9 +233,9 @@
               <div class="flex items-center gap-2">
                 <h3 class="truncate text-sm font-semibold text-slate-900">${esc(p.name || p.id)}</h3>
                 ${sourceBadge}
-                ${p.backend ? `<span class="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] text-sky-600">提供后端 API</span>` : ""}
+                ${p.backend ? `<span class="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] text-sky-600">${esc(t("plugin.badge.backend"))}</span>` : ""}
               </div>
-              <p class="mt-1 line-clamp-2 text-xs text-slate-500">${esc(p.description || "无描述")}</p>
+              <p class="mt-1 line-clamp-2 text-xs text-slate-500">${esc(p.description || t("plugin.list.noDescription"))}</p>
               <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] text-slate-400">
                 ${meta.map((m) => `<span class="truncate">${esc(m)}</span>`).join("")}
               </div>
@@ -243,7 +248,7 @@
 
     async function loadPlugins() {
       const resp = await fetch("/api/plugins", { headers: { Accept: "application/json" } });
-      if (!resp.ok) throw new Error(`读取插件列表失败 (${resp.status})`);
+      if (!resp.ok) throw new Error(t("plugin.error.load", { status: resp.status }));
       state.plugins = await resp.json();
       renderStats();
       renderList();
@@ -280,43 +285,47 @@
           return;
         }
         if (!resp.ok) {
-          throw new Error(data.error || data.message || `安装失败 (${resp.status})`);
+          throw new Error(data.error || data.message || t("plugin.error.install", { status: resp.status }));
         }
 
         closeConflict();
         await loadPlugins();
-        const name = (data.plugin && data.plugin.name) || data.name || "插件";
+        const name = (data.plugin && data.plugin.name) || data.name || t("plugin.fallback.pluginName");
         if (data.status === "kept") {
-          toast(`已保留现有版本：${name}`);
+          toast(t("plugin.toast.kept", { name }));
         } else {
-          toast(`安装成功：${name}${action === "overwrite" ? "（已覆盖）" : ""}`);
-          notifyDesktop(`应用列表已更新：${name}`);
+          toast(t(action === "overwrite" ? "plugin.toast.installedOverwrite" : "plugin.toast.installed", { name }));
+          notifyDesktop(t("plugin.toast.appsUpdated", { name }));
         }
       } catch (err) {
-        toast(err.message || "安装失败", "err");
+        toast(err.message || t("plugin.error.installShort"), "err");
       } finally {
         state.busy = false;
       }
+    }
+
+    function renderConflictHint() {
+      const data = state.pendingConflict;
+      if (!data) return;
+      const relationText = {
+        newer: t("plugin.conflict.relation.newer"),
+        older: t("plugin.conflict.relation.older"),
+        same: t("plugin.conflict.relation.same"),
+      }[data.relation] || t("plugin.conflict.confirm");
+      $("#conflictHint").textContent = (data.error || t("plugin.conflict.installed")) + " · " + relationText;
     }
 
     function openConflict(file, data) {
       state.pendingFile = file;
       state.pendingConflict = data;
       state.copyMode = false;
-      $("#conflictHint").textContent = data.error || "目标插件已安装，请选择处理方式。";
+      renderConflictHint();
 
       const describe = (p) => `
         <div class="truncate font-medium text-slate-800">${esc(p.name || p.id)}</div>
         <div class="font-mono text-[10px] text-slate-400">${esc(p.id)} · v${esc(p.version || "0.0.0")}</div>`;
       $("#existingBox").innerHTML = describe(data.existing || {});
       $("#incomingBox").innerHTML = describe(data.incoming || {});
-
-      const relationText = {
-        newer: "新包版本更新，可直接覆盖升级。",
-        older: "新包版本更旧，覆盖将降级现有插件。",
-        same: "两个版本相同，覆盖会重新写入文件。",
-      }[data.relation] || "请确认如何处理。";
-      $("#conflictHint").textContent = (data.error || "插件已安装") + " · " + relationText;
 
       const baseID = (data.existing && data.existing.id) || "plugin";
       $("#copyId").value = `${baseID}-copy`;
@@ -337,23 +346,23 @@
     }
 
     async function removePlugin(id) {
-      if (!confirm(`确认卸载插件 ${id}？数据目录会保留。`)) return;
+      if (!confirm(t("plugin.confirm.remove", { id }))) return;
       try {
         const resp = await fetch(`/api/plugins/${encodeURIComponent(id)}`, { method: "DELETE" });
         const data = await parseJSON(resp);
-        if (!resp.ok) throw new Error(data.error || data.message || `卸载失败 (${resp.status})`);
+        if (!resp.ok) throw new Error(data.error || data.message || t("plugin.error.remove", { status: resp.status }));
         await loadPlugins();
-        toast(`已卸载：${id}`);
-        notifyDesktop(`已卸载插件：${id}`);
+        toast(t("plugin.toast.removed", { id }));
+        notifyDesktop(t("plugin.toast.uninstalledNotice", { id }));
       } catch (err) {
-        toast(err.message || "卸载失败", "err");
+        toast(err.message || t("plugin.error.removeShort"), "err");
       }
     }
 
     function pickFile(file) {
       if (!file) return;
       if (!/\.zip$/i.test(file.name)) {
-        toast("请选择 .zip 插件包", "err");
+        toast(t("plugin.toast.zipOnly"), "err");
         return;
       }
       installFile(file);
@@ -363,7 +372,7 @@
     $("#refreshBtn").addEventListener("click", async () => {
       try {
         await loadPlugins();
-        toast("插件列表已刷新");
+        toast(t("plugin.toast.refreshed"));
       } catch (err) {
         toast(err.message, "err");
       }
@@ -409,7 +418,7 @@
       }
       const id = $("#copyId").value.trim();
       if (!id) {
-        toast("请填写新的插件 id", "err");
+        toast(t("plugin.error.copyId"), "err");
         return;
       }
       installFile(state.pendingFile, "copy", id);
@@ -420,6 +429,14 @@
     });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !mask.classList.contains("hidden")) closeConflict();
+    });
+
+    document.title = t("plugin.app.title");
+    document.addEventListener("devos:locale-changed", () => {
+      document.title = t("plugin.app.title");
+      renderStats();
+      renderList();
+      renderConflictHint();
     });
 
     loadPlugins().catch((err) => toast(err.message, "err"));

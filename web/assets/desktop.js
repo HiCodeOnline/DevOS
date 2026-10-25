@@ -77,6 +77,19 @@ function t(key, params) {
   return window.DevOSI18n ? window.DevOSI18n.t(key, params) : key;
 }
 
+// 内置应用的清单名称是中文，界面名称按当前语言翻译；未翻译时回退清单值。
+function appName(app) {
+  const key = `app.${app.id}.name`;
+  const value = t(key);
+  return value === key ? app.name : value;
+}
+
+function appDesc(app) {
+  const key = `app.${app.id}.desc`;
+  const value = t(key);
+  return value === key ? (app.description || app.category || "") : value;
+}
+
 // 应用壁纸：预设使用 CSS 渐变，自定义壁纸来自内核 /api/security/wallpaper/file。
 const wallpaperEl = $("#wallpaper");
 const WALLPAPER_PRESETS = ["aurora", "dusk", "mint", "sand", "midnight"];
@@ -113,8 +126,8 @@ function renderIcons() {
     const btn = el("button");
     btn.className = "desktop-icon";
     btn.dataset.app = app.id;
-    btn.title = app.description || app.name;
-    btn.innerHTML = `${iconMarkup(app)}<span class="icon-label">${esc(app.name)}</span>`;
+    btn.title = appDesc(app) || appName(app);
+    btn.innerHTML = `${iconMarkup(app)}<span class="icon-label">${esc(appName(app))}</span>`;
     btn.addEventListener("click", (event) => {
       event.stopPropagation();
       selectIcon(app.id);
@@ -135,7 +148,7 @@ function renderStartApps(filter = "") {
   const keyword = filter.trim().toLowerCase();
   const list = state.apps.filter((app) => {
     if (!keyword) return true;
-    return `${app.name} ${app.description} ${app.category}`.toLowerCase().includes(keyword);
+    return `${appName(app)} ${appDesc(app)} ${app.category}`.toLowerCase().includes(keyword);
   });
   if (list.length === 0) {
     startApps.innerHTML = `<div class="start-empty">${esc(t("start.empty"))}</div>`;
@@ -145,8 +158,8 @@ function renderStartApps(filter = "") {
   for (const app of list) {
     const btn = el("button", "start-app");
     btn.innerHTML = `${iconMarkup(app)}<span class="min-w-0">
-      <span class="start-app-name">${esc(app.name)}</span>
-      <span class="start-app-desc">${esc(app.description || app.category)}</span>
+      <span class="start-app-name">${esc(appName(app))}</span>
+      <span class="start-app-desc">${esc(appDesc(app) || app.category)}</span>
     </span>`;
     btn.addEventListener("click", () => {
       closeStartMenu();
@@ -160,10 +173,10 @@ function renderTasks() {
   tasksEl.innerHTML = "";
   for (const win of state.windows.values()) {
     const btn = el("button", "task-btn");
-    btn.title = win.app.name;
+    btn.title = appName(win.app);
     if (win.id === state.activeId && !win.minimized) btn.classList.add("is-active");
     if (win.minimized) btn.classList.add("is-minimized");
-    btn.innerHTML = `<span class="task-icon" style="color:${esc(win.app.accent || "#0ea5e9")}">${iconContent(win.app.icon)}</span><span class="task-title">${esc(win.app.name)}</span>`;
+    btn.innerHTML = `<span class="task-icon" style="color:${esc(win.app.accent || "#0ea5e9")}">${iconContent(win.app.icon)}</span><span class="task-title">${esc(appName(win.app))}</span>`;
     btn.addEventListener("click", () => {
       if (win.minimized) {
         restoreWindow(win);
@@ -243,7 +256,7 @@ function createWindow(app, query = "") {
   node.innerHTML = `
     <header class="window-header">
       <span class="window-app-icon" style="color:${esc(app.accent || "#0ea5e9")}">${iconContent(app.icon)}</span>
-      <span class="window-title">${esc(app.name)}</span>
+      <span class="window-title">${esc(appName(app))}</span>
       <span class="ml-auto flex items-center gap-0.5">
         <button class="window-btn" data-act="min" title="${esc(t("window.min"))}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
@@ -257,7 +270,7 @@ function createWindow(app, query = "") {
       </span>
     </header>
     <div class="window-body">
-      <iframe src="/apps/${encodeURIComponent(app.id)}/${encodeURIComponent(entry)}${query ? "?" + query : ""}" title="${esc(app.name)}" loading="eager"></iframe>
+      <iframe src="/apps/${encodeURIComponent(app.id)}/${encodeURIComponent(entry)}${query ? "?" + query : ""}" title="${esc(appName(app))}" loading="eager"></iframe>
     </div>
     <div class="window-resize"></div>`;
 
@@ -274,7 +287,10 @@ function createWindow(app, query = "") {
   // 插件页面与桌面同源：统一禁用右键菜单并接管 Alt+Tab。
   const frame = node.querySelector("iframe");
   if (frame) {
-    frame.addEventListener("load", () => installFrameGuards(frame.contentDocument));
+    frame.addEventListener("load", () => {
+      installFrameGuards(frame.contentDocument);
+      sendLocaleToFrame(frame);
+    });
   }
 
   node.addEventListener("pointerdown", () => focusWindow(win), true);
@@ -313,6 +329,8 @@ function focusWindow(win) {
 function refreshWindowTitles() {
   const labels = { min: t("window.min"), max: t("window.max"), close: t("window.close") };
   for (const win of state.windows.values()) {
+    const title = win.el.querySelector(".window-title");
+    if (title) title.textContent = appName(win.app);
     win.el.querySelectorAll(".window-btn").forEach((btn) => {
       const label = labels[btn.dataset.act];
       if (label) btn.title = label;
@@ -359,7 +377,7 @@ function renderSwitcher() {
   switcherEl.innerHTML = state.switcher.wins.map((win, index) => `
     <div class="switcher-item${index === state.switcher.index ? " is-active" : ""}">
       <span class="switcher-icon" style="--accent:${esc(win.app.accent || "#0ea5e9")}">${iconContent(win.app.icon)}</span>
-      <span class="switcher-name">${esc(win.app.name)}</span>
+      <span class="switcher-name">${esc(appName(win.app))}</span>
     </div>`).join("");
 }
 
@@ -666,11 +684,26 @@ window.addEventListener("blur", () => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) renderClock();
 });
+// 把外壳语言推给已打开的应用页面，实现联动切换。
+function sendLocaleToFrame(frame) {
+  if (!frame || !frame.contentWindow || !window.DevOSI18n) return;
+  frame.contentWindow.postMessage({ type: "devos:locale", locale: window.DevOSI18n.getLocale() }, location.origin);
+}
+
+function broadcastLocale() {
+  for (const win of state.windows.values()) {
+    sendLocaleToFrame(win.el.querySelector("iframe"));
+  }
+}
+
 document.addEventListener("devos:locale-changed", () => {
   renderClock();
   renderStatus();
+  renderIcons();
+  renderTasks();
   renderStartApps(searchInput.value);
   refreshWindowTitles();
+  broadcastLocale();
 });
 
 // 供设置面板与锁屏复用桌面能力。

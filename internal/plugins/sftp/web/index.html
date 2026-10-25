@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -13,6 +13,8 @@
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/ui.css?v=1" />
+  <script src="/assets/app-i18n.js?v=2"></script>
+  <script src="/assets/locales/apps/sftp.js?v=1"></script>
   <style>
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.45); border-radius: 999px; }
@@ -29,17 +31,17 @@
     </span>
     <div class="flex flex-none items-center gap-2">
       <select id="profileSelect" class="w-56 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11.5px] outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
-        <option value="">选择连接…</option>
+        <option value="" data-i18n="sftp.profile.choose">选择连接…</option>
       </select>
-      <button id="connectBtn" class="rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-slate-700">连接</button>
+      <button id="connectBtn" class="rounded-lg bg-slate-900 px-2.5 py-1.5 text-[11px] font-medium text-white hover:bg-slate-700" data-i18n="sftp.conn.connect">连接</button>
       <span id="connBadge" class="flex items-center gap-1.5 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
-        <span id="connDot" class="h-1.5 w-1.5 rounded-full bg-slate-300"></span><span id="connText">未连接</span>
+        <span id="connDot" class="h-1.5 w-1.5 rounded-full bg-slate-300"></span><span id="connText" data-i18n="sftp.conn.idle">未连接</span>
       </span>
     </div>
     <div class="ml-auto flex items-center gap-2">
       <button id="queueBtn" class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16"/><path d="M4 12h10"/><path d="M4 18h7"/></svg>
-        传输队列
+        <span data-i18n="sftp.queue.title">传输队列</span>
         <span id="queueBadge" class="rounded-full bg-emerald-100 px-1.5 text-[9.5px] font-medium text-emerald-700">0</span>
       </button>
     </div>
@@ -49,32 +51,32 @@
     <!-- 本地 -->
     <section class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div class="flex h-9 flex-none items-center gap-1.5 border-b border-slate-200 bg-slate-50/80 px-2">
-        <span class="flex-none text-[11px] font-semibold text-slate-700">本地</span>
-        <button data-act="local-up" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="上一级">
+        <span class="flex-none text-[11px] font-semibold text-slate-700" data-i18n="sftp.local.title">本地</span>
+        <button data-act="local-up" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="上一级" data-i18n-title="sftp.local.upTitle">
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
         </button>
         <input id="localPath" spellcheck="false" class="h-6 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 font-mono text-[10.5px] text-slate-600 outline-none hover:border-slate-200 hover:bg-white focus:border-emerald-400 focus:bg-white" />
-        <button data-act="local-refresh" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="刷新">
+        <button data-act="local-refresh" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="刷新" data-i18n-title="sftp.local.refreshTitle">
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
         </button>
         <span class="mx-0.5 h-4 w-px bg-slate-200"></span>
-        <button data-act="upload" class="rounded-md bg-emerald-600 px-2 py-1 text-[10.5px] font-medium text-white hover:bg-emerald-500 disabled:opacity-40" title="上传选中项到远程目录">上传 →</button>
+        <button data-act="upload" class="rounded-md bg-emerald-600 px-2 py-1 text-[10.5px] font-medium text-white hover:bg-emerald-500 disabled:opacity-40" title="上传选中项到远程目录" data-i18n-title="sftp.local.uploadTitle" data-i18n="sftp.local.upload">上传 →</button>
       </div>
       <div id="localDrop" class="relative min-h-0 flex-1 overflow-auto">
         <table class="w-full table-fixed text-left text-[11px]">
           <thead class="sticky top-0 z-10 bg-white/95 backdrop-blur">
             <tr class="border-b border-slate-200 text-[9.5px] uppercase tracking-wide text-slate-400">
               <th class="w-8 px-2 py-1.5"></th>
-              <th data-sort="local-name" class="cursor-pointer px-1 py-1.5 font-medium hover:text-slate-600">名称</th>
-              <th data-sort="local-size" class="w-20 cursor-pointer px-1 py-1.5 text-right font-medium hover:text-slate-600">大小</th>
-              <th data-sort="local-time" class="hidden w-32 cursor-pointer px-1 py-1.5 font-medium hover:text-slate-600 md:table-cell">修改时间</th>
-              <th class="w-24 px-1 py-1.5 font-medium">权限</th>
+              <th data-sort="local-name" class="cursor-pointer px-1 py-1.5 font-medium hover:text-slate-600" data-i18n="sftp.column.name">名称</th>
+              <th data-sort="local-size" class="w-20 cursor-pointer px-1 py-1.5 text-right font-medium hover:text-slate-600" data-i18n="sftp.column.size">大小</th>
+              <th data-sort="local-time" class="hidden w-32 cursor-pointer px-1 py-1.5 font-medium hover:text-slate-600 md:table-cell" data-i18n="sftp.column.time">修改时间</th>
+              <th class="w-24 px-1 py-1.5 font-medium" data-i18n="sftp.column.mode">权限</th>
             </tr>
           </thead>
           <tbody id="localBody" class="divide-y divide-slate-100"></tbody>
         </table>
         <div id="localEmpty" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-400">
-          <p class="text-[11px]">正在读取本地目录…</p>
+          <p class="text-[11px]" data-i18n="sftp.local.loading">正在读取本地目录…</p>
         </div>
       </div>
       <div class="flex h-6 flex-none items-center justify-between border-t border-slate-200 px-2 text-[10px] text-slate-400">
@@ -85,31 +87,31 @@
     <!-- 远程 -->
     <section class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white">
       <div class="flex h-9 flex-none items-center gap-1.5 border-b border-slate-200 bg-slate-50/80 px-2">
-        <span class="flex-none text-[11px] font-semibold text-slate-700">远程</span>
-        <button data-act="remote-up" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="上一级">
+        <span class="flex-none text-[11px] font-semibold text-slate-700" data-i18n="sftp.remote.title">远程</span>
+        <button data-act="remote-up" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="上一级" data-i18n-title="sftp.local.upTitle">
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
         </button>
-        <input id="remotePath" spellcheck="false" placeholder="连接后输入远程路径" class="h-6 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 font-mono text-[10.5px] text-slate-600 outline-none hover:border-slate-200 hover:bg-white focus:border-emerald-400 focus:bg-white" />
-        <button data-act="remote-refresh" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="刷新">
+        <input id="remotePath" spellcheck="false" placeholder="连接后输入远程路径" data-i18n-placeholder="sftp.remote.placeholder" class="h-6 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 font-mono text-[10.5px] text-slate-600 outline-none hover:border-slate-200 hover:bg-white focus:border-emerald-400 focus:bg-white" />
+        <button data-act="remote-refresh" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="刷新" data-i18n-title="sftp.local.refreshTitle">
           <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
         </button>
         <span class="mx-0.5 h-4 w-px bg-slate-200"></span>
-        <button data-act="download" class="rounded-md bg-emerald-600 px-2 py-1 text-[10.5px] font-medium text-white hover:bg-emerald-500 disabled:opacity-40" title="下载选中项到本地目录">← 下载</button>
-        <button data-act="mkdir" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10.5px] text-slate-600 hover:bg-slate-50 disabled:opacity-40" title="新建文件夹">新建</button>
-        <button data-act="rename" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10.5px] text-slate-600 hover:bg-slate-50 disabled:opacity-40" title="重命名">重命名</button>
-        <button data-act="chmod" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10.5px] text-slate-600 hover:bg-slate-50 disabled:opacity-40" title="修改权限">权限</button>
-        <button data-act="edit" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10.5px] text-slate-600 hover:bg-slate-50 disabled:opacity-40" title="在线编辑">编辑</button>
-        <button data-act="delete" class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[10.5px] text-rose-600 hover:bg-rose-100 disabled:opacity-40" title="删除">删除</button>
+        <button data-act="download" class="rounded-md bg-emerald-600 px-2 py-1 text-[10.5px] font-medium text-white hover:bg-emerald-500 disabled:opacity-40" title="下载选中项到本地目录" data-i18n-title="sftp.remote.downloadTitle" data-i18n="sftp.remote.download">← 下载</button>
+        <button data-act="mkdir" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10.5px] text-slate-600 hover:bg-slate-50 disabled:opacity-40" title="新建文件夹" data-i18n-title="sftp.remote.mkdirTitle" data-i18n="sftp.remote.mkdir">新建</button>
+        <button data-act="rename" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10.5px] text-slate-600 hover:bg-slate-50 disabled:opacity-40" title="重命名" data-i18n-title="sftp.remote.renameTitle" data-i18n="sftp.remote.rename">重命名</button>
+        <button data-act="chmod" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10.5px] text-slate-600 hover:bg-slate-50 disabled:opacity-40" title="修改权限" data-i18n-title="sftp.remote.chmodTitle" data-i18n="sftp.remote.chmod">权限</button>
+        <button data-act="edit" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10.5px] text-slate-600 hover:bg-slate-50 disabled:opacity-40" title="在线编辑" data-i18n-title="sftp.remote.editTitle" data-i18n="sftp.remote.edit">编辑</button>
+        <button data-act="delete" class="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[10.5px] text-rose-600 hover:bg-rose-100 disabled:opacity-40" title="删除" data-i18n-title="sftp.remote.deleteTitle" data-i18n="sftp.remote.delete">删除</button>
       </div>
       <div id="remoteDrop" class="relative min-h-0 flex-1 overflow-auto">
         <table class="w-full table-fixed text-left text-[11px]">
           <thead class="sticky top-0 z-10 bg-white/95 backdrop-blur">
             <tr class="border-b border-slate-200 text-[9.5px] uppercase tracking-wide text-slate-400">
               <th class="w-8 px-2 py-1.5"></th>
-              <th data-sort="remote-name" class="cursor-pointer px-1 py-1.5 font-medium hover:text-slate-600">名称</th>
-              <th data-sort="remote-size" class="w-20 cursor-pointer px-1 py-1.5 text-right font-medium hover:text-slate-600">大小</th>
-              <th data-sort="remote-time" class="hidden w-32 cursor-pointer px-1 py-1.5 font-medium hover:text-slate-600 md:table-cell">修改时间</th>
-              <th class="w-24 px-1 py-1.5 font-medium">权限</th>
+              <th data-sort="remote-name" class="cursor-pointer px-1 py-1.5 font-medium hover:text-slate-600" data-i18n="sftp.column.name">名称</th>
+              <th data-sort="remote-size" class="w-20 cursor-pointer px-1 py-1.5 text-right font-medium hover:text-slate-600" data-i18n="sftp.column.size">大小</th>
+              <th data-sort="remote-time" class="hidden w-32 cursor-pointer px-1 py-1.5 font-medium hover:text-slate-600 md:table-cell" data-i18n="sftp.column.time">修改时间</th>
+              <th class="w-24 px-1 py-1.5 font-medium" data-i18n="sftp.column.mode">权限</th>
             </tr>
           </thead>
           <tbody id="remoteBody" class="divide-y divide-slate-100"></tbody>
@@ -118,8 +120,8 @@
           <div class="grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-white text-emerald-500 shadow-sm">
             <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8Z"/></svg>
           </div>
-          <p class="text-[11px]">选择连接以浏览远程文件</p>
-          <p class="text-[10px] text-slate-400">会话配置与 SSH 终端共享，支持跳板机</p>
+          <p class="text-[11px]" data-i18n="sftp.remote.choose">选择连接以浏览远程文件</p>
+          <p class="text-[10px] text-slate-400" data-i18n="sftp.remote.hint">会话配置与 SSH 终端共享，支持跳板机</p>
         </div>
       </div>
       <div class="flex h-6 flex-none items-center justify-between border-t border-slate-200 px-2 text-[10px] text-slate-400">
@@ -133,16 +135,16 @@
     <div class="flex h-8 items-center gap-2 px-3">
       <button id="queueToggle" class="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
         <svg id="queueChevron" class="h-3 w-3 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>
-        传输队列
+        <span data-i18n="sftp.queue.title">传输队列</span>
       </button>
-      <span id="queueSummary" class="text-[10px] text-slate-400">暂无任务</span>
-      <button id="clearQueue" class="ml-auto rounded-md px-2 py-0.5 text-[10px] text-slate-400 hover:bg-slate-100 hover:text-slate-700">清除已完成</button>
+      <span id="queueSummary" class="text-[10px] text-slate-400" data-i18n="sftp.queue.empty">暂无任务</span>
+      <button id="clearQueue" class="ml-auto rounded-md px-2 py-0.5 text-[10px] text-slate-400 hover:bg-slate-100 hover:text-slate-700" data-i18n="sftp.queue.clear">清除已完成</button>
     </div>
     <div id="queueBody" class="max-h-36 overflow-y-auto border-t border-slate-100"></div>
   </section>
 
   <footer class="flex h-6 flex-none items-center gap-3 border-t border-slate-200 bg-slate-50 px-3 text-[10px] text-slate-400">
-    <span id="statusText">就绪</span>
+    <span id="statusText" data-i18n="sftp.status.ready">就绪</span>
     <span id="statusTarget" class="font-mono"></span>
   </footer>
 
@@ -150,7 +152,7 @@
   <div id="editor" class="fixed inset-0 z-40 hidden bg-slate-900/40 p-6 backdrop-blur-sm">
     <div class="mx-auto flex h-full w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
       <div class="flex flex-none items-center gap-2 border-b border-slate-200 px-4 py-2.5">
-        <span class="text-[12px] font-semibold text-slate-800">在线编辑</span>
+        <span class="text-[12px] font-semibold text-slate-800" data-i18n="sftp.editor.title">在线编辑</span>
         <span id="editorPath" class="min-w-0 truncate font-mono text-[10.5px] text-slate-400"></span>
         <span id="editorSize" class="ml-auto flex-none text-[10px] text-slate-400"></span>
         <button id="editorClose" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
@@ -159,10 +161,10 @@
       </div>
       <textarea id="editorText" spellcheck="false" class="min-h-0 flex-1 resize-none bg-slate-50 p-3 font-mono text-[11.5px] leading-relaxed text-slate-700 outline-none"></textarea>
       <div class="flex flex-none items-center gap-2 border-t border-slate-200 px-4 py-2">
-        <span class="text-[10px] text-slate-400">保存后立即写入远程文件</span>
+        <span class="text-[10px] text-slate-400" data-i18n="sftp.editor.note">保存后立即写入远程文件</span>
         <div class="ml-auto flex gap-2">
-          <button id="editorCancel" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">取消</button>
-          <button id="editorSave" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-emerald-500">保存</button>
+          <button id="editorCancel" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50" data-i18n="sftp.editor.cancel">取消</button>
+          <button id="editorSave" class="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-emerald-500" data-i18n="sftp.editor.save">保存</button>
         </div>
       </div>
     </div>
@@ -173,16 +175,21 @@
   <script>
     const API = "/api/apps/sftp";
     const $ = (id) => document.getElementById(id);
+    const I18N = window.DevOSAppI18n;
+    const t = (key, params) => (I18N ? I18N.t(key, params) : key);
 
     const state = {
       profiles: [],
       profileId: "",
-      local: { path: "", entries: [], selected: new Set(), sort: { key: "name", dir: 1 }, loading: false },
-      remote: { path: "/", entries: [], selected: new Set(), sort: { key: "name", dir: 1 }, loading: false },
+      connStatus: "idle",
+      local: { path: "", entries: [], selected: new Set(), sort: { key: "name", dir: 1 }, loading: false, error: "" },
+      remote: { path: "/", entries: [], selected: new Set(), sort: { key: "name", dir: 1 }, loading: false, error: "" },
       jobs: new Map(),
       editing: null,
       queueOpen: true,
     };
+
+    document.title = t("sftp.app.title");
 
     function esc(value) {
       return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
@@ -207,7 +214,7 @@
       const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
       const resp = await fetch(API + path, { ...options, headers });
       if (!resp.ok) {
-        let message = `请求失败 (${resp.status})`;
+        let message = t("sftp.error.requestFailed", { status: resp.status });
         try {
           const data = await resp.json();
           message = data.message || data.error || message;
@@ -223,10 +230,10 @@
     }
 
     function formatSize(bytes) {
-      if (bytes < 1024) return bytes + " B";
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-      if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + " MB";
-      return (bytes / 1024 / 1024 / 1024).toFixed(2) + " GB";
+      if (bytes < 1024) return bytes + " " + t("sftp.size.b");
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " " + t("sftp.size.kb");
+      if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + " " + t("sftp.size.mb");
+      return (bytes / 1024 / 1024 / 1024).toFixed(2) + " " + t("sftp.size.gb");
     }
 
     function formatTime(raw) {
@@ -275,36 +282,40 @@
     // ---------- 目录读取 ----------
     async function loadLocal(path) {
       state.local.loading = true;
+      state.local.error = "";
       renderTable("local");
+      renderEmptyState("local");
       try {
         const data = await api(`/local/list?path=${encodeURIComponent(path || "drives")}`);
         state.local.path = data.path;
         state.local.entries = data.entries || [];
         state.local.selected.clear();
+        state.local.error = "";
         $("localPath").value = data.path === "drives" ? "" : data.path;
-        $("localPath").placeholder = "本地路径，留空显示驱动器";
-        $("localEmpty").style.display = data.entries && data.entries.length ? "none" : "flex";
-        $("localEmpty").innerHTML = `<p class="text-[11px]">${data.entries && data.entries.length ? "" : "该目录为空"}</p>`;
-        setStatus(`本地 ${data.path === "drives" ? "驱动器" : data.path}`);
+        $("localPath").placeholder = t("sftp.local.placeholder");
+        setStatus(t("sftp.local.status", { path: data.path === "drives" ? t("sftp.local.drives") : data.path }));
       } catch (err) {
         state.local.entries = [];
         state.local.selected.clear();
-        $("localEmpty").style.display = "flex";
-        $("localEmpty").innerHTML = `<p class="max-w-[70%] text-center text-[11px] text-rose-500">读取本地目录失败：${esc(err.message)}</p>`;
-        toast("读取本地目录失败：" + err.message, "error");
+        state.local.error = err.message;
+        toast(t("sftp.local.loadFailed", { error: err.message }), "error");
       } finally {
         state.local.loading = false;
         renderTable("local");
+        renderEmptyState("local");
       }
     }
 
     async function loadRemote(path) {
       if (!state.profileId) {
         renderTable("remote");
+        renderEmptyState("remote");
         return false;
       }
       state.remote.loading = true;
+      state.remote.error = "";
       renderTable("remote");
+      renderEmptyState("remote");
       let ok = true;
       try {
         const data = await api(`/list?profile=${encodeURIComponent(state.profileId)}&path=${encodeURIComponent(path || "/")}`);
@@ -314,25 +325,48 @@
           path: joinRemote(data.path, item.name),
         }));
         state.remote.selected.clear();
+        state.remote.error = "";
         $("remotePath").value = data.path;
-        $("remoteEmpty").style.display = state.remote.entries.length ? "none" : "flex";
-        $("remoteEmpty").innerHTML = state.remote.entries.length
-          ? ""
-          : `<p class="text-[11px]">当前目录为空</p>`;
-        setStatus(`已加载 ${state.remote.entries.length} 个远程条目`);
+        setStatus(t("sftp.remote.loaded", { count: state.remote.entries.length }));
       } catch (err) {
         ok = false;
         state.remote.entries = [];
         state.remote.selected.clear();
-        $("remoteEmpty").style.display = "flex";
-        $("remoteEmpty").innerHTML = `<p class="max-w-[70%] text-center text-[11px] text-rose-500">读取远程目录失败：${esc(err.message)}</p>`;
+        state.remote.error = err.message;
         setConnBadge("error");
-        toast("读取远程目录失败：" + err.message, "error");
+        toast(t("sftp.remote.loadFailed", { error: err.message }), "error");
       } finally {
         state.remote.loading = false;
         renderTable("remote");
+        renderEmptyState("remote");
       }
       return ok;
+    }
+
+    function renderEmptyState(pane) {
+      const node = $(pane === "local" ? "localEmpty" : "remoteEmpty");
+      const st = state[pane];
+      if (pane === "remote" && !state.profileId) {
+        node.style.display = "flex";
+        node.innerHTML = `<p class="text-[11px]">${esc(t("sftp.remote.choose"))}</p>
+          <p class="text-[10px] text-slate-400">${esc(t("sftp.remote.hint"))}</p>`;
+        return;
+      }
+      if (st.entries.length) {
+        node.style.display = "none";
+        node.innerHTML = "";
+        return;
+      }
+      node.style.display = "flex";
+      if (st.loading) {
+        node.innerHTML = `<p class="text-[11px]">${esc(t(pane === "local" ? "sftp.local.loading" : "sftp.remote.loading"))}</p>`;
+        return;
+      }
+      if (st.error) {
+        node.innerHTML = `<p class="max-w-[70%] text-center text-[11px] text-rose-500">${esc(t(pane === "local" ? "sftp.local.loadFailed" : "sftp.remote.loadFailed", { error: st.error }))}</p>`;
+        return;
+      }
+      node.innerHTML = `<p class="text-[11px]">${esc(t(pane === "local" ? "sftp.local.empty" : "sftp.remote.empty"))}</p>`;
     }
 
     // ---------- 渲染 ----------
@@ -390,11 +424,11 @@
       }).join("");
 
       if (pane === "local") {
-        $("localCount").textContent = list.length ? `${list.length} 个条目` : "";
-        $("localSel").textContent = selected.size ? `已选 ${selected.size} 项` : "";
+        $("localCount").textContent = list.length ? t("sftp.list.count", { count: list.length }) : "";
+        $("localSel").textContent = selected.size ? t("sftp.list.selected", { count: selected.size }) : "";
       } else {
-        $("remoteCount").textContent = state.profileId ? `${list.length} 个条目` : "";
-        $("remoteSel").textContent = selected.size ? `已选 ${selected.size} 项` : "";
+        $("remoteCount").textContent = state.profileId ? t("sftp.list.count", { count: list.length }) : "";
+        $("remoteSel").textContent = selected.size ? t("sftp.list.selected", { count: selected.size }) : "";
       }
 
       body.querySelectorAll("tr[data-full]").forEach((row) => {
@@ -468,14 +502,15 @@
 
     function setConnBadge(status) {
       const map = {
-        idle: ["bg-slate-300", "未连接"],
-        connecting: ["bg-amber-400 animate-pulse", "连接中…"],
-        ok: ["bg-emerald-500", "已连接"],
-        error: ["bg-rose-500", "连接失败"],
+        idle: ["bg-slate-300", "sftp.conn.idle"],
+        connecting: ["bg-amber-400 animate-pulse", "sftp.conn.connecting"],
+        ok: ["bg-emerald-500", "sftp.conn.ok"],
+        error: ["bg-rose-500", "sftp.conn.error"],
       };
       const info = map[status] || map.idle;
+      state.connStatus = map[status] ? status : "idle";
       $("connDot").className = "h-1.5 w-1.5 rounded-full " + info[0];
-      $("connText").textContent = info[1];
+      $("connText").textContent = t(info[1]);
       $("statusTarget").textContent = status === "ok" ? state.remote.path : "";
     }
 
@@ -483,11 +518,11 @@
     async function loadProfiles() {
       state.profiles = await api("/profiles");
       const select = $("profileSelect");
-      select.innerHTML = `<option value="">选择连接…</option>` + state.profiles.map((p) =>
+      select.innerHTML = `<option value="">${esc(t("sftp.profile.choose"))}</option>` + state.profiles.map((p) =>
         `<option value="${esc(p.id)}">${esc(p.name)}（${esc(p.user)}@${esc(p.host)}）</option>`
       ).join("");
       if (!state.profiles.length) {
-        toast("还没有会话配置，请先在 SSH 终端中创建", "error");
+        toast(t("sftp.toast.profileNone"), "error");
       }
     }
 
@@ -496,8 +531,8 @@
       state.remote.selected.clear();
       if (!state.profileId) {
         state.remote.entries = [];
-        $("remoteEmpty").style.display = "flex";
-        $("remoteEmpty").innerHTML = `<p class="text-[11px]">选择连接以浏览远程文件</p>`;
+        state.remote.error = "";
+        renderEmptyState("remote");
         setConnBadge("idle");
         renderTable("remote");
         return;
@@ -565,8 +600,8 @@
     }
 
     async function makeRemoteDir() {
-      if (!state.profileId) return toast("请先连接会话", "error");
-      const name = prompt("新建文件夹名称");
+      if (!state.profileId) return toast(t("sftp.toast.notConnected"), "error");
+      const name = prompt(t("sftp.prompt.mkdir"));
       if (!name || !name.trim()) return;
       try {
         await api("/mkdir", {
@@ -574,9 +609,9 @@
           body: JSON.stringify({ profile: state.profileId, path: joinRemote(currentRemoteDir(), name.trim()) }),
         });
         await loadRemote(currentRemoteDir());
-        toast("文件夹已创建");
+        toast(t("sftp.toast.mkdirDone"));
       } catch (err) {
-        toast("创建失败：" + err.message, "error");
+        toast(t("sftp.toast.mkdirFailed", { error: err.message }), "error");
       }
     }
 
@@ -584,7 +619,7 @@
       const from = [...state.remote.selected][0];
       if (!from) return;
       const oldName = from.split("/").filter(Boolean).pop() || from;
-      const name = prompt("重命名为", oldName);
+      const name = prompt(t("sftp.prompt.rename"), oldName);
       if (!name || !name.trim() || name.trim() === oldName) return;
       const to = joinRemote(parentRemote(from), name.trim());
       try {
@@ -593,9 +628,9 @@
           body: JSON.stringify({ profile: state.profileId, from, to }),
         });
         await loadRemote(currentRemoteDir());
-        toast("已重命名");
+        toast(t("sftp.toast.renameDone"));
       } catch (err) {
-        toast("重命名失败：" + err.message, "error");
+        toast(t("sftp.toast.renameFailed", { error: err.message }), "error");
       }
     }
 
@@ -603,10 +638,10 @@
       const target = [...state.remote.selected][0];
       if (!target) return;
       const item = sortEntries("remote").find((entry) => entry.path === target);
-      const mode = prompt("权限（八进制，例如 644 / 755）", item ? modeToOctal(item.mode) : "644");
+      const mode = prompt(t("sftp.prompt.chmod"), item ? modeToOctal(item.mode) : "644");
       if (!mode) return;
       if (!/^[0-7]{3,4}$/.test(mode.trim())) {
-        toast("权限格式不正确，应为八进制数字", "error");
+        toast(t("sftp.toast.chmodInvalid"), "error");
         return;
       }
       try {
@@ -615,25 +650,25 @@
           body: JSON.stringify({ profile: state.profileId, path: target, mode: mode.trim() }),
         });
         await loadRemote(currentRemoteDir());
-        toast("权限已更新");
+        toast(t("sftp.toast.chmodDone"));
       } catch (err) {
-        toast("修改权限失败：" + err.message, "error");
+        toast(t("sftp.toast.chmodFailed", { error: err.message }), "error");
       }
     }
 
     async function deleteRemote() {
       const paths = [...state.remote.selected];
       if (!paths.length) return;
-      if (!confirm(`确定删除选中的 ${paths.length} 个条目？文件夹会递归删除。`)) return;
+      if (!confirm(t("sftp.confirm.delete", { count: paths.length }))) return;
       try {
         await api("/remove", {
           method: "POST",
           body: JSON.stringify({ profile: state.profileId, paths, recursive: true }),
         });
         await loadRemote(currentRemoteDir());
-        toast("已删除");
+        toast(t("sftp.toast.deleted"));
       } catch (err) {
-        toast("删除失败：" + err.message, "error");
+        toast(t("sftp.toast.deleteFailed", { error: err.message }), "error");
       }
     }
 
@@ -641,17 +676,17 @@
     async function uploadSelection() {
       const items = dragItems("local", [...state.local.selected][0]);
       if (!items.length) return;
-      if (!state.profileId) return toast("请先连接会话", "error");
-      if (state.local.path === "drives") return toast("请先进入具体本地目录", "error");
+      if (!state.profileId) return toast(t("sftp.toast.notConnected"), "error");
+      if (state.local.path === "drives") return toast(t("sftp.toast.needLocalDir"), "error");
       await startTransfer("upload", currentRemoteDir(), items);
     }
 
     async function downloadSelection() {
       const items = dragItems("remote", [...state.remote.selected][0]);
       if (!items.length) return;
-      if (!state.profileId) return toast("请先连接会话", "error");
+      if (!state.profileId) return toast(t("sftp.toast.notConnected"), "error");
       const dir = currentLocalDir();
-      if (!dir) return toast("请先在本地栏进入一个目录", "error");
+      if (!dir) return toast(t("sftp.toast.needDownloadDir"), "error");
       await startTransfer("download", dir, items);
     }
 
@@ -666,9 +701,9 @@
         if (!state.queueOpen) toggleQueue(true);
         renderQueue();
         pollJob(job.id);
-        setStatus(direction === "upload" ? "正在上传…" : "正在下载…");
+        setStatus(direction === "upload" ? t("sftp.status.uploading") : t("sftp.status.downloading"));
       } catch (err) {
-        toast("创建传输任务失败：" + err.message, "error");
+        toast(t("sftp.toast.transferCreateFailed", { error: err.message }), "error");
       }
     }
 
@@ -683,9 +718,9 @@
             if (job.status === "done") {
               if (job.direction === "upload") await loadRemote(currentRemoteDir());
               else await loadLocal(state.local.path);
-              toast(`传输完成：${job.doneFiles} 个文件`);
+              toast(t("sftp.toast.transferDone", { count: job.doneFiles }));
             } else {
-              toast("传输失败：" + (job.error || "未知错误"), "error");
+              toast(t("sftp.toast.transferFailed", { error: job.error || t("sftp.error.unknown") }), "error");
             }
           }
         } catch (err) {
@@ -701,12 +736,12 @@
       $("queueBadge").className = "rounded-full px-1.5 text-[9.5px] font-medium " +
         (running ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500");
       $("queueSummary").textContent = jobs.length
-        ? `${jobs.length} 个任务 · ${running} 个进行中`
-        : "暂无任务";
+        ? t("sftp.queue.summary", { total: jobs.length, running })
+        : t("sftp.queue.empty");
 
       const body = $("queueBody");
       if (!jobs.length) {
-        body.innerHTML = `<div class="px-3 py-4 text-center text-[10.5px] text-slate-400">上传或下载的文件会显示在这里</div>`;
+        body.innerHTML = `<div class="px-3 py-4 text-center text-[10.5px] text-slate-400">${esc(t("sftp.queue.hint"))}</div>`;
         return;
       }
       body.innerHTML = jobs.map((job) => {
@@ -714,12 +749,20 @@
           ? Math.min(100, Math.round((job.doneBytes / job.totalBytes) * 100))
           : (job.totalFiles > 0 ? Math.round((job.doneFiles / job.totalFiles) * 100) : 0);
         const tone = job.status === "error" ? "bg-rose-500" : job.status === "done" ? "bg-emerald-500" : "bg-sky-500";
-        const label = job.status === "running" ? "进行中" : job.status === "done" ? "已完成" : "失败";
+        const label = job.status === "running"
+          ? t("sftp.job.transferring")
+          : job.status === "done"
+            ? t("sftp.job.completed")
+            : job.status === "waiting"
+              ? t("sftp.job.waiting")
+              : job.status === "canceled"
+                ? t("sftp.job.canceled")
+                : t("sftp.job.failed");
         const labelColor = job.status === "error" ? "text-rose-600" : job.status === "done" ? "text-emerald-600" : "text-sky-600";
-        const current = (job.current || "").split(/[\\/]/).filter(Boolean).pop() || (job.direction === "upload" ? "准备上传…" : "准备下载…");
+        const current = (job.current || "").split(/[\\/]/).filter(Boolean).pop() || t(job.direction === "upload" ? "sftp.job.preparingUpload" : "sftp.job.preparingDownload");
         return `<div class="border-b border-slate-100 px-3 py-1.5 last:border-0">
           <div class="flex items-center gap-2 text-[10px]">
-            <span class="flex-none rounded bg-slate-100 px-1.5 py-0.5 text-[9.5px] text-slate-500">${job.direction === "upload" ? "上传" : "下载"}</span>
+            <span class="flex-none rounded bg-slate-100 px-1.5 py-0.5 text-[9.5px] text-slate-500">${t(job.direction === "upload" ? "sftp.direction.upload" : "sftp.direction.download")}</span>
             <span class="min-w-0 flex-1 truncate text-slate-600" title="${esc(job.current || "")}">${esc(current)}</span>
             <span class="flex-none font-mono text-slate-400">${formatSize(job.doneBytes)} / ${formatSize(job.totalBytes)}</span>
             <span class="flex-none ${labelColor}">${label}</span>
@@ -766,12 +809,12 @@
         }
         if (!items.length || !state.profileId) return;
         if (pane === "remote") {
-          if (state.local.path === "drives") return toast("请先进入具体本地目录", "error");
+          if (state.local.path === "drives") return toast(t("sftp.toast.needLocalDir"), "error");
           await startTransfer("upload", currentRemoteDir(), items);
           return;
         }
         const dir = currentLocalDir();
-        if (!dir) return toast("请先在本地栏进入一个目录", "error");
+        if (!dir) return toast(t("sftp.toast.needDownloadDir"), "error");
         await startTransfer("download", dir, items);
       });
     }
@@ -786,7 +829,7 @@
       try {
         const data = await api(`/read?profile=${encodeURIComponent(state.profileId)}&path=${encodeURIComponent(target)}`);
         if (data.binary) {
-          toast("二进制文件不支持在线编辑", "error");
+          toast(t("sftp.editor.binary"), "error");
           return;
         }
         state.editing = target;
@@ -797,7 +840,7 @@
         $("editor").classList.remove("hidden");
         setTimeout(() => $("editorText").focus(), 30);
       } catch (err) {
-        toast("打开文件失败：" + err.message, "error");
+        toast(t("sftp.editor.openFailed", { error: err.message }), "error");
       }
     }
 
@@ -815,11 +858,11 @@
           method: "POST",
           body: JSON.stringify({ profile: state.profileId, path: state.editing, content: $("editorText").value }),
         });
-        toast("文件已保存");
+        toast(t("sftp.editor.saved"));
         closeEditor();
         await loadRemote(currentRemoteDir());
       } catch (err) {
-        toast("保存失败：" + err.message, "error");
+        toast(t("sftp.editor.saveFailed", { error: err.message }), "error");
       }
     });
 
@@ -844,7 +887,7 @@
       try {
         await loadProfiles();
       } catch (err) {
-        toast("加载会话失败：" + err.message, "error");
+        toast(t("sftp.toast.profileLoadFailed", { error: err.message }), "error");
       }
       try {
         const home = await api("/local/home");
@@ -865,6 +908,26 @@
     }
 
     init();
+
+    // 跟随桌面外壳切换语言时刷新动态文案。
+    if (I18N) {
+      document.addEventListener("devos:locale-changed", () => {
+        document.title = t("sftp.app.title");
+        $("localPath").placeholder = t("sftp.local.placeholder");
+        renderTable("local");
+        renderTable("remote");
+        renderEmptyState("local");
+        renderEmptyState("remote");
+        renderQueue();
+        setConnBadge(state.connStatus);
+        if (state.profileId) {
+          const prof = state.profiles.find((p) => p.id === state.profileId);
+          if (prof) setStatus(`${prof.user}@${prof.host}:${prof.port} · SFTP`);
+        } else {
+          setStatus(t("sftp.status.ready"));
+        }
+      });
+    }
   </script>
 </body>
 </html>

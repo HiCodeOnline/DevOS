@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -13,14 +13,16 @@
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/ui.css?v=1" />
+  <script src="/assets/app-i18n.js?v=2"></script>
+  <script src="/assets/locales/apps/api.js?v=1"></script>
 </head>
 <body class="flex h-screen flex-col overflow-hidden bg-slate-50 font-sans text-slate-700 antialiased">
   <header class="flex flex-none items-center gap-1 border-b border-slate-200 bg-white/85 px-3 py-2">
     <span class="mr-2 grid h-8 w-8 place-items-center rounded-lg bg-amber-50 text-amber-600">
       <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H6a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2"/></svg>
     </span>
-    <button data-tab="debug" class="tab-btn rounded-lg bg-slate-900 px-3 py-1.5 text-[11.5px] font-medium text-white">接口调试</button>
-    <button data-tab="mock" class="tab-btn rounded-lg px-3 py-1.5 text-[11.5px] font-medium text-slate-500 hover:bg-slate-100">Mock 服务</button>
+    <button data-tab="debug" class="tab-btn rounded-lg bg-slate-900 px-3 py-1.5 text-[11.5px] font-medium text-white" data-i18n="api.tab.debug">接口调试</button>
+    <button data-tab="mock" class="tab-btn rounded-lg px-3 py-1.5 text-[11.5px] font-medium text-slate-500 hover:bg-slate-100" data-i18n="api.tab.mock">Mock 服务</button>
     <span id="mockHint" class="ml-auto hidden text-[10.5px] text-slate-400"></span>
   </header>
 
@@ -28,8 +30,8 @@
   <section id="tabDebug" class="flex min-h-0 flex-1">
     <aside class="flex w-[220px] flex-none flex-col border-r border-slate-200 bg-white/70">
       <div class="flex items-center justify-between px-3 py-2.5">
-        <span class="text-[11px] font-semibold text-slate-600">已保存请求</span>
-        <button id="saveReqBtn" class="rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white hover:bg-slate-700">保存</button>
+        <span class="text-[11px] font-semibold text-slate-600" data-i18n="api.debug.savedTitle">已保存请求</span>
+        <button id="saveReqBtn" class="rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white hover:bg-slate-700" data-i18n="api.common.save">保存</button>
       </div>
       <div id="savedList" class="flex-1 space-y-1 overflow-y-auto px-2 pb-2"></div>
     </aside>
@@ -41,16 +43,16 @@
             <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option>
           </select>
           <input id="url" placeholder="https://httpbin.org/get" class="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11.5px] outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
-          <button id="sendBtn" class="rounded-lg bg-amber-500 px-4 py-2 text-[11.5px] font-semibold text-white transition hover:bg-amber-400 disabled:opacity-50">发送</button>
+          <button id="sendBtn" class="rounded-lg bg-amber-500 px-4 py-2 text-[11.5px] font-semibold text-white transition hover:bg-amber-400 disabled:opacity-50" data-i18n="api.debug.send">发送</button>
         </div>
 
         <div class="mt-3 grid grid-cols-2 gap-3">
           <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">请求头（每行 Key: Value）</span>
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.debug.headers">请求头（每行 Key: Value）</span>
             <textarea id="reqHeaders" rows="5" class="w-full resize-none rounded-lg border border-slate-200 p-2 font-mono text-[10.5px] outline-none focus:border-amber-400" placeholder="Content-Type: application/json"></textarea>
           </label>
           <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">请求体</span>
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.debug.body">请求体</span>
             <textarea id="reqBody" rows="5" class="w-full resize-none rounded-lg border border-slate-200 p-2 font-mono text-[10.5px] outline-none focus:border-amber-400" placeholder='{"name":"devos"}'></textarea>
           </label>
         </div>
@@ -58,16 +60,16 @@
 
       <div class="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
         <div class="flex items-center gap-2">
-          <span class="text-[11px] font-semibold text-slate-600">响应</span>
+          <span class="text-[11px] font-semibold text-slate-600" data-i18n="api.debug.response">响应</span>
           <span id="resStatus" class="hidden rounded-full px-2 py-0.5 text-[10px] font-semibold"></span>
           <span id="resTime" class="hidden text-[10px] text-slate-400"></span>
           <span id="resSize" class="hidden text-[10px] text-slate-400"></span>
-          <button id="copyResBtn" class="ml-auto rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50">复制</button>
+          <button id="copyResBtn" class="ml-auto rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50" data-i18n="api.common.copy">复制</button>
         </div>
-        <div id="resHint" class="py-8 text-center text-[11px] text-slate-400">发送请求后在此查看结果</div>
+        <div id="resHint" class="py-8 text-center text-[11px] text-slate-400" data-i18n="api.debug.hint">发送请求后在此查看结果</div>
         <pre id="resBody" class="hidden max-h-[320px] overflow-auto rounded-lg bg-slate-900 p-3 font-mono text-[10.5px] leading-relaxed text-slate-100"></pre>
         <details id="resHeadersBox" class="mt-2 hidden">
-          <summary class="cursor-pointer text-[10.5px] text-slate-500">响应头</summary>
+          <summary class="cursor-pointer text-[10.5px] text-slate-500" data-i18n="api.debug.responseHeaders">响应头</summary>
           <pre id="resHeaders" class="mt-1 max-h-40 overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-[10px] text-slate-600"></pre>
         </details>
       </div>
@@ -77,10 +79,10 @@
   <!-- Mock -->
   <section id="tabMock" class="hidden min-h-0 flex-1 flex-col overflow-hidden">
     <div class="flex flex-none items-center gap-3 border-b border-slate-200 bg-white/60 px-4 py-2.5">
-      <span class="text-[11px] text-slate-500">Mock 基础地址</span>
+      <span class="text-[11px] text-slate-500" data-i18n="api.mock.base">Mock 基础地址</span>
       <code id="mockBase" class="rounded-md bg-slate-900 px-2 py-1 font-mono text-[10.5px] text-emerald-300">…</code>
-      <button id="copyMockBtn" class="rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50">复制</button>
-      <button id="newMockBtn" class="ml-auto rounded-lg bg-amber-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-400">新建规则</button>
+      <button id="copyMockBtn" class="rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50" data-i18n="api.common.copy">复制</button>
+      <button id="newMockBtn" class="ml-auto rounded-lg bg-amber-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-400" data-i18n="api.mock.newRule">新建规则</button>
     </div>
     <div class="min-h-0 flex-1 overflow-y-auto p-3">
       <div id="mockList" class="space-y-2"></div>
@@ -91,7 +93,7 @@
   <div id="mockModal" class="fixed inset-0 z-30 hidden items-center justify-center bg-slate-900/30 p-4 backdrop-blur-sm">
     <div class="max-h-[90vh] w-[560px] overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
       <div class="mb-3 flex items-center justify-between">
-        <h2 id="mockTitle" class="text-sm font-semibold text-slate-900">新建 Mock 规则</h2>
+        <h2 id="mockTitle" class="text-sm font-semibold text-slate-900" data-i18n="api.mock.titleNew">新建 Mock 规则</h2>
         <button id="closeMockModal" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
@@ -99,47 +101,47 @@
       <form id="mockForm" class="space-y-3">
         <input type="hidden" id="mId" />
         <label class="block">
-          <span class="mb-1 block text-[10.5px] font-medium text-slate-500">规则名称</span>
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.name">规则名称</span>
           <input id="mName" required class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-amber-400" />
         </label>
         <div class="grid grid-cols-4 gap-2">
           <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">方法</span>
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.method">方法</span>
             <select id="mMethod" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs outline-none focus:border-amber-400">
               <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>ANY</option>
             </select>
           </label>
           <label class="col-span-2 block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">路径（支持 /api/* 通配）</span>
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.path">路径（支持 /api/* 通配）</span>
             <input id="mPath" required placeholder="/hello" class="w-full rounded-lg border border-slate-200 px-2 py-2 font-mono text-[11px] outline-none focus:border-amber-400" />
           </label>
           <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">状态码</span>
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.status">状态码</span>
             <input id="mStatus" type="number" value="200" class="w-full rounded-lg border border-slate-200 px-2 py-2 text-xs outline-none focus:border-amber-400" />
           </label>
         </div>
         <div class="grid grid-cols-4 gap-2">
           <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">延迟 (ms)</span>
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.delay">延迟 (ms)</span>
             <input id="mDelay" type="number" value="0" class="w-full rounded-lg border border-slate-200 px-2 py-2 text-xs outline-none focus:border-amber-400" />
           </label>
           <label class="col-span-3 flex items-end gap-2 pb-2">
             <input id="mEnabled" type="checkbox" checked class="rounded border-slate-300" />
-            <span class="text-[11px] text-slate-600">启用该规则</span>
+            <span class="text-[11px] text-slate-600" data-i18n="api.mock.enableRule">启用该规则</span>
           </label>
         </div>
         <label class="block">
-          <span class="mb-1 block text-[10.5px] font-medium text-slate-500">响应头（每行 Key: Value）</span>
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.resHeaders">响应头（每行 Key: Value）</span>
           <textarea id="mHeaders" rows="3" class="w-full resize-none rounded-lg border border-slate-200 p-2 font-mono text-[10.5px] outline-none focus:border-amber-400" placeholder="Content-Type: application/json"></textarea>
         </label>
         <label class="block">
-          <span class="mb-1 block text-[10.5px] font-medium text-slate-500">响应体</span>
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.resBody">响应体</span>
           <textarea id="mBody" rows="5" class="w-full resize-none rounded-lg border border-slate-200 p-2 font-mono text-[10.5px] outline-none focus:border-amber-400" placeholder='{"ok":true}'></textarea>
         </label>
         <p id="mockError" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-600"></p>
         <div class="flex gap-2">
-          <button type="submit" class="flex-1 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-400">保存规则</button>
-          <button type="button" id="cancelMock" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50">取消</button>
+          <button type="submit" class="flex-1 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-400" data-i18n="api.mock.saveRule">保存规则</button>
+          <button type="button" id="cancelMock" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50" data-i18n="api.common.cancel">取消</button>
         </div>
       </form>
     </div>
@@ -148,10 +150,29 @@
   <div id="toast" class="pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-900 px-4 py-2 text-[11px] text-white opacity-0 transition-opacity"></div>
 
   <script>
+    const I18N = window.DevOSAppI18n;
+    const t = (key, params) => (I18N ? I18N.t(key, params) : key);
     const API = "/api/apps/api";
-    const state = { tab: "debug", mocks: [], baseURL: "", lastResponse: "", saved: [] };
+    const state = { tab: "debug", mocks: [], baseURL: "", lastResponse: "", saved: [], lastError: "" };
 
     const $ = (id) => document.getElementById(id);
+
+    document.title = t("api.app.title");
+
+    document.addEventListener("devos:locale-changed", () => {
+      document.title = t("api.app.title");
+      renderSaved();
+      renderMocks();
+      $("sendBtn").textContent = $("sendBtn").disabled ? t("api.debug.sending") : t("api.debug.send");
+      if (state.lastError) {
+        $("resHint").textContent = t("api.debug.error", { error: state.lastError });
+      } else if ($("resBody").classList.contains("hidden")) {
+        $("resHint").textContent = t("api.debug.hint");
+      }
+      if (!$("mockModal").classList.contains("hidden")) {
+        $("mockTitle").textContent = t($("mId").value ? "api.mock.titleEdit" : "api.mock.titleNew");
+      }
+    });
 
     function esc(value) {
       return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
@@ -171,7 +192,7 @@
       const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
       const resp = await fetch(API + path, { ...options, headers });
       if (!resp.ok) {
-        let message = `请求失败 (${resp.status})`;
+        let message = t("api.debug.requestFailed", { status: resp.status });
         try {
           const data = await resp.json();
           message = data.message || data.error || message;
@@ -228,14 +249,14 @@
     function renderSaved() {
       const box = $("savedList");
       if (!state.saved.length) {
-        box.innerHTML = `<div class="rounded-lg border border-dashed border-slate-200 px-2.5 py-5 text-center text-[10px] text-slate-400">暂无保存的请求</div>`;
+        box.innerHTML = `<div class="rounded-lg border border-dashed border-slate-200 px-2.5 py-5 text-center text-[10px] text-slate-400">${esc(t("api.debug.noSaved"))}</div>`;
         return;
       }
       box.innerHTML = state.saved.map((item) => `
         <div class="group flex cursor-pointer items-center gap-1.5 rounded-lg border border-transparent px-2 py-1.5 hover:border-slate-200 hover:bg-slate-50" data-id="${esc(item.id)}">
           <span class="w-9 flex-none font-mono text-[9px] font-semibold text-amber-600">${esc(item.method)}</span>
           <span class="min-w-0 flex-1 truncate text-[11px] text-slate-700">${esc(item.name || item.url)}</span>
-          <button data-del class="hidden rounded p-0.5 text-slate-400 hover:text-rose-600 group-hover:block" title="删除">
+          <button data-del class="hidden rounded p-0.5 text-slate-400 hover:text-rose-600 group-hover:block" title="${esc(t("api.common.delete"))}">
             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
           </button>
         </div>`).join("");
@@ -257,7 +278,7 @@
     }
 
     $("saveReqBtn").addEventListener("click", () => {
-      const name = prompt("请求名称", $("url").value || "新请求");
+      const name = prompt(t("api.debug.requestName"), $("url").value || t("api.debug.newRequest"));
       if (!name) return;
       state.saved.unshift({
         id: Date.now().toString(36),
@@ -268,14 +289,14 @@
         body: $("reqBody").value,
       });
       persistSaved();
-      toast("已保存请求");
+      toast(t("api.debug.saved"));
     });
 
     $("sendBtn").addEventListener("click", async () => {
       const url = $("url").value.trim();
-      if (!url) return toast("请输入请求地址");
+      if (!url) return toast(t("api.debug.urlRequired"));
       $("sendBtn").disabled = true;
-      $("sendBtn").textContent = "发送中…";
+      $("sendBtn").textContent = t("api.debug.sending");
       try {
         const data = await api("/send", {
           method: "POST",
@@ -287,6 +308,7 @@
           }),
         });
         state.lastResponse = data.body || "";
+        state.lastError = "";
         $("resHint").classList.add("hidden");
         $("resBody").classList.remove("hidden");
         $("resBody").textContent = pretty(data.body || "");
@@ -302,21 +324,22 @@
         $("resHeaders").textContent = headersToText(data.headers);
         $("resHeadersBox").classList.remove("hidden");
       } catch (err) {
+        state.lastError = err.message;
         $("resHint").classList.remove("hidden");
-        $("resHint").textContent = "请求失败：" + err.message;
+        $("resHint").textContent = t("api.debug.error", { error: err.message });
         $("resHint").className = "py-8 text-center text-[11px] text-rose-500";
         $("resBody").classList.add("hidden");
         $("resStatus").classList.add("hidden");
       } finally {
         $("sendBtn").disabled = false;
-        $("sendBtn").textContent = "发送";
+        $("sendBtn").textContent = t("api.debug.send");
       }
     });
 
     $("copyResBtn").addEventListener("click", async () => {
-      if (!state.lastResponse) return toast("暂无响应内容");
+      if (!state.lastResponse) return toast(t("api.debug.noResponse"));
       await navigator.clipboard.writeText(state.lastResponse);
-      toast("已复制响应");
+      toast(t("api.debug.copied"));
     });
 
     // ---------- Mock ----------
@@ -325,14 +348,14 @@
         state.mocks = await api("/mocks");
         renderMocks();
       } catch (err) {
-        toast("加载 Mock 规则失败：" + err.message);
+        toast(t("api.mock.loadFailed", { error: err.message }));
       }
     }
 
     function renderMocks() {
       const box = $("mockList");
       if (!state.mocks.length) {
-        box.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-white/50 px-4 py-12 text-center text-[11px] text-slate-400">还没有 Mock 规则，点击右上角新建</div>`;
+        box.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-white/50 px-4 py-12 text-center text-[11px] text-slate-400">${esc(t("api.mock.empty"))}</div>`;
         return;
       }
       box.innerHTML = state.mocks.map((rule) => `
@@ -341,17 +364,17 @@
             <span class="rounded-md bg-slate-900 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold text-amber-300">${esc(rule.method)}</span>
             <code class="font-mono text-[11.5px] text-slate-800">${esc(rule.path)}</code>
             <span class="text-[10px] text-slate-400">${esc(rule.status)} · ${esc(rule.delayMs || 0)}ms</span>
-            <span class="text-[10px] ${rule.enabled ? "text-emerald-600" : "text-slate-400"}">${rule.enabled ? "启用" : "停用"}</span>
+            <span class="text-[10px] ${rule.enabled ? "text-emerald-600" : "text-slate-400"}">${esc(rule.enabled ? t("api.common.enabled") : t("api.common.disabled"))}</span>
             <div class="ml-auto flex items-center gap-1">
               <label class="flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 px-1.5 py-1 text-[10px] text-slate-500">
-                <input type="checkbox" data-toggle ${rule.enabled ? "checked" : ""} class="rounded border-slate-300" />启用
+                <input type="checkbox" data-toggle ${rule.enabled ? "checked" : ""} class="rounded border-slate-300" />${esc(t("api.common.enable"))}
               </label>
-              <button data-edit class="rounded-md border border-slate-200 px-1.5 py-1 text-[10px] text-slate-500 hover:bg-slate-50">编辑</button>
-              <button data-delete class="rounded-md border border-rose-200 px-1.5 py-1 text-[10px] text-rose-500 hover:bg-rose-50">删除</button>
+              <button data-edit class="rounded-md border border-slate-200 px-1.5 py-1 text-[10px] text-slate-500 hover:bg-slate-50">${esc(t("api.common.edit"))}</button>
+              <button data-delete class="rounded-md border border-rose-200 px-1.5 py-1 text-[10px] text-rose-500 hover:bg-rose-50">${esc(t("api.common.delete"))}</button>
             </div>
           </div>
           <div class="mt-2 flex items-center gap-2">
-            <span class="text-[10px] text-slate-400">${esc(rule.name || "未命名")}</span>
+            <span class="text-[10px] text-slate-400">${esc(rule.name || t("api.mock.untitled"))}</span>
             <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-slate-400">${esc(rule.body || "")}</span>
           </div>
         </div>`).join("");
@@ -364,18 +387,18 @@
             await api("/mocks", { method: "POST", body: JSON.stringify(state.mocks) });
             renderMocks();
           } catch (err) {
-            toast("更新失败：" + err.message);
+            toast(t("api.mock.updateFailed", { error: err.message }));
           }
         });
         node.querySelector("[data-edit]").addEventListener("click", () => openMockModal(rule));
         node.querySelector("[data-delete]").addEventListener("click", async () => {
-          if (!confirm(`删除规则「${rule.name}」？`)) return;
+          if (!confirm(t("api.mock.confirmDelete", { name: rule.name }))) return;
           try {
             await api(`/mocks/${encodeURIComponent(rule.id)}`, { method: "DELETE" });
             await loadMocks();
-            toast("已删除规则");
+            toast(t("api.mock.deleted"));
           } catch (err) {
-            toast("删除失败：" + err.message);
+            toast(t("api.mock.deleteFailed", { error: err.message }));
           }
         });
       });
@@ -385,7 +408,7 @@
       $("mockModal").classList.remove("hidden");
       $("mockModal").classList.add("flex");
       $("mockError").classList.add("hidden");
-      $("mockTitle").textContent = rule ? "编辑 Mock 规则" : "新建 Mock 规则";
+      $("mockTitle").textContent = t(rule ? "api.mock.titleEdit" : "api.mock.titleNew");
       $("mId").value = rule ? rule.id : "";
       $("mName").value = rule ? rule.name : "";
       $("mMethod").value = rule ? rule.method : "GET";
@@ -427,7 +450,7 @@
         await api("/mocks", { method: "POST", body: JSON.stringify(next) });
         closeMockModal();
         await loadMocks();
-        toast("规则已保存");
+        toast(t("api.mock.saved"));
       } catch (err) {
         $("mockError").textContent = err.message;
         $("mockError").classList.remove("hidden");
@@ -436,7 +459,7 @@
 
     $("copyMockBtn").addEventListener("click", async () => {
       await navigator.clipboard.writeText(state.baseURL + "/mock");
-      toast("已复制 Mock 地址");
+      toast(t("api.mock.copyBase"));
     });
 
     async function init() {
