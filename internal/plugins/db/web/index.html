@@ -1737,7 +1737,13 @@ $('#fDriverBtn').addEventListener('click', () => {
 document.addEventListener('click', (ev) => {
   if (!ev.target.closest('#driverSelect')) closeDriverMenu();
 });
-$('#connModal').addEventListener('scroll', closeDriverMenu, true);
+// 下拉菜单使用 fixed 定位但仍在弹窗 DOM 内，菜单自身的滚动不应触发收起。
+$('#connModal').addEventListener('scroll', (ev) => {
+  const menu = $('#fDriverMenu');
+  if (ev.target === menu || menu.contains(ev.target)) return;
+  closeDriverMenu();
+}, true);
+$('#fDriverMenu').addEventListener('wheel', (ev) => ev.stopPropagation(), { passive: true });
 window.addEventListener('resize', closeDriverMenu);
 // Escape：下拉打开时只收起下拉，否则关闭弹窗。
 $('#connModal').addEventListener('keydown', (ev) => {
