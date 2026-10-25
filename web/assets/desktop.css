@@ -620,13 +620,20 @@
 .window-resize::after {
   content: "";
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 8px;
-  height: 8px;
+  right: 0;
+  bottom: 0;
+  width: 13px;
+  height: 13px;
   border-right: 2px solid rgba(148, 163, 184, 0.9);
   border-bottom: 2px solid rgba(148, 163, 184, 0.9);
-  border-radius: 1px;
+  border-bottom-right-radius: 13px;
+  pointer-events: none;
+}
+/* 最大化窗口圆角更小，拖动弧线同步收小以保持同心。 */
+.window.is-maximized .window-resize::after {
+  width: 9px;
+  height: 9px;
+  border-bottom-right-radius: 9px;
 }
 
 /* Toast */
