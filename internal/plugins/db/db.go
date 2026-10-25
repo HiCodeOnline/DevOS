@@ -12,12 +12,14 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/gofiber/fiber/v2"
 
 	"devos/internal/plugin"
+	"devos/internal/secure"
 )
 
 //go:embed web
@@ -62,6 +64,10 @@ func (c *Connection) ApplyDefaults() {
 		if c.SSLMode == "" {
 			c.SSLMode = "disable"
 		}
+	case familyRedis:
+		if strings.TrimSpace(c.Database) == "" {
+			c.Database = "0"
+		}
 	}
 	if c.Name == "" {
 		if t.File {
@@ -77,14 +83,23 @@ type DB struct {
 	mu    sync.RWMutex
 	conns []Connection
 	file  string
+	keys  *secure.Keyring
 	log   *slog.Logger
 
-	poolsMu sync.Mutex
-	pools   map[string]*sqlPool
+	poolsMu      sync.Mutex
+	pools        map[string]*sqlPool
+	redisClients map[string]*redisPool
+	mongoClients map[string]*mongoConn
 }
 
 // New 创建数据库插件。
-func New() *DB { return &DB{pools: map[string]*sqlPool{}} }
+func New() *DB {
+	return &DB{
+		pools:        map[string]*sqlPool{},
+		redisClients: map[string]*redisPool{},
+		mongoClients: map[string]*mongoConn{},
+	}
+}
 
 func (p *DB) Manifest() plugin.Manifest {
 	return plugin.Manifest{
@@ -107,6 +122,11 @@ func (p *DB) Manifest() plugin.Manifest {
 func (p *DB) Init(ctx *plugin.Context) error {
 	p.file = filepath.Join(ctx.DataDir, "connections.json")
 	p.log = ctx.Logger
+	keys, err := secure.Open(ctx.DataDir, "connections.key")
+	if err != nil {
+		return fmt.Errorf("初始化连接加密密钥失败: %w", err)
+	}
+	p.keys = keys
 	return p.load()
 }
 
@@ -125,7 +145,7 @@ func (p *DB) Register(api fiber.Router) {
 	api.Post("/connections", p.handleSaveConnection)
 	api.Delete("/connections/:id", p.handleDeleteConnection)
 	api.Post("/connections/:id/duplicate", p.handleDuplicateConnection)
-	api.Get("/connections/export", p.handleExportConnections)
+	api.Post("/connections/export", p.handleExportConnections)
 	api.Post("/connections/import", p.handleImportConnections)
 	api.Post("/test", p.handleTest)
 	api.Get("/ping", p.handlePing)
@@ -136,6 +156,15 @@ func (p *DB) Register(api fiber.Router) {
 	api.Get("/table-data", p.handleTableData)
 	api.Post("/query", p.handleQuery)
 	api.Post("/export", p.handleExport)
+
+	// NoSQL：Redis 键空间与 MongoDB 文档浏览。
+	api.Get("/redis/keys", p.handleRedisKeys)
+	api.Get("/redis/key", p.handleRedisKey)
+	api.Delete("/redis/key", p.handleRedisDeleteKey)
+	api.Post("/redis/command", p.handleRedisCommand)
+	api.Get("/mongo/collections", p.handleMongoCollections)
+	api.Get("/mongo/documents", p.handleMongoDocuments)
+	api.Post("/mongo/command", p.handleMongoCommand)
 }
 
 func (p *DB) listConnections() []Connection {
@@ -183,6 +212,11 @@ func (p *DB) handleSaveConnection(c *fiber.Ctx) error {
 		}
 	} else if strings.TrimSpace(in.Host) == "" {
 		return jsonErr(c, fiber.StatusBadRequest, "主机地址不能为空")
+	}
+	if t.Family == familyRedis && strings.TrimSpace(in.Database) != "" {
+		if idx, err := strconv.Atoi(strings.TrimSpace(in.Database)); err != nil || idx < 0 {
+			return jsonErr(c, fiber.StatusBadRequest, "Redis 库号必须是非负整数")
+		}
 	}
 	in.ApplyDefaults()
 
@@ -249,18 +283,53 @@ func (p *DB) handleDuplicateConnection(c *fiber.Ctx) error {
 }
 
 func (p *DB) handleExportConnections(c *fiber.Ctx) error {
-	data, err := json.MarshalIndent(p.listConnections(), "", "  ")
+	payload, err := json.Marshal(p.listConnections())
 	if err != nil {
 		return jsonErr(c, fiber.StatusInternalServerError, err.Error())
 	}
-	c.Set("Content-Type", "application/json; charset=utf-8")
-	c.Set("Content-Disposition", `attachment; filename="devos-databases.json"`)
-	return c.Send(data)
+	password, err := secure.NewExportPassword()
+	if err != nil {
+		return jsonErr(c, fiber.StatusInternalServerError, err.Error())
+	}
+	content, err := secure.Seal(password, payload)
+	if err != nil {
+		return jsonErr(c, fiber.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(fiber.Map{
+		"filename": "devos-databases.json",
+		"key":      password,
+		"content":  string(content),
+	})
 }
 
 func (p *DB) handleImportConnections(c *fiber.Ctx) error {
+	var in struct {
+		Content string `json:"content"`
+		Key     string `json:"key"`
+	}
+	if err := c.BodyParser(&in); err != nil {
+		return jsonErr(c, fiber.StatusBadRequest, "参数解析失败")
+	}
+	raw := []byte(strings.TrimSpace(in.Content))
+	if len(raw) == 0 {
+		return jsonErr(c, fiber.StatusBadRequest, "导入文件内容为空")
+	}
+	payload := raw
+	if secure.IsEnvelope(raw) {
+		if strings.TrimSpace(in.Key) == "" {
+			return jsonErr(c, fiber.StatusBadRequest, "该文件已加密，请输入导出时生成的密钥")
+		}
+		plain, err := secure.Unseal(in.Key, raw)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadRequest, err.Error())
+		}
+		payload = plain
+	} else if strings.TrimSpace(in.Key) != "" {
+		return jsonErr(c, fiber.StatusBadRequest, "该文件未加密，无需填写密钥")
+	}
+
 	var items []Connection
-	if err := json.Unmarshal(c.Body(), &items); err != nil {
+	if err := json.Unmarshal(payload, &items); err != nil {
 		return jsonErr(c, fiber.StatusBadRequest, "文件格式不正确，应为连接数组")
 	}
 	p.mu.Lock()
@@ -309,7 +378,26 @@ func (p *DB) load() error {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return json.Unmarshal(data, &p.conns)
+	if err := json.Unmarshal(data, &p.conns); err != nil {
+		return err
+	}
+	plaintext := false
+	for i := range p.conns {
+		if secure.IsEncrypted(p.conns[i].Password) {
+			plain, err := p.keys.Decrypt(p.conns[i].Password)
+			if err != nil {
+				return fmt.Errorf("解密连接「%s」的密码失败: %w", p.conns[i].Name, err)
+			}
+			p.conns[i].Password = plain
+		} else if p.conns[i].Password != "" {
+			plaintext = true
+		}
+	}
+	if plaintext {
+		// 历史明文密码在加载时立即重新加密落盘。
+		return p.persistLocked()
+	}
+	return nil
 }
 
 func (p *DB) persist() error {
@@ -320,7 +408,16 @@ func (p *DB) persist() error {
 
 // persistLocked 在已持有写锁时写入配置文件。
 func (p *DB) persistLocked() error {
-	data, err := json.MarshalIndent(p.conns, "", "  ")
+	out := make([]Connection, len(p.conns))
+	copy(out, p.conns)
+	for i := range out {
+		encrypted, err := p.keys.Encrypt(out[i].Password)
+		if err != nil {
+			return err
+		}
+		out[i].Password = encrypted
+	}
+	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		return err
 	}

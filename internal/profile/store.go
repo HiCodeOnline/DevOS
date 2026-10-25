@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+
+	"devos/internal/secure"
 )
 
 // Profile 描述一个 SSH/SFTP 连接配置，字段设计参照 Xshell 的会话属性。
@@ -93,9 +95,11 @@ func (p Profile) ColorSchemeOrDefault() string {
 }
 
 // Store 以 JSON 文件持久化连接配置，供 SSH 与 SFTP 插件共享。
+// 密码、私钥与口令以 AES-256-GCM 加密后落盘。
 type Store struct {
 	mu   sync.RWMutex
 	path string
+	keys *secure.Keyring
 	list []Profile
 }
 
@@ -112,17 +116,55 @@ func Open(dir string) (*Store, error) {
 	if s, ok := stores[path]; ok {
 		return s, nil
 	}
-	s := &Store{path: path}
+	keys, err := secure.Open(dir, "profiles.key")
+	if err != nil {
+		return nil, fmt.Errorf("初始化会话加密密钥失败: %w", err)
+	}
+	s := &Store{path: path, keys: keys}
 	data, err := os.ReadFile(path)
 	if err == nil {
 		if err := json.Unmarshal(data, &s.list); err != nil {
 			return nil, fmt.Errorf("解析连接配置失败: %w", err)
+		}
+		plaintext, err := s.decryptSensitive()
+		if err != nil {
+			return nil, err
+		}
+		if plaintext {
+			// 历史明文数据在加载时立即重新加密落盘。
+			if err := s.persist(); err != nil {
+				return nil, err
+			}
 		}
 	} else if !os.IsNotExist(err) {
 		return nil, err
 	}
 	stores[path] = s
 	return s, nil
+}
+
+// decryptSensitive 解密已加密的凭据字段，并报告是否存在历史明文。
+func (s *Store) decryptSensitive() (bool, error) {
+	plaintext := false
+	for i := range s.list {
+		fields := sensitiveFields(&s.list[i])
+		for _, field := range fields {
+			if secure.IsEncrypted(*field) {
+				plain, err := s.keys.Decrypt(*field)
+				if err != nil {
+					return false, fmt.Errorf("解密会话「%s」的凭据失败: %w", s.list[i].Name, err)
+				}
+				*field = plain
+			} else if *field != "" {
+				plaintext = true
+			}
+		}
+	}
+	return plaintext, nil
+}
+
+func sensitiveFields(p *Profile) []*string {
+	return []*string{&p.Password, &p.PrivateKey, &p.Passphrase}
 }
 
 func (s *Store) List() []Profile {
@@ -230,7 +272,18 @@ func (s *Store) Import(items []Profile) (int, error) {
 }
 
 func (s *Store) persist() error {
-	data, err := json.MarshalIndent(s.list, "", "  ")
+	out := make([]Profile, len(s.list))
+	copy(out, s.list)
+	for i := range out {
+		for _, field := range sensitiveFields(&out[i]) {
+			encrypted, err := s.keys.Encrypt(*field)
+			if err != nil {
+				return err
+			}
+			*field = encrypted
+		}
+	}
+	data, err := json.MarshalIndent(out, "", "  ")
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,10 @@
 const state = {
   apps: [],
   system: null,
+  security: null,
   windows: new Map(),
+  mru: [],
+  switcher: { visible: false, wins: [], index: 0 },
   seq: 0,
   z: 20,
   selectedId: null,
@@ -33,6 +36,16 @@ function esc(value) {
   }[ch]));
 }
 
+// 默认禁用浏览器右键菜单，并在同源插件页面内同步启用 Alt+Tab 窗口切换。
+function installFrameGuards(doc) {
+  if (!doc || doc.__devosGuarded) return;
+  doc.__devosGuarded = true;
+  doc.addEventListener("contextmenu", (event) => event.preventDefault(), true);
+  doc.addEventListener("keydown", handleWindowKeyDown, true);
+  doc.addEventListener("keyup", handleWindowKeyUp, true);
+}
+installFrameGuards(document);
+
 function iconContent(icon) {
   const value = String(icon ?? "").trim();
   if (!value) return "";
@@ -58,6 +71,28 @@ async function fetchJSON(url, options) {
     throw new Error(message);
   }
   return resp.json();
+}
+
+function t(key, params) {
+  return window.DevOSI18n ? window.DevOSI18n.t(key, params) : key;
+}
+
+// 应用壁纸：预设使用 CSS 渐变，自定义壁纸来自内核 /api/security/wallpaper/file。
+const wallpaperEl = $("#wallpaper");
+const WALLPAPER_PRESETS = ["aurora", "dusk", "mint", "sand", "midnight"];
+
+function applyWallpaper(wallpaper) {
+  if (!wallpaperEl) return;
+  WALLPAPER_PRESETS.forEach((preset) => wallpaperEl.classList.remove(`preset-${preset}`));
+  wallpaperEl.classList.remove("is-custom");
+  wallpaperEl.style.backgroundImage = "";
+  if (wallpaper && wallpaper.kind === "custom" && wallpaper.file) {
+    wallpaperEl.classList.add("is-custom");
+    wallpaperEl.style.backgroundImage = `url("/api/security/wallpaper/file/${encodeURIComponent(wallpaper.file)}")`;
+    return;
+  }
+  const preset = wallpaper && WALLPAPER_PRESETS.includes(wallpaper.preset) ? wallpaper.preset : "aurora";
+  wallpaperEl.classList.add(`preset-${preset}`);
 }
 
 function toast(message) {
@@ -103,7 +138,7 @@ function renderStartApps(filter = "") {
     return `${app.name} ${app.description} ${app.category}`.toLowerCase().includes(keyword);
   });
   if (list.length === 0) {
-    startApps.innerHTML = `<div class="start-empty">没有匹配的应用</div>`;
+    startApps.innerHTML = `<div class="start-empty">${esc(t("start.empty"))}</div>`;
     return;
   }
   startApps.innerHTML = "";
@@ -144,22 +179,23 @@ function renderTasks() {
 
 function renderClock() {
   const now = new Date();
-  const time = now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
-  const date = now.toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "short" });
+  const bcp47 = window.DevOSI18n ? window.DevOSI18n.bcp47() : "zh-CN";
+  const time = now.toLocaleTimeString(bcp47, { hour: "2-digit", minute: "2-digit", hour12: false });
+  const date = now.toLocaleDateString(bcp47, { month: "long", day: "numeric", weekday: "short" });
   clockEl.innerHTML = `<span class="clock-time">${time}</span><span class="clock-date">${date}</span>`;
 }
 
 function renderStatus() {
   const sys = state.system;
   if (!sys) return;
-  statusEl.innerHTML = `<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>${esc(sys.hostname)} · ${sys.apps} 个应用`;
+  statusEl.innerHTML = `<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>${esc(sys.hostname)} · ${esc(t("start.appsCount", { count: sys.apps }))}`;
   $("#startMeta").textContent = `${sys.hostname} · ${sys.os} · ${sys.dataDir}`;
 }
 
 function openApp(appId, params) {
   const app = state.apps.find((item) => item.id === appId);
   if (!app) {
-    toast("应用未安装：" + appId);
+    toast(t("toast.appMissing", { id: appId }));
     return;
   }
 
@@ -209,13 +245,13 @@ function createWindow(app, query = "") {
       <span class="window-app-icon" style="color:${esc(app.accent || "#0ea5e9")}">${iconContent(app.icon)}</span>
       <span class="window-title">${esc(app.name)}</span>
       <span class="ml-auto flex items-center gap-0.5">
-        <button class="window-btn" data-act="min" title="最小化">
+        <button class="window-btn" data-act="min" title="${esc(t("window.min"))}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>
         </button>
-        <button class="window-btn" data-act="max" title="最大化">
+        <button class="window-btn" data-act="max" title="${esc(t("window.max"))}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="5" width="14" height="14" rx="1.2"/></svg>
         </button>
-        <button class="window-btn close" data-act="close" title="关闭">
+        <button class="window-btn close" data-act="close" title="${esc(t("window.close"))}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </span>
@@ -234,6 +270,12 @@ function createWindow(app, query = "") {
     maximized: false,
     prev: null,
   };
+
+  // 插件页面与桌面同源：统一禁用右键菜单并接管 Alt+Tab。
+  const frame = node.querySelector("iframe");
+  if (frame) {
+    frame.addEventListener("load", () => installFrameGuards(frame.contentDocument));
+  }
 
   node.addEventListener("pointerdown", () => focusWindow(win), true);
 
@@ -259,11 +301,23 @@ function createWindow(app, query = "") {
 
 function focusWindow(win) {
   state.activeId = win.id;
+  state.mru = [win.id, ...state.mru.filter((id) => id !== win.id)];
   for (const item of state.windows.values()) {
     item.el.classList.toggle("is-active", item.id === win.id);
   }
   win.el.style.zIndex = String(++state.z);
   renderTasks();
+}
+
+// 语言切换后同步已打开窗口的按钮提示。
+function refreshWindowTitles() {
+  const labels = { min: t("window.min"), max: t("window.max"), close: t("window.close") };
+  for (const win of state.windows.values()) {
+    win.el.querySelectorAll(".window-btn").forEach((btn) => {
+      const label = labels[btn.dataset.act];
+      if (label) btn.title = label;
+    });
+  }
 }
 
 function restoreWindow(win) {
@@ -284,8 +338,86 @@ function closeWindow(win) {
   if (frame) frame.src = "about:blank";
   win.el.remove();
   state.windows.delete(win.id);
+  state.mru = state.mru.filter((id) => id !== win.id);
   if (state.activeId === win.id) state.activeId = null;
   renderTasks();
+}
+
+// Alt+Tab 窗口切换：按住 Alt 连按 Tab 依次选择，松开 Alt 切换到选中窗口。
+const switcherEl = el("div", "switcher hidden");
+document.body.appendChild(switcherEl);
+
+function switcherCandidates() {
+  const ids = state.mru.filter((id) => state.windows.has(id));
+  for (const id of state.windows.keys()) {
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids.map((id) => state.windows.get(id));
+}
+
+function renderSwitcher() {
+  switcherEl.innerHTML = state.switcher.wins.map((win, index) => `
+    <div class="switcher-item${index === state.switcher.index ? " is-active" : ""}">
+      <span class="switcher-icon" style="--accent:${esc(win.app.accent || "#0ea5e9")}">${iconContent(win.app.icon)}</span>
+      <span class="switcher-name">${esc(win.app.name)}</span>
+    </div>`).join("");
+}
+
+function stepSwitcher(dir) {
+  const wins = switcherCandidates();
+  if (wins.length === 0) return;
+  const sw = state.switcher;
+  if (!sw.visible) {
+    sw.visible = true;
+    sw.wins = wins;
+    const current = wins.findIndex((win) => win.id === state.activeId);
+    sw.index = current < 0 ? 0 : current;
+    switcherEl.classList.remove("hidden");
+  } else {
+    sw.wins = wins;
+  }
+  const total = sw.wins.length;
+  sw.index = (sw.index + dir + total) % total;
+  renderSwitcher();
+}
+
+function commitSwitcher() {
+  const sw = state.switcher;
+  sw.visible = false;
+  switcherEl.classList.add("hidden");
+  const win = sw.wins[sw.index];
+  sw.wins = [];
+  sw.index = 0;
+  if (win && state.windows.has(win.id)) {
+    if (win.minimized) restoreWindow(win);
+    else focusWindow(win);
+  }
+}
+
+function cancelSwitcher() {
+  state.switcher.visible = false;
+  state.switcher.wins = [];
+  state.switcher.index = 0;
+  switcherEl.classList.add("hidden");
+}
+
+function handleWindowKeyDown(event) {
+  if (state.switcher.visible && event.key === "Escape") {
+    event.preventDefault();
+    cancelSwitcher();
+    return;
+  }
+  if (event.key !== "Tab" || !event.altKey) return;
+  event.preventDefault();
+  event.stopPropagation();
+  stepSwitcher(event.shiftKey ? -1 : 1);
+}
+
+function handleWindowKeyUp(event) {
+  if (event.key === "Alt" && state.switcher.visible) {
+    event.preventDefault();
+    commitSwitcher();
+  }
 }
 
 function toggleMaximize(win) {
@@ -420,23 +552,68 @@ async function loadApps() {
   renderStatus();
 }
 
-async function boot() {
-  renderClock();
-  setInterval(renderClock, 1000);
+function hideBoot() {
+  if (!bootEl || !bootEl.isConnected) return;
+  bootEl.classList.add("boot-done");
+  setTimeout(() => bootEl.remove(), 600);
+}
+
+async function startDesktop() {
   try {
     await loadApps();
   } catch (err) {
-    toast("加载应用失败：" + err.message);
+    toast(t("toast.loadAppsFailed", { error: err.message }));
   }
   const wanted = new URLSearchParams(location.search).get("app");
   if (wanted && state.apps.some((app) => app.id === wanted)) {
     setTimeout(() => openApp(wanted), 120);
     history.replaceState(null, "", location.pathname);
   }
-  setTimeout(() => {
-    bootEl.classList.add("boot-done");
-    setTimeout(() => bootEl.remove(), 600);
-  }, 520);
+  hideBoot();
+}
+
+// 手动锁定：撤销会话、关闭所有窗口并回到锁屏。
+async function lockDesktop() {
+  let data;
+  try {
+    data = await fetchJSON("/api/security/lock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-DevOS-Request": "1" },
+      body: "{}",
+    });
+  } catch (err) {
+    toast(t("toast.lockFailed", { error: err.message }));
+    return;
+  }
+  if (!data.locked) {
+    toast(t("toast.lockNoPassword"));
+    return;
+  }
+  closeStartMenu();
+  if (window.DevOSSettings) window.DevOSSettings.close();
+  for (const win of [...state.windows.values()]) closeWindow(win);
+  state.security = Object.assign({}, state.security, { locked: true });
+  window.DevOSLock.show({ onUnlock: startDesktop });
+}
+
+async function boot() {
+  renderClock();
+  setInterval(renderClock, 1000);
+  let status = null;
+  try {
+    status = await fetchJSON("/api/security/status");
+  } catch (_) { /* 读取失败时按未设置密码处理 */ }
+  if (status) {
+    state.security = status;
+    if (status.locale && window.DevOSI18n) window.DevOSI18n.setLocale(status.locale, { silent: true });
+    applyWallpaper(status.wallpaper);
+    if (status.hasPassword && status.locked) {
+      hideBoot();
+      window.DevOSLock.show({ onUnlock: startDesktop });
+      return;
+    }
+  }
+  await startDesktop();
 }
 
 startBtn.addEventListener("click", (event) => {
@@ -447,18 +624,27 @@ searchInput.addEventListener("input", () => renderStartApps(searchInput.value));
 $("#refreshApps").addEventListener("click", async () => {
   try {
     await loadApps();
-    toast("应用列表已刷新");
+    toast(t("toast.appsRefreshed"));
   } catch (err) {
-    toast("刷新失败：" + err.message);
+    toast(t("toast.refreshFailed", { error: err.message }));
   }
+});
+
+$("#openSettings").addEventListener("click", () => {
+  closeStartMenu();
+  if (window.DevOSSettings) window.DevOSSettings.open();
+});
+$("#lockNow").addEventListener("click", () => {
+  closeStartMenu();
+  lockDesktop();
 });
 
 window.addEventListener("message", (event) => {
   const data = event.data;
   if (!data || data.type !== "devos:apps-changed") return;
   loadApps()
-    .then(() => toast(data.message || "应用列表已更新"))
-    .catch((err) => toast("刷新应用列表失败：" + err.message));
+    .then(() => toast(data.message || t("toast.appsUpdated")))
+    .catch((err) => toast(t("toast.appsRefreshFailed", { error: err.message })));
 });
 
 desktopEl.addEventListener("click", (event) => {
@@ -472,8 +658,28 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeStartMenu();
 });
+document.addEventListener("keydown", handleWindowKeyDown, true);
+document.addEventListener("keyup", handleWindowKeyUp, true);
+window.addEventListener("blur", () => {
+  if (state.switcher.visible) commitSwitcher();
+});
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) renderClock();
 });
+document.addEventListener("devos:locale-changed", () => {
+  renderClock();
+  renderStatus();
+  renderStartApps(searchInput.value);
+  refreshWindowTitles();
+});
+
+// 供设置面板与锁屏复用桌面能力。
+window.DevOSDesktop = {
+  start: startDesktop,
+  lock: lockDesktop,
+  applyWallpaper,
+  notify: toast,
+  security: () => state.security,
+};
 
 boot();

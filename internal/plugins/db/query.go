@@ -95,6 +95,12 @@ func (p *DB) handleQuery(c *fiber.Ctx) error {
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadRequest, err.Error())
 	}
+	switch familyOf(conn.Driver) {
+	case familyRedis:
+		return jsonErr(c, fiber.StatusBadRequest, "Redis 连接请在「命令」控制台执行命令")
+	case familyMongo:
+		return jsonErr(c, fiber.StatusBadRequest, "MongoDB 连接请在「命令」控制台执行 JSON 命令")
+	}
 	if conn.ReadOnly && isWriteSQL(in.SQL) {
 		return jsonErr(c, fiber.StatusForbidden, "该连接为只读模式，已拒绝执行写操作")
 	}

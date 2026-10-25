@@ -2,11 +2,51 @@
   position: fixed;
   inset: 0;
   z-index: -1;
+  transition: background-image 0.3s ease;
   background:
     radial-gradient(1100px 620px at 6% -8%, rgba(186, 230, 253, 0.75) 0%, rgba(186, 230, 253, 0) 62%),
     radial-gradient(900px 540px at 92% -6%, rgba(221, 214, 254, 0.7) 0%, rgba(221, 214, 254, 0) 58%),
     radial-gradient(760px 480px at 50% 108%, rgba(224, 231, 255, 0.72) 0%, rgba(224, 231, 255, 0) 60%),
     linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+.wallpaper.preset-aurora {
+  background:
+    radial-gradient(1100px 620px at 6% -8%, rgba(186, 230, 253, 0.75) 0%, rgba(186, 230, 253, 0) 62%),
+    radial-gradient(900px 540px at 92% -6%, rgba(221, 214, 254, 0.7) 0%, rgba(221, 214, 254, 0) 58%),
+    radial-gradient(760px 480px at 50% 108%, rgba(224, 231, 255, 0.72) 0%, rgba(224, 231, 255, 0) 60%),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+}
+.wallpaper.preset-dusk {
+  background:
+    radial-gradient(1000px 600px at 88% 0%, rgba(254, 215, 170, 0.72) 0%, rgba(254, 215, 170, 0) 60%),
+    radial-gradient(900px 520px at 8% 8%, rgba(233, 213, 255, 0.7) 0%, rgba(233, 213, 255, 0) 58%),
+    linear-gradient(170deg, #fdf4f1 0%, #f1e9f7 55%, #eef2f7 100%);
+}
+.wallpaper.preset-mint {
+  background:
+    radial-gradient(900px 560px at 10% 0%, rgba(167, 243, 208, 0.7) 0%, rgba(167, 243, 208, 0) 60%),
+    radial-gradient(820px 500px at 92% 12%, rgba(191, 219, 254, 0.7) 0%, rgba(191, 219, 254, 0) 58%),
+    linear-gradient(180deg, #f6fdfa 0%, #eef4f7 100%);
+}
+.wallpaper.preset-sand {
+  background:
+    radial-gradient(1000px 620px at 20% -6%, rgba(253, 230, 200, 0.75) 0%, rgba(253, 230, 200, 0) 60%),
+    radial-gradient(880px 540px at 96% 6%, rgba(226, 232, 240, 0.7) 0%, rgba(226, 232, 240, 0) 58%),
+    linear-gradient(180deg, #fdfaf5 0%, #f3f1ec 100%);
+}
+.wallpaper.preset-midnight {
+  background:
+    radial-gradient(900px 560px at 12% -4%, rgba(56, 189, 248, 0.28) 0%, rgba(56, 189, 248, 0) 62%),
+    radial-gradient(820px 520px at 92% 4%, rgba(129, 140, 248, 0.3) 0%, rgba(129, 140, 248, 0) 60%),
+    linear-gradient(170deg, #0f172a 0%, #1e293b 55%, #111827 100%);
+}
+.wallpaper.is-custom {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.wallpaper.is-custom::after {
+  display: none;
 }
 .wallpaper::after {
   content: "";
@@ -107,8 +147,8 @@
   border-color: rgba(255, 255, 255, 0.9);
 }
 .desktop-icon.is-selected {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(14, 165, 233, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(203, 213, 225, 0.95);
   box-shadow: 0 10px 26px -14px rgba(15, 23, 42, 0.35);
 }
 .icon-tile {
@@ -182,7 +222,7 @@
   background: rgba(241, 245, 249, 0.9);
 }
 .start-btn.is-open {
-  background: rgba(224, 242, 254, 0.95);
+  background: rgba(241, 245, 249, 0.95);
 }
 .start-logo {
   display: grid;
@@ -221,7 +261,7 @@
 }
 .task-btn.is-active {
   background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(186, 230, 253, 0.9);
+  border-color: rgba(203, 213, 225, 0.95);
   color: #0f172a;
   box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.5);
 }
@@ -359,6 +399,109 @@
   font-size: 12px;
   color: #94a3b8;
 }
+.start-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 14px 4px;
+  border-top: 1px solid rgba(226, 232, 240, 0.8);
+}
+.start-action {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  border-radius: 11px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.7);
+  font-size: 11.5px;
+  color: #475569;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.start-action:hover {
+  background: rgba(241, 245, 249, 0.95);
+  border-color: rgba(203, 213, 225, 0.95);
+  color: #0f172a;
+}
+.start-action svg {
+  height: 15px;
+  width: 15px;
+}
+
+/* Alt+Tab 窗口切换器 */
+.switcher {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 900;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  max-width: min(760px, calc(100vw - 48px));
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: 0 30px 70px -30px rgba(15, 23, 42, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translate(-50%, -50%);
+  animation: switcherIn 0.14s ease;
+}
+.switcher.hidden {
+  display: none;
+}
+@keyframes switcherIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.switcher-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 104px;
+  padding: 12px 8px 10px;
+  border-radius: 13px;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.switcher-item.is-active {
+  background: rgba(241, 245, 249, 0.98);
+  border-color: rgba(203, 213, 225, 0.95);
+  box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.45);
+}
+.switcher-icon {
+  display: grid;
+  place-items: center;
+  height: 46px;
+  width: 46px;
+  border-radius: 13px;
+  color: var(--accent, #0ea5e9);
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+.switcher-icon svg {
+  height: 26px;
+  width: 26px;
+}
+.switcher-icon img {
+  height: 30px;
+  width: 30px;
+  object-fit: contain;
+  border-radius: 7px;
+}
+.switcher-name {
+  max-width: 96px;
+  font-size: 11.5px;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* 窗口 */
 .window {
@@ -383,8 +526,8 @@
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 .window.is-active {
-  border-color: rgba(56, 189, 248, 0.55);
-  box-shadow: 0 34px 84px -32px rgba(15, 23, 42, 0.55), 0 0 0 3px rgba(224, 242, 254, 0.7);
+  border-color: rgba(203, 213, 225, 0.95);
+  box-shadow: 0 34px 84px -32px rgba(15, 23, 42, 0.55), 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 .window.is-maximized {
   border-radius: 12px;

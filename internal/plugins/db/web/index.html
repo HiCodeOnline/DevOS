@@ -12,6 +12,8 @@
     } } } };
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/ui.css?v=1" />
+  <script src="/assets/secure-ui.js?v=2"></script>
   <style>
     .pane { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
     .pane.hidden { display: none; }
@@ -245,6 +247,9 @@ function iconSvg(name, cls = 'h-3.5 w-3.5') {
     download: '<path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/>',
     close: '<path d="M6 6l12 12M18 6L6 18"/>',
     play: '<path d="m6 4 14 8-14 8V4Z"/>',
+    key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m11 12 8-8M17 6l2 2M19 4l2 2"/>',
+    collection: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 15h18"/>',
+    terminal: '<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>',
   };
   return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${map[name] || ''}</svg>`;
 }
@@ -253,6 +258,8 @@ const FALLBACK_TYPES = [
   { id: 'mysql', name: 'MySQL', family: 'mysql', group: '常用', defaultPort: 3306, color: '#0ea5e9', databaseLabel: '默认数据库（可选）' },
   { id: 'postgres', name: 'PostgreSQL', family: 'postgres', group: '常用', defaultPort: 5432, schemaLevel: true, color: '#336791', databaseLabel: '默认数据库（可选）' },
   { id: 'sqlite', name: 'SQLite', family: 'sqlite', group: '常用', file: true, color: '#10b981' },
+  { id: 'redis', name: 'Redis', family: 'redis', group: 'NoSQL', defaultPort: 6379, color: '#dc382d', databaseLabel: '默认库号（0-15）' },
+  { id: 'mongodb', name: 'MongoDB', family: 'mongo', group: 'NoSQL', defaultPort: 27017, color: '#10aa50', databaseLabel: '默认数据库（可选）' },
 ];
 let TYPES = FALLBACK_TYPES;
 let TYPE_MAP = Object.fromEntries(FALLBACK_TYPES.map((t) => [t.id, t]));
@@ -263,6 +270,10 @@ function typeOf(conn) {
 function objectSchema(conn, database) {
   return typeOf(conn).family === 'sqlite' ? 'main' : (database || '');
 }
+// NoSQL 连接使用各自的浏览方式。
+const isRedis = (conn) => typeOf(conn).family === 'redis';
+const isMongo = (conn) => typeOf(conn).family === 'mongo';
+const isNoSQL = (conn) => isRedis(conn) || isMongo(conn);
 async function loadTypes() {
   try {
     const list = await api('/types');
@@ -322,6 +333,8 @@ function renderConn(conn) {
   const p = keyOf('conn', conn.id);
   S.nodeMap.set(p, { kind: 'conn', path: p, connId: conn.id });
   const t = typeOf(conn);
+  const consoleTitle = isNoSQL(conn) ? '命令控制台' : '新建查询';
+  const consoleIcon = isNoSQL(conn) ? 'terminal' : 'sql';
   const open = S.expanded.has(p);
   const loading = S.loading.has(p);
   const dbs = S.cache.get(p);
@@ -335,7 +348,7 @@ function renderConn(conn) {
       ${iconSvg('db', 'h-3.5 w-3.5 flex-none text-slate-400')}
       <span class="min-w-0 flex-1 truncate text-[11.5px] font-medium text-slate-700" data-act="toggle" title="${esc(conn.name)} · ${esc(t.name)}">${esc(conn.name)}</span>
       <span class="tree-actions flex-none items-center gap-0.5">
-        <button data-act="query" title="新建查询" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
+        <button data-act="query" title="${consoleTitle}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg(consoleIcon, 'h-3 w-3')}</button>
         <button data-act="ping" title="测试连接" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-sky-600">${iconSvg('plug', 'h-3 w-3')}</button>
         <button data-act="edit" title="编辑" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-slate-700">${iconSvg('edit', 'h-3 w-3')}</button>
         <button data-act="dup" title="复制" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-slate-700">${iconSvg('copy', 'h-3 w-3')}</button>
@@ -347,7 +360,7 @@ function renderConn(conn) {
 
 function renderConnChildren(conn, dbs, loading) {
   if (loading) return `<div class="pl-9 py-1 text-[10.5px] text-slate-400">加载中…</div>`;
-  if (!dbs || !dbs.length) return `<div class="pl-9 py-1 text-[10.5px] text-slate-400">无数据库</div>`;
+  if (!dbs || !dbs.length) return `<div class="pl-9 py-1 text-[10.5px] text-slate-400">${isRedis(conn) ? '无可用库' : '无数据库'}</div>`;
   return dbs.map((db) => renderDb(conn, db)).join('');
 }
 
@@ -358,16 +371,22 @@ function renderDb(conn, db) {
   const open = S.expanded.has(p);
   const loading = S.loading.has(p);
   const children = S.cache.get(p);
-  const suffix = t.schemaLevel ? ' (数据库)' : (t.family === 'oracle' ? ' (模式)' : '');
+  let suffix = '';
+  let icon = 'db';
+  if (t.schemaLevel) suffix = ' (数据库)';
+  else if (t.family === 'oracle') suffix = ' (模式)';
+  else if (t.family === 'redis') { suffix = ' (库)'; icon = 'key'; }
+  else if (t.family === 'mongo') icon = 'collection';
+  const consoleTitle = isNoSQL(conn) ? '在此库打开命令控制台' : '在此库新建查询';
   return `
     <div class="tree-row mx-1 flex items-center gap-1 rounded-md py-0.5 pl-3 pr-1" data-node="${esc(p)}">
       <button data-act="toggle" class="grid h-4 w-4 flex-none place-items-center rounded text-slate-400 hover:bg-slate-200">
         ${loading ? iconSvg('refresh', 'h-3 w-3 spin') : iconSvg(open ? 'chevronDown' : 'chevron', 'h-3 w-3')}
       </button>
-      ${iconSvg(t.schemaLevel || t.family === 'oracle' ? 'schema' : 'db', 'h-3.5 w-3.5 flex-none text-slate-400')}
+      ${iconSvg(icon, 'h-3.5 w-3.5 flex-none text-slate-400')}
       <span class="min-w-0 flex-1 truncate text-[11px] text-slate-600" data-act="toggle" title="${esc(db)}">${esc(db + suffix)}</span>
       <span class="tree-actions flex-none items-center">
-        <button data-act="query" title="在此库新建查询" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
+        <button data-act="query" title="${consoleTitle}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg(isNoSQL(conn) ? 'terminal' : 'sql', 'h-3 w-3')}</button>
       </span>
     </div>
     ${open ? renderDbChildren(conn, db, children, loading) : ''}`;
@@ -375,11 +394,51 @@ function renderDb(conn, db) {
 
 function renderDbChildren(conn, db, children, loading) {
   if (loading) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">加载中…</div>`;
+  if (isRedis(conn)) return renderRedisKeys(conn, db, children);
+  if (isMongo(conn)) {
+    if (!children || !children.length) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">无集合</div>`;
+    return children.map((name) => renderCollection(conn, db, name)).join('');
+  }
   if (typeOf(conn).schemaLevel) {
     if (!children || !children.length) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">无模式</div>`;
     return children.map((s) => renderSchema(conn, db, s)).join('');
   }
   return renderObjects(conn, db, objectSchema(conn, db), children, 4);
+}
+
+/* Redis：键列表与 MongoDB：集合列表 */
+function renderRedisKeys(conn, db, data) {
+  if (!data) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">加载中…</div>`;
+  const rows = data.keys.map((item) => {
+    const p = keyOf('rkey', conn.id, db, item.key);
+    S.nodeMap.set(p, { kind: 'rkey', path: p, connId: conn.id, database: db, key: item.key });
+    const ttl = item.ttl >= 0 ? `${item.ttl}s` : '';
+    return `
+      <div class="tree-row mx-1 flex items-center gap-1 rounded-md py-0.5 pl-7 pr-1 cursor-pointer hover:bg-slate-100" data-node="${esc(p)}" data-act="open" title="${esc(item.key)} · ${esc(item.type)}">
+        ${iconSvg('key', 'h-3.5 w-3.5 flex-none text-rose-400/80')}
+        <span class="min-w-0 flex-1 truncate font-mono text-[10.5px] text-slate-600">${esc(item.key)}</span>
+        <span class="flex-none rounded bg-slate-100 px-1 text-[9px] text-slate-500">${esc(item.type)}</span>
+        ${ttl ? `<span class="flex-none text-[9px] text-amber-500">${esc(ttl)}</span>` : ''}
+      </div>`;
+  }).join('');
+  const empty = data.keys.length ? '' : `<div class="pl-12 py-1 text-[10.5px] text-slate-400">无匹配的键</div>`;
+  const morePath = keyOf('rmore', conn.id, db);
+  S.nodeMap.set(morePath, { kind: 'more', path: morePath, connId: conn.id, database: db });
+  const more = data.more ? `
+    <div class="mx-1 flex items-center gap-1 rounded-md py-0.5 pl-7 pr-1" data-node="${esc(morePath)}" data-act="more">
+      <button class="text-[10.5px] text-sky-600 hover:underline">加载更多键…</button>
+    </div>` : '';
+  return empty + rows + more;
+}
+
+function renderCollection(conn, db, name) {
+  const p = keyOf('coll', conn.id, db, name);
+  S.nodeMap.set(p, { kind: 'coll', path: p, connId: conn.id, database: db, table: name });
+  return `
+    <div class="tree-row mx-1 flex cursor-pointer items-center gap-1 rounded-md py-0.5 pl-7 pr-1 hover:bg-slate-100" data-node="${esc(p)}" data-act="open" title="${esc(name)}">
+      ${iconSvg('collection', 'h-3.5 w-3.5 flex-none text-emerald-500/80')}
+      <span class="min-w-0 flex-1 truncate font-mono text-[10.5px] text-slate-600">${esc(name)}</span>
+    </div>`;
 }
 
 function renderSchema(conn, db, schema) {
@@ -457,7 +516,11 @@ async function toggleNode(node) {
     if (node.kind === 'conn') {
       data = await api('/databases?id=' + encodeURIComponent(node.connId));
     } else if (node.kind === 'db') {
-      if (typeOf(conn).schemaLevel) {
+      if (isRedis(conn)) {
+        data = await api(`/redis/keys?id=${encodeURIComponent(node.connId)}&db=${encodeURIComponent(node.database)}&cursor=0`);
+      } else if (isMongo(conn)) {
+        data = await api(`/mongo/collections?id=${encodeURIComponent(node.connId)}&database=${encodeURIComponent(node.database)}`);
+      } else if (typeOf(conn).schemaLevel) {
         data = await api(`/schemas?id=${encodeURIComponent(node.connId)}&database=${encodeURIComponent(node.database)}`);
       } else {
         const schema = objectSchema(conn, node.database);
@@ -486,6 +549,20 @@ async function ensureDatabases(conn) {
   return S.cache.get(p) || [];
 }
 
+// Redis 键空间按游标增量加载。
+async function loadMoreRedisKeys(node) {
+  const cacheKey = keyOf('db', node.connId, node.database);
+  const current = S.cache.get(cacheKey);
+  if (!current || !current.more) return;
+  try {
+    const res = await api(`/redis/keys?id=${encodeURIComponent(node.connId)}&db=${encodeURIComponent(node.database)}&cursor=${encodeURIComponent(current.cursor)}`);
+    S.cache.set(cacheKey, { keys: [...current.keys, ...res.keys], cursor: res.cursor, more: res.more });
+    renderTree();
+  } catch (err) {
+    toast('加载失败：' + err.message, 'err');
+  }
+}
+
 $('#tree').addEventListener('click', async (ev) => {
   const row = ev.target.closest('[data-node]');
   if (!row) return;
@@ -506,7 +583,13 @@ $('#tree').addEventListener('click', async (ev) => {
     return;
   }
   if (act === 'open') {
-    openDataTab(node);
+    if (node.kind === 'rkey') openRedisKeyTab(node);
+    else if (node.kind === 'coll') openMongoTab(node);
+    else openDataTab(node);
+    return;
+  }
+  if (act === 'more') {
+    loadMoreRedisKeys(node);
     return;
   }
   if (act === 'query') {
@@ -552,15 +635,28 @@ $('#tree').addEventListener('click', async (ev) => {
 
 /* ---------- 标签页 ---------- */
 function tabTitle(tab) {
-  if (tab.type === 'query') return `查询 · ${tab.database || (findConn(tab.connId)?.name ?? '')}`;
+  if (tab.type === 'query') {
+    if (tab.fam === 'redis') return `Redis · ${tab.database || '0'}`;
+    if (tab.fam === 'mongo') return `Mongo · ${tab.database || ''}`;
+    return `查询 · ${tab.database || (findConn(tab.connId)?.name ?? '')}`;
+  }
+  if (tab.type === 'rkey') return tab.key;
+  if (tab.type === 'mongo') return `${tab.database}.${tab.table}`;
   return tab.table;
+}
+
+function tabIcon(tab) {
+  if (tab.type === 'rkey') return iconSvg('key', 'h-3 w-3');
+  if (tab.type === 'mongo') return iconSvg('collection', 'h-3 w-3');
+  if (tab.type === 'data') return iconSvg(S.nodeMap.get(tab.path)?.kind === 'view' ? 'view' : 'table', 'h-3 w-3');
+  return iconSvg(tab.fam && tab.fam !== 'sql' ? 'terminal' : 'sql', 'h-3 w-3');
 }
 
 function renderTabs() {
   const bar = $('#tabbar');
   bar.innerHTML = S.tabs.map((t) => `
     <div data-tab="${t.id}" class="group flex cursor-pointer items-center gap-1.5 rounded-t-lg border border-b-0 px-3 py-1.5 text-[11px] ${t.id === S.active ? 'border-slate-200 bg-white font-medium text-slate-800' : 'border-transparent text-slate-500 hover:bg-slate-100'}">
-      ${t.type === 'data' ? iconSvg(t.table && S.nodeMap.get(t.path)?.kind === 'view' ? 'view' : 'table', 'h-3 w-3') : iconSvg('sql', 'h-3 w-3')}
+      ${tabIcon(t)}
       <span class="max-w-[160px] truncate">${esc(tabTitle(t))}</span>
       <button data-close="${t.id}" class="ml-1 grid h-4 w-4 place-items-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700">${iconSvg('close', 'h-2.5 w-2.5')}</button>
     </div>`).join('');
@@ -596,9 +692,11 @@ function closeTab(id) {
 }
 
 function openQueryTab(connId, database, sql) {
+  const fam = typeOf(findConn(connId)).family;
   const tab = {
     id: ++S.seq,
     type: 'query',
+    fam: ['redis', 'mongo'].includes(fam) ? fam : 'sql',
     connId,
     database: database || '',
     sql: sql || '',
@@ -606,13 +704,15 @@ function openQueryTab(connId, database, sql) {
     error: '',
     busy: false,
     status: '',
+    output: '',
   };
   S.tabs.push(tab);
-  createQueryPane(tab);
+  if (tab.fam === 'sql') createQueryPane(tab);
+  else createCommandPane(tab);
   S.active = tab.id;
   renderTabs();
   renderTree();
-  setTimeout(() => tab.el?.querySelector('.sql-input')?.focus(), 30);
+  setTimeout(() => tab.el?.querySelector('.sql-input, .cmd-input')?.focus(), 30);
 }
 
 function openDataTab(node) {
@@ -752,6 +852,358 @@ async function execQuery(tab) {
   } finally {
     tab.busy = false;
     btn.disabled = false;
+  }
+}
+
+/* ---------- NoSQL 命令控制台（Redis / MongoDB） ---------- */
+function createCommandPane(tab) {
+  const redisMode = tab.fam === 'redis';
+  const el = document.createElement('section');
+  el.className = 'pane hidden';
+  el.innerHTML = `
+    <div class="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
+      <select class="db-select rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-mono text-[11px] outline-none focus:border-emerald-400">
+        <option value="">（选择库）</option>
+      </select>
+      <button class="exec-btn flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-50">
+        ${iconSvg('play', 'h-3 w-3')} 执行 <span class="kbd !text-white/80 !border-white/30 !bg-white/10">Ctrl+Enter</span>
+      </button>
+      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制结果</button>
+      <span class="query-hint ml-auto text-[10px] text-slate-400">${redisMode ? '每行一条命令，按顺序执行' : '输入 JSON 命令，如 {"find":"users","limit":20}'}</span>
+    </div>
+    <textarea class="cmd-input min-h-0 flex-none resize-none border-b border-slate-200 bg-white p-3 font-mono text-[11.5px] leading-relaxed text-slate-700 outline-none" style="height:38%;flex:0 0 38%" spellcheck="false"></textarea>
+    <div class="query-status flex-none border-b border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>
+    <pre class="cmd-result min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words bg-white p-3 font-mono text-[11px] leading-relaxed text-slate-700"></pre>`;
+  $('#panes').appendChild(el);
+  tab.el = el;
+
+  const conn = findConn(tab.connId);
+  const select = $('.db-select', el);
+  const input = $('.cmd-input', el);
+  input.value = tab.sql || '';
+  input.placeholder = redisMode ? 'SET user:1 "Alice"\nGET user:1\nKEYS *' : '{"find": "users", "filter": {}, "limit": 20}';
+
+  (async () => {
+    try {
+      const dbs = await ensureDatabases(conn);
+      for (const db of dbs) {
+        const opt = document.createElement('option');
+        opt.value = db;
+        opt.textContent = redisMode ? `db${db}` : db;
+        select.appendChild(opt);
+      }
+      if (!tab.database && conn.database && dbs.includes(conn.database)) tab.database = conn.database;
+      if (!tab.database && dbs.length) tab.database = dbs[0];
+      select.value = tab.database || '';
+      renderTabs();
+    } catch (err) {
+      $('.query-hint', el).textContent = '库列表加载失败：' + err.message;
+    }
+  })();
+
+  select.addEventListener('change', () => { tab.database = select.value; renderTabs(); });
+  input.addEventListener('input', () => { tab.sql = input.value; });
+  input.addEventListener('keydown', (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+      ev.preventDefault();
+      execCommand(tab);
+    }
+  });
+  $('.exec-btn', el).addEventListener('click', () => execCommand(tab));
+  $('.copy-btn', el).addEventListener('click', () => {
+    if (!tab.output) { toast('没有可复制的结果'); return; }
+    navigator.clipboard.writeText(tab.output).then(() => toast('已复制结果')).catch(() => toast('复制失败', 'err'));
+  });
+}
+
+async function execCommand(tab) {
+  if (tab.busy) return;
+  const el = tab.el;
+  const command = $('.cmd-input', el).value;
+  if (!command.trim()) {
+    toast(tab.fam === 'redis' ? '请输入 Redis 命令' : '请输入 JSON 命令');
+    return;
+  }
+  tab.busy = true;
+  const btn = $('.exec-btn', el);
+  const resultEl = $('.cmd-result', el);
+  btn.disabled = true;
+  $('.query-status', el).textContent = '执行中…';
+  resultEl.classList.remove('text-rose-600');
+  try {
+    if (tab.fam === 'redis') {
+      const res = await api('/redis/command', {
+        method: 'POST',
+        body: JSON.stringify({ id: tab.connId, db: tab.database, command }),
+      });
+      const lines = [];
+      for (const item of res.results) {
+        lines.push('> ' + item.command);
+        lines.push(item.error ? '(error) ' + item.error : formatRedisValue(item.value));
+      }
+      tab.output = lines.join('\n');
+      resultEl.textContent = tab.output;
+      $('.query-status', el).textContent = `${res.results.length} 条命令 · ${res.durationMs} ms`;
+    } else {
+      const res = await api('/mongo/command', {
+        method: 'POST',
+        body: JSON.stringify({ id: tab.connId, database: tab.database, command }),
+      });
+      tab.output = JSON.stringify(res.result, null, 2);
+      resultEl.textContent = tab.output;
+      $('.query-status', el).textContent = `执行成功 · ${res.durationMs} ms`;
+    }
+  } catch (err) {
+    tab.output = err.message;
+    resultEl.textContent = err.message;
+    resultEl.classList.add('text-rose-600');
+    $('.query-status', el).textContent = '执行失败';
+  } finally {
+    tab.busy = false;
+    btn.disabled = false;
+  }
+}
+
+function formatRedisValue(v) {
+  if (v === null || v === undefined) return '(nil)';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  try { return JSON.stringify(v, null, 2); } catch { return String(v); }
+}
+
+function ttlLabel(ttl) {
+  if (ttl === -1) return '永久';
+  if (ttl === -2) return '已过期';
+  if (ttl === null || ttl === undefined) return '-';
+  return `${ttl}s`;
+}
+
+/* ---------- Redis 键详情 ---------- */
+function openRedisKeyTab(node) {
+  const existing = S.tabs.find((t) => t.type === 'rkey' && t.connId === node.connId && t.database === node.database && t.key === node.key);
+  if (existing) {
+    activateTab(existing.id);
+    return;
+  }
+  const tab = {
+    id: ++S.seq,
+    type: 'rkey',
+    connId: node.connId,
+    database: node.database,
+    key: node.key,
+    detail: null,
+    output: '',
+  };
+  S.tabs.push(tab);
+  createRedisKeyPane(tab);
+  S.active = tab.id;
+  renderTabs();
+  renderTree();
+  loadRedisKey(tab);
+}
+
+function createRedisKeyPane(tab) {
+  const el = document.createElement('section');
+  el.className = 'pane hidden';
+  el.innerHTML = `
+    <div class="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
+      <span class="key-name min-w-0 max-w-[360px] truncate font-mono text-[11.5px] font-medium text-slate-800"></span>
+      <span class="key-type rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"></span>
+      <span class="key-meta text-[10px] text-slate-500"></span>
+      <button class="refresh-btn grid h-6 w-6 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="刷新">${iconSvg('refresh', 'h-3 w-3')}</button>
+      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制</button>
+      <button class="del-btn ml-auto rounded-lg border border-rose-200 px-2 py-1.5 text-[10.5px] text-rose-600 hover:bg-rose-50">删除键</button>
+    </div>
+    <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>
+    <div class="data-status flex-none border-t border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>`;
+  $('#panes').appendChild(el);
+  tab.el = el;
+  $('.key-name', el).textContent = tab.key;
+
+  $('.refresh-btn', el).addEventListener('click', () => loadRedisKey(tab));
+  $('.copy-btn', el).addEventListener('click', () => {
+    if (!tab.output) { toast('没有可复制的内容'); return; }
+    navigator.clipboard.writeText(tab.output).then(() => toast('已复制')).catch(() => toast('复制失败', 'err'));
+  });
+  $('.del-btn', el).addEventListener('click', async () => {
+    if (!confirm(`确定删除键「${tab.key}」吗？`)) return;
+    try {
+      await api(`/redis/key?id=${encodeURIComponent(tab.connId)}&db=${encodeURIComponent(tab.database)}&key=${encodeURIComponent(tab.key)}`, { method: 'DELETE' });
+      const cacheKey = keyOf('db', tab.connId, tab.database);
+      const cached = S.cache.get(cacheKey);
+      if (cached) S.cache.set(cacheKey, { ...cached, keys: cached.keys.filter((k) => k.key !== tab.key) });
+      toast('键已删除');
+      closeTab(tab.id);
+      renderTree();
+    } catch (err) {
+      toast('删除失败：' + err.message, 'err');
+    }
+  });
+}
+
+async function loadRedisKey(tab) {
+  const el = tab.el;
+  const wrap = $('.grid-wrap', el);
+  $('.data-status', el).textContent = '加载中…';
+  try {
+    const params = new URLSearchParams({ id: tab.connId, db: tab.database, key: tab.key });
+    const res = await api('/redis/key?' + params.toString());
+    tab.detail = res;
+    $('.key-type', el).textContent = res.type;
+    $('.key-meta', el).textContent = `TTL ${ttlLabel(res.ttl)}${res.length >= 0 ? ` · 长度 ${res.length}` : ''}`;
+
+    const value = res.value;
+    let html = '';
+    if (res.type === 'string') {
+      tab.output = String(value ?? '');
+      html = `<pre class="whitespace-pre-wrap break-words p-3 font-mono text-[11.5px] leading-relaxed text-slate-700">${esc(tab.output)}</pre>`;
+    } else if (res.type === 'hash') {
+      tab.output = JSON.stringify(value || {}, null, 2);
+      html = renderGrid(['字段', '值'], Object.entries(value || {}), {});
+    } else if (res.type === 'list') {
+      tab.output = JSON.stringify(value || [], null, 2);
+      html = renderGrid(['序号', '值'], (value || []).map((v, i) => [i + 1, v]), {});
+    } else if (res.type === 'set') {
+      tab.output = JSON.stringify(value || [], null, 2);
+      html = renderGrid(['成员'], (value || []).map((v) => [v]), {});
+    } else if (res.type === 'zset') {
+      tab.output = JSON.stringify(value || [], null, 2);
+      html = renderGrid(['成员', '分值'], value || [], {});
+    } else if (res.type === 'stream') {
+      tab.output = JSON.stringify(value || [], null, 2);
+      html = renderGrid(['ID', '字段值'], (value || []).map((m) => [m.id, JSON.stringify(m.values)]), {});
+    } else {
+      tab.output = JSON.stringify(value, null, 2);
+      html = `<pre class="whitespace-pre-wrap break-words p-3 font-mono text-[11.5px] leading-relaxed text-slate-700">${esc(tab.output)}</pre>`;
+    }
+    wrap.innerHTML = html;
+    $('.data-status', el).textContent =
+      `类型 ${res.type} · TTL ${ttlLabel(res.ttl)}${res.length >= 0 ? ` · 长度 ${res.length}` : ''}`;
+  } catch (err) {
+    tab.detail = null;
+    wrap.innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
+    $('.data-status', el).textContent = '加载失败';
+  }
+}
+
+/* ---------- MongoDB 文档 ---------- */
+function openMongoTab(node) {
+  const existing = S.tabs.find((t) => t.type === 'mongo' && t.connId === node.connId && t.database === node.database && t.table === node.table);
+  if (existing) {
+    activateTab(existing.id);
+    return;
+  }
+  const tab = {
+    id: ++S.seq,
+    type: 'mongo',
+    connId: node.connId,
+    database: node.database,
+    table: node.table,
+    filter: '',
+    page: 1,
+    pageSize: 100,
+    total: -1,
+    data: null,
+    output: '',
+  };
+  S.tabs.push(tab);
+  createMongoPane(tab);
+  S.active = tab.id;
+  renderTabs();
+  renderTree();
+  loadMongoDocs(tab);
+}
+
+function createMongoPane(tab) {
+  const el = document.createElement('section');
+  el.className = 'pane hidden';
+  el.innerHTML = `
+    <div class="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
+      <span class="table-title min-w-0 max-w-[240px] truncate font-mono text-[11.5px] font-medium text-slate-800">${esc(tab.database + '.' + tab.table)}</span>
+      <input class="filter-input min-w-[160px] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-[10.5px] outline-none focus:border-emerald-400" placeholder='过滤 JSON，如 {"status":"active"}' spellcheck="false" />
+      <button class="apply-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">应用</button>
+      <button class="refresh-btn grid h-6 w-6 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="刷新">${iconSvg('refresh', 'h-3 w-3')}</button>
+      <div class="pager flex items-center gap-1 text-[10.5px] text-slate-500">
+        <select class="page-size rounded-md border border-slate-200 bg-white px-1 py-1 text-[10px] outline-none focus:border-emerald-400">
+          <option value="50">50 条</option>
+          <option value="100" selected>100 条</option>
+          <option value="200">200 条</option>
+          <option value="500">500 条</option>
+        </select>
+        <button class="prev-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">上一页</button>
+        <span class="page-label">1 / 1</span>
+        <button class="next-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">下一页</button>
+      </div>
+      <button class="copy-btn ml-auto rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制</button>
+    </div>
+    <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>
+    <div class="data-status flex-none border-t border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>`;
+  $('#panes').appendChild(el);
+  tab.el = el;
+
+  const filterInput = $('.filter-input', el);
+  filterInput.value = tab.filter;
+  filterInput.addEventListener('input', () => { tab.filter = filterInput.value; });
+  filterInput.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      tab.page = 1;
+      loadMongoDocs(tab);
+    }
+  });
+  $('.apply-btn', el).addEventListener('click', () => {
+    tab.page = 1;
+    loadMongoDocs(tab);
+  });
+  $('.refresh-btn', el).addEventListener('click', () => loadMongoDocs(tab));
+  $('.prev-btn', el).addEventListener('click', () => {
+    if (tab.page <= 1) return;
+    tab.page--;
+    loadMongoDocs(tab);
+  });
+  $('.next-btn', el).addEventListener('click', () => {
+    if (tab.total >= 0 && tab.page >= Math.max(1, Math.ceil(tab.total / tab.pageSize))) return;
+    tab.page++;
+    loadMongoDocs(tab);
+  });
+  $('.page-size', el).addEventListener('change', (ev) => {
+    tab.pageSize = Number(ev.target.value) || 100;
+    tab.page = 1;
+    loadMongoDocs(tab);
+  });
+  $('.copy-btn', el).addEventListener('click', () => {
+    if (!tab.data) { toast('没有可复制的结果'); return; }
+    const { columns, rows } = tab.data;
+    const text = [columns.join('\t'), ...rows.map((r) => r.map((v) => v === null ? 'NULL' : (typeof v === 'object' ? JSON.stringify(v) : String(v))).join('\t'))].join('\n');
+    navigator.clipboard.writeText(text).then(() => toast(`已复制 ${rows.length} 条`)).catch(() => toast('复制失败', 'err'));
+  });
+}
+
+async function loadMongoDocs(tab) {
+  const el = tab.el;
+  const wrap = $('.grid-wrap', el);
+  $('.data-status', el).textContent = '加载中…';
+  try {
+    const params = new URLSearchParams({
+      id: tab.connId,
+      database: tab.database,
+      collection: tab.table,
+      page: String(tab.page),
+      pageSize: String(tab.pageSize),
+    });
+    if (tab.filter.trim()) params.set('filter', tab.filter.trim());
+    const res = await api('/mongo/documents?' + params.toString());
+    tab.data = res;
+    tab.total = res.total;
+    wrap.innerHTML = renderGrid(res.columns, res.rows, {});
+    const pages = res.total >= 0 ? Math.max(1, Math.ceil(res.total / tab.pageSize)) : '?';
+    $('.page-label', el).textContent = `${tab.page} / ${pages}`;
+    $('.data-status', el).textContent =
+      `共 ${res.total >= 0 ? res.total : '未知'} 条 · 本页 ${res.rowCount} 条 · ${res.durationMs} ms`;
+  } catch (err) {
+    tab.data = null;
+    wrap.innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
+    $('.data-status', el).textContent = '加载失败';
   }
 }
 
@@ -920,8 +1372,13 @@ function renderGrid(columns, rows, opts = {}) {
 
 function cellHtml(v) {
   if (v === null || v === undefined) return `<td class="null">NULL</td>`;
-  const str = String(v);
-  const cls = typeof v === 'number' ? 'num' : (str.length > 200 ? '' : '');
+  let str;
+  if (typeof v === 'object') {
+    try { str = JSON.stringify(v); } catch { str = String(v); }
+  } else {
+    str = String(v);
+  }
+  const cls = typeof v === 'number' ? 'num' : '';
   const display = str.length > 500 ? str.slice(0, 500) + '…' : str;
   return `<td class="${cls}" title="${esc(str)}">${esc(display)}</td>`;
 }
@@ -1032,11 +1489,15 @@ function setDriver(driver) {
   $('#dbFieldWrap').classList.toggle('hidden', isFile);
   $('#sqliteFields').classList.toggle('hidden', !isFile);
   $('#charsetWrap').classList.toggle('hidden', t.family !== 'mysql');
-  $('#sslWrap').classList.toggle('hidden', t.family !== 'postgres');
+  $('#sslWrap').classList.toggle('hidden', !['postgres', 'redis', 'mongo'].includes(t.family));
   $('#dbLabelText').textContent = t.databaseLabel || '默认数据库（可选）';
-  $('#fDatabase').placeholder = t.family === 'oracle'
-    ? (t.id === 'dm' ? '默认模式，如 SYSDBA' : '服务名，如 ORCL')
-    : '不填则连接后选择';
+  if (t.family === 'oracle') {
+    $('#fDatabase').placeholder = t.id === 'dm' ? '默认模式，如 SYSDBA' : '服务名，如 ORCL';
+  } else if (t.family === 'redis') {
+    $('#fDatabase').placeholder = '0';
+  } else {
+    $('#fDatabase').placeholder = '不填则连接后选择';
+  }
 
   const portText = t.defaultPort ? String(t.defaultPort) : '';
   $('#fPort').placeholder = portText;
@@ -1121,16 +1582,37 @@ $('#searchInput').addEventListener('input', (ev) => {
   S.search = ev.target.value.trim();
   renderTree();
 });
-$('#exportBtn').addEventListener('click', () => window.open(API + '/connections/export', '_blank'));
+$('#exportBtn').addEventListener('click', async () => {
+  try {
+    const res = await api('/connections/export', { method: 'POST' });
+    await DevOSSecure.showExport(res);
+  } catch (err) {
+    toast('导出失败：' + err.message, 'err');
+  }
+});
 $('#importBtn').addEventListener('click', () => $('#importFile').click());
 $('#importFile').addEventListener('change', async (ev) => {
   const file = ev.target.files?.[0];
   if (!file) return;
   try {
     const text = await file.text();
-    const items = JSON.parse(text);
-    if (!Array.isArray(items)) throw new Error('文件应为连接数组');
-    const res = await api('/connections/import', { method: 'POST', body: JSON.stringify(items) });
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch (_) {
+      parsed = null;
+    }
+    let key = '';
+    if (DevOSSecure.isEncryptedEnvelope(parsed)) {
+      key = await DevOSSecure.askKey({ title: '导入加密连接' });
+      if (!key) return;
+    } else if (!Array.isArray(parsed)) {
+      throw new Error('文件应为连接数组或加密导出文件');
+    }
+    const res = await api('/connections/import', {
+      method: 'POST',
+      body: JSON.stringify({ content: text, key }),
+    });
     toast(`已导入 ${res.imported} 个连接`);
     await loadConnections();
   } catch (err) {

@@ -7,6 +7,8 @@ const (
 	familySQLite    = "sqlite"
 	familyOracle    = "oracle"
 	familySQLServer = "sqlserver"
+	familyRedis     = "redis"
+	familyMongo     = "mongo"
 )
 
 // DBType 描述一种可连接的数据库类型。
@@ -30,6 +32,10 @@ var dbTypes = []DBType{
 	{ID: "mariadb", Name: "MariaDB", Family: familyMySQL, Group: "常用", DefaultPort: 3306, Color: "#0ea5e9", DatabaseLabel: "默认数据库（可选）"},
 	{ID: "postgres", Name: "PostgreSQL", Family: familyPostgres, Group: "常用", DefaultPort: 5432, SchemaLevel: true, Color: "#336791", DatabaseLabel: "默认数据库（可选）"},
 	{ID: "sqlite", Name: "SQLite", Family: familySQLite, Group: "常用", File: true, Color: "#10b981"},
+
+	// NoSQL
+	{ID: "redis", Name: "Redis", Family: familyRedis, Group: "NoSQL", DefaultPort: 6379, Color: "#dc382d", DatabaseLabel: "默认库号（0-15）", Hint: "键值数据库；Redis 6+ 支持 ACL 用户名"},
+	{ID: "mongodb", Name: "MongoDB", Family: familyMongo, Group: "NoSQL", DefaultPort: 27017, Color: "#10aa50", DatabaseLabel: "默认数据库（可选）", Hint: "文档数据库；认证库可通过附加参数 authSource 指定"},
 
 	// 国产化
 	{ID: "dm", Name: "达梦 DM", Family: familyOracle, Group: "国产化", DefaultPort: 5236, Color: "#0f766e", DatabaseLabel: "默认模式（可选）", Hint: "DM8，使用 Oracle 兼容语法"},

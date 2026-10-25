@@ -12,6 +12,8 @@
     } } } };
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/ui.css?v=1" />
+  <script src="/assets/secure-ui.js?v=2"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
   <style>
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -1203,14 +1205,13 @@
     });
 
     // ---------- 导入导出 ----------
-    $("exportBtn").addEventListener("click", () => {
-      const link = document.createElement("a");
-      link.href = API + "/export";
-      link.download = "devos-sessions.json";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      toast("已导出会话（含凭据，请妥善保管）");
+    $("exportBtn").addEventListener("click", async () => {
+      try {
+        const data = await api("/export", { method: "POST" });
+        await DevOSSecure.showExport(data);
+      } catch (err) {
+        toast("导出失败：" + err.message, "error");
+      }
     });
 
     $("importBtn").addEventListener("click", () => $("importFile").click());
@@ -1220,7 +1221,23 @@
       $("importFile").value = "";
       try {
         const text = await file.text();
-        const data = await api("/import", { method: "POST", body: text });
+        let parsed = null;
+        try {
+          parsed = JSON.parse(text);
+        } catch (_) {
+          parsed = null;
+        }
+        let key = "";
+        if (DevOSSecure.isEncryptedEnvelope(parsed)) {
+          key = await DevOSSecure.askKey({ title: "导入加密会话" });
+          if (!key) return;
+        } else if (!Array.isArray(parsed)) {
+          throw new Error("文件格式不正确，应为会话数组或加密导出文件");
+        }
+        const data = await api("/import", {
+          method: "POST",
+          body: JSON.stringify({ content: text, key }),
+        });
         await loadProfiles();
         toast(`已导入 ${data.imported} 个会话`);
       } catch (err) {

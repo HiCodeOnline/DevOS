@@ -249,7 +249,7 @@ func (p *DB) pool(c Connection, database string) (*sql.DB, error) {
 	return db, nil
 }
 
-// closePools 关闭某个连接下的全部连接池。
+// closePools 关闭某个连接下的全部连接池与 NoSQL 客户端。
 func (p *DB) closePools(connID string) {
 	prefix := connID + "|"
 	p.poolsMu.Lock()
@@ -258,6 +258,18 @@ func (p *DB) closePools(connID string) {
 		if strings.HasPrefix(key, prefix) {
 			_ = pool.db.Close()
 			delete(p.pools, key)
+		}
+	}
+	for key, pool := range p.redisClients {
+		if strings.HasPrefix(key, connID+"|r") {
+			_ = pool.client.Close()
+			delete(p.redisClients, key)
+		}
+	}
+	for key, pool := range p.mongoClients {
+		if strings.HasPrefix(key, connID+"|m") {
+			_ = pool.client.Disconnect(context.Background())
+			delete(p.mongoClients, key)
 		}
 	}
 }
@@ -280,6 +292,13 @@ func versionSQL(driver string) string {
 
 // ping 校验连接可用性并返回版本信息。
 func (p *DB) ping(c Connection, database string) (int64, string, error) {
+	switch familyOf(c.Driver) {
+	case familyRedis:
+		return p.pingRedis(c, database)
+	case familyMongo:
+		return p.pingMongo(c)
+	}
+
 	db, err := p.pool(c, database)
 	if err != nil {
 		return 0, "", err
@@ -388,6 +407,10 @@ func (p *DB) handleDatabases(c *fiber.Ctx) error {
 		return jsonErr(c, fiber.StatusBadRequest, err.Error())
 	}
 	switch familyOf(conn.Driver) {
+	case familyRedis:
+		return p.handleRedisDatabases(c)
+	case familyMongo:
+		return p.handleMongoDatabases(c)
 	case familySQLite:
 		return c.JSON([]string{"main"})
 	case familyOracle:

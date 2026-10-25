@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -20,6 +21,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"devos/internal/plugin"
+	"devos/internal/secure"
 )
 
 //go:embed web
@@ -42,6 +44,7 @@ type API struct {
 	mu    sync.RWMutex
 	rules []MockRule
 	file  string
+	keys  *secure.Keyring
 	log   *slog.Logger
 }
 
@@ -68,6 +71,11 @@ func (p *API) Manifest() plugin.Manifest {
 func (p *API) Init(ctx *plugin.Context) error {
 	p.file = filepath.Join(ctx.DataDir, "mocks.json")
 	p.log = ctx.Logger
+	keys, err := secure.Open(ctx.DataDir, "mocks.key")
+	if err != nil {
+		return fmt.Errorf("初始化加密密钥失败: %w", err)
+	}
+	p.keys = keys
 	if err := p.load(); err != nil {
 		return err
 	}
@@ -280,7 +288,18 @@ func (p *API) load() error {
 		}
 		return err
 	}
-	return json.Unmarshal(data, &p.rules)
+	plain, err := p.keys.DecryptBytes(data)
+	if err != nil {
+		return fmt.Errorf("解密接口规则失败: %w", err)
+	}
+	if err := json.Unmarshal(plain, &p.rules); err != nil {
+		return err
+	}
+	if string(plain) == string(data) {
+		// 历史明文数据在加载时立即重新加密落盘。
+		return p.persist()
+	}
+	return nil
 }
 
 func (p *API) persist() error {
@@ -290,7 +309,11 @@ func (p *API) persist() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(p.file, append(data, '\n'), 0o644)
+	encrypted, err := p.keys.EncryptBytes(data)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(p.file, append(encrypted, '\n'), 0o600)
 }
 
 func newID() string {

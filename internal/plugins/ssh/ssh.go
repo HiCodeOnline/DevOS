@@ -22,6 +22,7 @@ import (
 
 	"devos/internal/plugin"
 	"devos/internal/profile"
+	"devos/internal/secure"
 	"devos/internal/sshtools"
 )
 
@@ -105,19 +106,54 @@ func (p *SSH) Register(api fiber.Router) {
 		return c.JSON(fiber.Map{"ok": true})
 	})
 
-	api.Get("/export", func(c *fiber.Ctx) error {
-		data, err := json.MarshalIndent(p.store.List(), "", "  ")
+	api.Post("/export", func(c *fiber.Ctx) error {
+		payload, err := json.Marshal(p.store.List())
 		if err != nil {
 			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 		}
-		c.Set("Content-Type", "application/json; charset=utf-8")
-		c.Set("Content-Disposition", `attachment; filename="devos-sessions.json"`)
-		return c.Send(data)
+		password, err := secure.NewExportPassword()
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		}
+		content, err := secure.Seal(password, payload)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		}
+		return c.JSON(fiber.Map{
+			"filename": "devos-sessions.json",
+			"key":      password,
+			"content":  string(content),
+		})
 	})
 
 	api.Post("/import", func(c *fiber.Ctx) error {
+		var in struct {
+			Content string `json:"content"`
+			Key     string `json:"key"`
+		}
+		if err := c.BodyParser(&in); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "参数解析失败")
+		}
+		raw := []byte(strings.TrimSpace(in.Content))
+		if len(raw) == 0 {
+			return fiber.NewError(fiber.StatusBadRequest, "导入文件内容为空")
+		}
+		payload := raw
+		if secure.IsEnvelope(raw) {
+			if strings.TrimSpace(in.Key) == "" {
+				return fiber.NewError(fiber.StatusBadRequest, "该文件已加密，请输入导出时生成的密钥")
+			}
+			plain, err := secure.Unseal(in.Key, raw)
+			if err != nil {
+				return fiber.NewError(fiber.StatusBadRequest, err.Error())
+			}
+			payload = plain
+		} else if strings.TrimSpace(in.Key) != "" {
+			return fiber.NewError(fiber.StatusBadRequest, "该文件未加密，无需填写密钥")
+		}
+
 		var items []profile.Profile
-		if err := json.Unmarshal(c.Body(), &items); err != nil {
+		if err := json.Unmarshal(payload, &items); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, "文件格式不正确，应为会话数组")
 		}
 		count, err := p.store.Import(items)

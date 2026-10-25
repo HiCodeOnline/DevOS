@@ -19,6 +19,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 
 	"devos/internal/plugin"
+	"devos/internal/security"
 )
 
 // Kernel 持有内核运行时状态。
@@ -29,6 +30,11 @@ type Kernel struct {
 	baseURL string
 	log     *slog.Logger
 	webFS   fs.FS
+
+	sec          *security.Store
+	sessions     *security.Sessions
+	throttle     *security.Throttle
+	wallpaperDir string
 
 	webRoot    string             // 运行时 Web 插件安装目录
 	builtinIDs map[string]bool    // 内置插件 ID，禁止被 Web 插件覆盖
@@ -57,6 +63,9 @@ func New(webFS fs.FS, dataDir, baseURL string, log *slog.Logger) *Kernel {
 
 // Load 初始化并注册全部插件（内置 + 运行时 Web 插件）。
 func (k *Kernel) Load(builtin []plugin.Plugin) error {
+	if err := k.initSecurity(); err != nil {
+		return err
+	}
 	seen := map[string]bool{}
 	k.builtinIDs = make(map[string]bool, len(builtin))
 	for _, p := range builtin {
@@ -115,9 +124,14 @@ func (k *Kernel) Load(builtin []plugin.Plugin) error {
 func (k *Kernel) routes() {
 	app := k.app
 
+	// 应用锁：必须在所有业务路由之前注册，锁定状态下拦截 API 与应用页面。
+	app.Use(k.securityGuard)
+
 	app.Get("/api/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"app": "devos", "version": "0.1.0", "pid": os.Getpid()})
 	})
+
+	k.registerSecurityRoutes(app)
 
 	app.Get("/api/system", func(c *fiber.Ctx) error {
 		host, _ := os.Hostname()
