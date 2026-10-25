@@ -1,4 +1,4 @@
-/* DevOS 锁屏：输入应用密码解锁，支持在锁屏界面切换语言。 */
+/* DevOS 锁屏：输入应用密码解锁。 */
 (function () {
   if (window.DevOSLock) return;
 
@@ -7,7 +7,6 @@
   var passwordInput = document.getElementById("lockPassword");
   var submitBtn = document.getElementById("lockSubmit");
   var errorEl = document.getElementById("lockError");
-  var localesEl = document.getElementById("lockLocales");
   var timeEl = screen ? screen.querySelector(".lock-time") : null;
   var dateEl = screen ? screen.querySelector(".lock-date") : null;
 
@@ -17,12 +16,6 @@
 
   function t(key, params) {
     return window.DevOSI18n ? window.DevOSI18n.t(key, params) : key;
-  }
-
-  function esc(value) {
-    return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
-    });
   }
 
   function request(url, body) {
@@ -54,25 +47,6 @@
     dateEl.textContent = now.toLocaleDateString(bcp47(), { month: "long", day: "numeric", weekday: "long" });
   }
 
-  function renderLocales() {
-    if (!localesEl || !window.DevOSI18n) return;
-    var current = window.DevOSI18n.getLocale();
-    localesEl.innerHTML = window.DevOSI18n.supported.map(function (code) {
-      var active = code === current ? " is-active" : "";
-      return '<button type="button" class="lock-locale' + active + '" data-locale="' + code + '">' +
-        esc(window.DevOSI18n.t("locale.name." + code)) + "</button>";
-    }).join("");
-    localesEl.querySelectorAll("[data-locale]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var code = btn.getAttribute("data-locale");
-        window.DevOSI18n.setLocale(code);
-        renderLocales();
-        renderClock();
-        request("/api/security/locale", { locale: code }).catch(function () { /* 忽略离线错误 */ });
-      });
-    });
-  }
-
   function showError(message) {
     if (!errorEl) return;
     errorEl.textContent = message;
@@ -100,7 +74,6 @@
     passwordInput.value = "";
     submitBtn.disabled = false;
     submitBtn.textContent = t("lock.unlock");
-    renderLocales();
     renderClock();
     if (clockTimer) clearInterval(clockTimer);
     clockTimer = setInterval(renderClock, 1000);
@@ -156,8 +129,8 @@
   if (window.DevOSI18n) {
     window.DevOSI18n.onChange(function () {
       if (screen && !screen.classList.contains("hidden")) {
-        renderLocales();
         renderClock();
+        submitBtn.textContent = busy ? t("lock.verifying") : t("lock.unlock");
       }
     });
   }

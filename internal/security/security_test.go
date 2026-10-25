@@ -119,14 +119,17 @@ func TestStorePasswordLifecycle(t *testing.T) {
 
 func TestStorePersistsLocaleAndWallpaper(t *testing.T) {
 	store, dir := newStore(t)
-	if store.Locale() != "zh-CN" {
-		t.Fatalf("默认语言 = %q", store.Locale())
+	if store.Locale() != "" {
+		t.Fatalf("默认语言应为空（跟随系统），实际 %q", store.Locale())
 	}
 	if err := store.SetLocale("en-US"); err != nil {
 		t.Fatalf("SetLocale: %v", err)
 	}
 	if store.Locale() != "en" {
 		t.Fatalf("语言应归一为 en，实际 %q", store.Locale())
+	}
+	if err := store.SetLocale("fr"); err == nil {
+		t.Fatal("不支持的语言应报错")
 	}
 	if err := store.SetWallpaper(Wallpaper{Kind: WallpaperCustom, File: "wallpaper-1-a1b2c3d4.png"}); err != nil {
 		t.Fatalf("SetWallpaper: %v", err)

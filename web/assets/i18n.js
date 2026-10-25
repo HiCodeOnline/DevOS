@@ -3,23 +3,23 @@
   if (window.DevOSI18n) return;
 
   var FALLBACK = "zh-CN";
-  var STORAGE_KEY = "devos.locale";
   var SUPPORTED = ["zh-CN", "en", "zh-TW"];
   var BCP47 = { "zh-CN": "zh-CN", "en": "en-US", "zh-TW": "zh-TW" };
   var dicts = Object.create(null);
   var listeners = [];
 
-  function pickInitial() {
-    var saved = "";
-    try { saved = localStorage.getItem(STORAGE_KEY) || ""; } catch (_) { saved = ""; }
-    if (SUPPORTED.indexOf(saved) >= 0) return saved;
-    var nav = String(navigator.language || "").toLowerCase();
-    if (nav.indexOf("zh") === 0) return /tw|hk|hant/.test(nav) ? "zh-TW" : "zh-CN";
-    if (nav.indexOf("en") === 0) return "en";
+  // 默认语言跟随系统；用户在设置中的选择由内核持久化后覆盖这里的结果。
+  function detectLocale() {
+    var tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""];
+    for (var i = 0; i < tags.length; i++) {
+      var tag = String(tags[i] || "").toLowerCase();
+      if (tag.indexOf("zh") === 0) return /(tw|hk|mo|hant)/.test(tag) ? "zh-TW" : "zh-CN";
+      if (tag.indexOf("en") === 0) return "en";
+    }
     return FALLBACK;
   }
 
-  var locale = pickInitial();
+  var locale = detectLocale();
 
   function register(code, dict) {
     if (!code || !dict) return;
@@ -63,7 +63,6 @@
   function setLocale(code, options) {
     var next = SUPPORTED.indexOf(code) >= 0 ? code : FALLBACK;
     locale = next;
-    try { localStorage.setItem(STORAGE_KEY, next); } catch (_) { /* 忽略隐私模式限制 */ }
     document.documentElement.lang = next;
     apply(document);
     if (!(options && options.silent)) {

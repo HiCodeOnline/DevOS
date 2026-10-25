@@ -36,6 +36,25 @@
     .tree-row:hover .tree-actions { display: flex; }
     .spin { animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 自绘下拉：替代原生 select 弹出层，保证与页面其他控件一致 */
+    .ui-select-trigger { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; font-size: 12px; line-height: 1.4; text-align: left; transition: border-color .15s ease, box-shadow .15s ease; }
+    .ui-select-trigger:hover { border-color: #cbd5e1; }
+    .ui-select-trigger[aria-expanded="true"] { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16, 185, 129, .14); }
+    .ui-select-value { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .ui-select-caret { width: 12px; height: 12px; flex: none; color: #94a3b8; }
+    .ui-select-menu { position: fixed; z-index: 80; max-height: 300px; overflow-y: auto; padding: 4px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; box-shadow: 0 24px 50px -22px rgba(15, 23, 42, .4), 0 2px 8px rgba(15, 23, 42, .06); }
+    .ui-select-menu.hidden { display: none; }
+    .ui-select-menu::-webkit-scrollbar { width: 8px; }
+    .ui-select-menu::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+    .ui-select-group { padding: 6px 8px 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; color: #94a3b8; }
+    .ui-select-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 8px; font-size: 11.5px; color: #334155; text-align: left; }
+    .ui-select-item:hover { background: #f1f5f9; }
+    .ui-select-item.is-active { background: #ecfdf5; color: #047857; font-weight: 600; }
+    .ui-select-dot { width: 7px; height: 7px; border-radius: 999px; flex: none; }
+    .ui-select-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .ui-select-check { width: 13px; height: 13px; flex: none; color: #059669; opacity: 0; }
+    .ui-select-item.is-active .ui-select-check { opacity: 1; }
   </style>
 </head>
 <body class="flex h-screen flex-col overflow-hidden bg-slate-50 font-sans text-slate-700 antialiased">
@@ -105,11 +124,18 @@
             <input id="fGroup" placeholder="未分组" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
           </label>
         </div>
-        <label class="block">
+        <div class="block">
           <span class="mb-1 block text-[10.5px] font-medium text-slate-500">数据库类型</span>
-          <select id="fDriver" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-400"></select>
+          <div id="driverSelect">
+            <button type="button" id="fDriverBtn" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+              <span id="fDriverLabel" class="ui-select-value"></span>
+              <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+            </button>
+            <input type="hidden" id="fDriver" />
+            <div id="fDriverMenu" class="ui-select-menu hidden" role="listbox"></div>
+          </div>
           <span id="driverHint" class="mt-1 block text-[10px] text-slate-400"></span>
-        </label>
+        </div>
 
         <div id="serverFields" class="space-y-3">
           <div class="grid grid-cols-3 gap-2">
@@ -1446,15 +1472,68 @@ async function exportCSV(tab) {
 let editingDriver = 'mysql';
 
 function fillDriverOptions() {
-  const sel = $('#fDriver');
+  const menu = $('#fDriverMenu');
   const groups = new Map();
   for (const t of TYPES) {
     if (!groups.has(t.group)) groups.set(t.group, []);
     groups.get(t.group).push(t);
   }
-  sel.innerHTML = [...groups.entries()].map(([group, items]) =>
-    `<optgroup label="${esc(group)}">${items.map((t) => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</optgroup>`
+  menu.innerHTML = [...groups.entries()].map(([group, items]) =>
+    `<div class="ui-select-group">${esc(group)}</div>` +
+    items.map((t) => `
+      <button type="button" class="ui-select-item" data-driver="${esc(t.id)}">
+        <span class="ui-select-dot" style="background:${esc(t.color || '#94a3b8')}"></span>
+        <span class="ui-select-name">${esc(t.name)}</span>
+        <svg class="ui-select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4 10-10"/></svg>
+      </button>`).join('')
   ).join('');
+  menu.querySelectorAll('[data-driver]').forEach((item) => {
+    item.addEventListener('click', () => {
+      setDriver(item.dataset.driver);
+      closeDriverMenu();
+      $('#fDriverBtn').focus();
+    });
+  });
+  syncDriverLabel();
+}
+
+// 同步下拉按钮文案与列表选中态。
+function syncDriverLabel() {
+  const t = TYPE_MAP[editingDriver] || FALLBACK_TYPES[0];
+  $('#fDriverLabel').textContent = t.name;
+  $('#fDriverMenu').querySelectorAll('[data-driver]').forEach((item) => {
+    item.classList.toggle('is-active', item.dataset.driver === editingDriver);
+  });
+}
+
+function closeDriverMenu() {
+  const menu = $('#fDriverMenu');
+  if (menu.classList.contains('hidden')) return;
+  menu.classList.add('hidden');
+  $('#fDriverBtn').setAttribute('aria-expanded', 'false');
+}
+
+// 菜单使用 fixed 定位，避免被弹窗的滚动容器裁切。
+function openDriverMenu() {
+  const menu = $('#fDriverMenu');
+  const btn = $('#fDriverBtn');
+  menu.classList.remove('hidden');
+  btn.setAttribute('aria-expanded', 'true');
+  const rect = btn.getBoundingClientRect();
+  const gap = 6;
+  const height = Math.min(menu.scrollHeight, 300);
+  const up = rect.bottom + gap + height > window.innerHeight && rect.top - gap - height > 0;
+  menu.style.width = `${Math.round(rect.width)}px`;
+  menu.style.left = `${Math.round(rect.left)}px`;
+  if (up) {
+    menu.style.top = 'auto';
+    menu.style.bottom = `${Math.round(window.innerHeight - rect.top + gap)}px`;
+  } else {
+    menu.style.bottom = 'auto';
+    menu.style.top = `${Math.round(rect.bottom + gap)}px`;
+  }
+  const active = menu.querySelector('.ui-select-item.is-active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
 }
 
 function currentFormConn() {
@@ -1483,6 +1562,7 @@ function setDriver(driver) {
   editingDriver = t.id;
   $('#fDriver').value = t.id;
   $('#driverHint').textContent = t.hint || '';
+  syncDriverLabel();
 
   const isFile = !!t.file;
   $('#serverFields').classList.toggle('hidden', isFile);
@@ -1529,16 +1609,36 @@ function openConnModal(conn) {
   setTimeout(() => $('#fName').focus(), 30);
 }
 
-function closeConnModal() { $('#connModal').classList.add('hidden'); }
+function closeConnModal() {
+  closeDriverMenu();
+  $('#connModal').classList.add('hidden');
+}
 
 $('#newConnBtn').addEventListener('click', () => openConnModal(null));
 $('#emptyNewBtn').addEventListener('click', () => openConnModal(null));
 $('#closeConnModal').addEventListener('click', closeConnModal);
 $('#cancelConnBtn').addEventListener('click', closeConnModal);
 $('#connModal').addEventListener('click', (ev) => { if (ev.target === $('#connModal')) closeConnModal(); });
-document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeConnModal(); });
-
-$('#fDriver').addEventListener('change', () => setDriver($('#fDriver').value));
+$('#fDriverBtn').addEventListener('click', () => {
+  if ($('#fDriverMenu').classList.contains('hidden')) openDriverMenu();
+  else closeDriverMenu();
+});
+document.addEventListener('click', (ev) => {
+  if (!ev.target.closest('#driverSelect')) closeDriverMenu();
+});
+$('#connModal').addEventListener('scroll', closeDriverMenu, true);
+window.addEventListener('resize', closeDriverMenu);
+// Escape：下拉打开时只收起下拉，否则关闭弹窗。
+$('#connModal').addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape') return;
+  if (!$('#fDriverMenu').classList.contains('hidden')) {
+    ev.stopPropagation();
+    closeDriverMenu();
+    $('#fDriverBtn').focus();
+    return;
+  }
+  closeConnModal();
+});
 
 $('#testConnBtn').addEventListener('click', async () => {
   const box = $('#connTestResult');

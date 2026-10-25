@@ -36,7 +36,6 @@ func (k *Kernel) registerSecurityRoutes(app *fiber.App) {
 	api.Post("/lock", k.handleSecurityLock)
 	api.Post("/password", k.handleSecurityPassword)
 	api.Post("/settings", k.handleSecuritySettings)
-	api.Post("/locale", k.handleSecurityLocale)
 	api.Post("/wallpaper", k.handleWallpaperUpload)
 	api.Get("/wallpaper/file/:name", k.handleWallpaperFile)
 }
@@ -166,23 +165,7 @@ func (k *Kernel) handleSecuritySettings(c *fiber.Ctx) error {
 	return c.JSON(k.statusPayload(c))
 }
 
-// handleSecurityLocale 允许锁屏界面在解锁前切换语言并持久化。
-func (k *Kernel) handleSecurityLocale(c *fiber.Ctx) error {
-	if err := k.verifyRequestOrigin(c); err != nil {
-		return err
-	}
-	var in struct {
-		Locale string `json:"locale"`
-	}
-	if err := c.BodyParser(&in); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, "参数解析失败")
-	}
-	if err := k.sec.SetLocale(in.Locale); err != nil {
-		return fiber.NewError(fiber.StatusBadRequest, err.Error())
-	}
-	return c.JSON(fiber.Map{"ok": true, "locale": k.sec.Locale()})
-}
-
+// handleWallpaperUpload 处理本地上传壁纸。
 func (k *Kernel) handleWallpaperUpload(c *fiber.Ctx) error {
 	if err := k.verifyRequestOrigin(c); err != nil {
 		return err

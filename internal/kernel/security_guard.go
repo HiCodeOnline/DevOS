@@ -72,7 +72,7 @@ func needsUnlock(path string) bool {
 // isPublicSecurityPath 是锁定状态下仍需放行的接口（锁屏与壁纸展示）。
 func isPublicSecurityPath(path string) bool {
 	switch path {
-	case "/api/health", "/api/security/status", "/api/security/unlock", "/api/security/locale":
+	case "/api/health", "/api/security/status", "/api/security/unlock":
 		return true
 	}
 	return strings.HasPrefix(path, "/api/security/wallpaper/file/")

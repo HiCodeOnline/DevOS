@@ -23,6 +23,9 @@ const (
 // 支持的语言标识；新增语言时在此登记并在前端补充词典。
 var SupportedLocales = []string{"zh-CN", "en", "zh-TW"}
 
+// settingsVersion 为当前设置文件版本；版本 2 起语言为空表示跟随系统。
+const settingsVersion = 2
+
 // Wallpaper 描述当前壁纸来源。
 type Wallpaper struct {
 	Kind   string `json:"kind"`             // preset | custom
@@ -53,8 +56,8 @@ func Open(dir string) (*Store, error) {
 	s := &Store{
 		path: filepath.Join(dir, SettingsFile),
 		data: Settings{
-			Version:   1,
-			Locale:    "zh-CN",
+			Version:   settingsVersion,
+			Locale:    "",
 			Wallpaper: Wallpaper{Kind: WallpaperPreset, Preset: DefaultPreset},
 		},
 	}
@@ -64,9 +67,12 @@ func Open(dir string) (*Store, error) {
 		if err := json.Unmarshal(raw, &s.data); err != nil {
 			return nil, fmt.Errorf("安全设置文件损坏: %w", err)
 		}
-		s.data.Locale = NormalizeLocale(s.data.Locale)
-		if s.data.Version == 0 {
-			s.data.Version = 1
+		if s.data.Version < settingsVersion {
+			// 旧版本的语言总是被写成默认值，视为未选择，迁移为跟随系统。
+			s.data.Locale = ""
+			s.data.Version = settingsVersion
+		} else {
+			s.data.Locale = NormalizeLocale(s.data.Locale)
 		}
 		if s.data.Wallpaper.Kind != WallpaperCustom && s.data.Wallpaper.Kind != WallpaperPreset {
 			s.data.Wallpaper = Wallpaper{Kind: WallpaperPreset, Preset: DefaultPreset}
@@ -85,12 +91,12 @@ func Open(dir string) (*Store, error) {
 	return s, nil
 }
 
-// NormalizeLocale 把语言标识归一为受支持的值，未知语言回退简体中文。
+// NormalizeLocale 把语言标识归一为受支持的值；空值与未知语言返回空，表示跟随系统。
 func NormalizeLocale(locale string) string {
 	value := strings.TrimSpace(locale)
 	switch {
 	case value == "":
-		return "zh-CN"
+		return ""
 	case strings.EqualFold(value, "zh-CN"), strings.EqualFold(value, "zh-Hans"), strings.EqualFold(value, "zh"),
 		strings.HasPrefix(strings.ToLower(value), "zh-cn"), strings.HasPrefix(strings.ToLower(value), "zh-hans"):
 		return "zh-CN"
@@ -100,7 +106,7 @@ func NormalizeLocale(locale string) string {
 	case strings.EqualFold(value, "en"), strings.HasPrefix(strings.ToLower(value), "en-"):
 		return "en"
 	default:
-		return "zh-CN"
+		return ""
 	}
 }
 
@@ -243,6 +249,9 @@ func (s *Store) RemovePassword(oldPassword string) error {
 // SetLocale 更新语言并持久化。
 func (s *Store) SetLocale(locale string) error {
 	normalized := NormalizeLocale(locale)
+	if normalized == "" {
+		return errors.New("不支持的语言")
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.data.Locale = normalized

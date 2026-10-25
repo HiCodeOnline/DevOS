@@ -108,8 +108,8 @@ func TestGuardAllowsEverythingWithoutPassword(t *testing.T) {
 	if status.HasPassword || status.Locked {
 		t.Fatalf("初始状态不应锁定: %s", res.Body)
 	}
-	if status.Locale != "zh-CN" || status.Wallpaper.Kind != "preset" {
-		t.Fatalf("初始设置不符: %s", res.Body)
+	if status.Locale != "" || status.Wallpaper.Kind != "preset" {
+		t.Fatalf("初始设置不符（语言应跟随系统）: %s", res.Body)
 	}
 	if strings.Contains(string(res.Body), "hash") || strings.Contains(string(res.Body), "salt") {
 		t.Fatalf("status 不应泄露密码哈希: %s", res.Body)
@@ -248,29 +248,23 @@ func TestRemovePasswordUnlocksEverything(t *testing.T) {
 	}
 }
 
-func TestLocaleCanBeChangedFromLockScreen(t *testing.T) {
+func TestLocaleChangeRequiresUnlock(t *testing.T) {
 	k := newSecurityKernel(t)
 	setPassword(t, k, "locale-pass")
 
+	// 锁屏界面不再提供语言切换，语言变更只能在解锁后经设置接口完成。
 	body, _ := json.Marshal(map[string]string{"locale": "zh-TW"})
-	res := request(t, k, "POST", "/api/security/locale", string(body), nil, devosHeaders(nil))
-	if res.Code != fiber.StatusOK {
-		t.Fatalf("锁定状态下应允许切换语言: %d %s", res.Code, res.Body)
-	}
-	var out struct {
-		Locale string `json:"locale"`
-	}
-	if err := json.Unmarshal(res.Body, &out); err != nil || out.Locale != "zh-TW" {
-		t.Fatalf("语言切换结果不符: %s", res.Body)
+	res := request(t, k, "POST", "/api/security/settings", string(body), nil, devosHeaders(nil))
+	if res.Code != fiber.StatusUnauthorized {
+		t.Fatalf("锁定状态下不应允许修改语言: %d %s", res.Code, res.Body)
 	}
 
-	status := request(t, k, "GET", "/api/security/status", "", nil, nil)
-	var info struct {
+	var status struct {
 		Locale string `json:"locale"`
 	}
-	_ = json.Unmarshal(status.Body, &info)
-	if info.Locale != "zh-TW" {
-		t.Fatalf("status 应返回新语言: %s", status.Body)
+	_ = json.Unmarshal(request(t, k, "GET", "/api/security/status", "", nil, nil).Body, &status)
+	if status.Locale != "" {
+		t.Fatalf("未解锁时语言应保持跟随系统: %s", status.Locale)
 	}
 }
 
