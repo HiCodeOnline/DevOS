@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>插件管理 · DevOS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Cascadia Code', 'Consolas', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    html, body { height: 100%; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, .55);
+      border-radius: 999px;
+      border: 3px solid transparent;
+      background-clip: content-box;
+    }
+    ::-webkit-scrollbar-track { background: transparent; }
+    .icon-tile img { height: 34px; width: 34px; object-fit: contain; border-radius: 8px; }
+  </style>
+</head>
+<body class="h-full overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased">
+  <div class="flex h-full flex-col">
+    <header class="flex flex-none items-center gap-3 border-b border-slate-200 bg-white/85 px-6 py-4 backdrop-blur">
+      <div class="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-sky-400 text-white shadow-lg shadow-indigo-500/20">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 4a2 2 0 0 1 4 0v2h3a2 2 0 0 1 2 2v3h-2a2 2 0 0 0 0 4h2v3a2 2 0 0 1-2 2h-3v-2a2 2 0 0 0-4 0v2H6a2 2 0 0 1-2-2v-3h2a2 2 0 0 0 0-4H4V8a2 2 0 0 1 2-2h3V4Z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-base font-semibold tracking-tight text-slate-900">插件管理</h1>
+        <p class="text-[11px] text-slate-500">离线安装 Web 插件 · 规范 v1 · 冲突时可选覆盖、保留或另存</p>
+      </div>
+      <div class="ml-auto flex items-center gap-2">
+        <button id="refreshBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+          刷新
+        </button>
+        <button id="installBtn" class="rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-slate-800">
+          安装 ZIP
+        </button>
+        <input id="fileInput" type="file" accept=".zip,application/zip" class="hidden" />
+      </div>
+    </header>
+
+    <div class="flex-none px-6 pt-5">
+      <div id="dropZone" class="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white/70 px-6 py-7 text-center transition hover:border-sky-300 hover:bg-sky-50/40">
+        <svg class="h-8 w-8 text-slate-300 transition group-hover:text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+        </svg>
+        <div class="mt-2 text-sm font-medium text-slate-700">拖拽 ZIP 插件包到此处，或点击选择文件</div>
+        <div class="mt-1 text-[11px] text-slate-400">单包上限 64MB · 自动校验目录结构与清单</div>
+      </div>
+
+      <div id="stats" class="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-slate-500"></div>
+    </div>
+
+    <main class="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+      <div id="list" class="grid gap-3"></div>
+    </main>
+  </div>
+
+  <!-- 冲突弹窗 -->
+  <div id="conflictMask" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/35 p-6 backdrop-blur-sm">
+    <div class="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div class="flex items-start gap-3 border-b border-slate-100 px-6 py-5">
+        <span class="grid h-9 w-9 flex-none place-items-center rounded-xl bg-amber-50 text-amber-500">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9 2.4 18a1.9 1.9 0 0 0 1.7 2.8h15.8a1.9 1.9 0 0 0 1.7-2.8L13.7 3.9a1.9 1.9 0 0 0-3.4 0Z"/>
+          </svg>
+        </span>
+        <div class="min-w-0">
+          <h2 class="text-sm font-semibold text-slate-900">插件已安装</h2>
+          <p id="conflictHint" class="mt-1 text-xs text-slate-500"></p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 px-6 py-4">
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <div class="text-[11px] font-medium text-slate-400">现有版本</div>
+          <div id="existingBox" class="mt-1.5 space-y-1 text-xs text-slate-700"></div>
+        </div>
+        <div class="rounded-xl border border-sky-200 bg-sky-50/60 p-3">
+          <div class="text-[11px] font-medium text-sky-500">待安装版本</div>
+          <div id="incomingBox" class="mt-1.5 space-y-1 text-xs text-slate-700"></div>
+        </div>
+      </div>
+
+      <div class="border-t border-slate-100 px-6 py-4">
+        <div id="copyRow" class="mb-3 hidden items-center gap-2">
+          <label class="text-xs text-slate-500" for="copyId">新插件 id</label>
+          <input id="copyId" type="text" class="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-100" />
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <button id="cancelBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 transition hover:bg-slate-50">取消</button>
+          <button id="keepBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 transition hover:bg-slate-50">保留现有</button>
+          <button id="copyBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 transition hover:bg-slate-50">另存为新插件</button>
+          <button id="overwriteBtn" class="rounded-lg bg-slate-900 px-3.5 py-2 text-xs font-medium text-white transition hover:bg-slate-800">覆盖安装</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts" class="fixed bottom-6 left-1/2 z-[60] flex -translate-x-1/2 flex-col items-center gap-2"></div>
+
+  <script>
+    const state = {
+      plugins: [],
+      pendingFile: null,
+      pendingConflict: null,
+      copyMode: false,
+      busy: false,
+    };
+
+    const $ = (sel) => document.querySelector(sel);
+    const listEl = $("#list");
+    const statsEl = $("#stats");
+    const dropZone = $("#dropZone");
+    const fileInput = $("#fileInput");
+    const mask = $("#conflictMask");
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[ch]));
+    }
+
+    function iconContent(icon) {
+      const value = String(icon ?? "").trim();
+      if (!value) return "";
+      if (value.startsWith("<") || value.startsWith("data:")) return icon;
+      if (value.startsWith("/") || value.startsWith("http://") || value.startsWith("https://")) {
+        return `<img src="${esc(value)}" alt="" />`;
+      }
+      return esc(value);
+    }
+
+    function iconTile(plugin) {
+      return `<span class="icon-tile grid h-12 w-12 flex-none place-items-center rounded-xl border border-slate-200 bg-white shadow-sm" style="color:${esc(plugin.accent || "#0ea5e9")}">${iconContent(plugin.icon)}</span>`;
+    }
+
+    function toast(message, tone = "ok") {
+      const node = document.createElement("div");
+      const color = tone === "err" ? "bg-rose-600" : "bg-slate-900";
+      node.className = `rounded-xl ${color} px-4 py-2.5 text-xs text-white shadow-xl transition`;
+      node.textContent = message;
+      $("#toasts").appendChild(node);
+      setTimeout(() => {
+        node.style.opacity = "0";
+        node.style.transform = "translateY(6px)";
+        setTimeout(() => node.remove(), 250);
+      }, 3200);
+    }
+
+    function fmtTime(value) {
+      if (!value) return "";
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return value;
+      return d.toLocaleString("zh-CN", { hour12: false });
+    }
+
+    function renderStats() {
+      const builtin = state.plugins.filter((p) => p.source === "builtin").length;
+      const installed = state.plugins.filter((p) => p.source === "installed").length;
+      const external = state.plugins.filter((p) => p.source === "external").length;
+      const chips = [
+        `共 ${state.plugins.length} 个插件`,
+        `内置 ${builtin}`,
+        `已安装 ${installed}`,
+      ];
+      if (external) chips.push(`外部目录 ${external}`);
+      chips.push("规范版本 v1");
+      statsEl.innerHTML = chips
+        .map((text) => `<span class="rounded-full border border-slate-200 bg-white px-2.5 py-1">${esc(text)}</span>`)
+        .join("");
+    }
+
+    function renderList() {
+      listEl.innerHTML = "";
+      if (state.plugins.length === 0) {
+        listEl.innerHTML = `<div class="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center text-xs text-slate-400">暂无插件</div>`;
+        return;
+      }
+      for (const p of state.plugins) {
+        const card = document.createElement("article");
+        card.className = "rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md";
+        const badgeMap = {
+          builtin: `<span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">内置</span>`,
+          installed: `<span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-600">已安装</span>`,
+          external: `<span class="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] text-amber-600">外部目录</span>`,
+        };
+        const sourceBadge = badgeMap[p.source] || badgeMap.external;
+        const meta = [];
+        if (p.category) meta.push(p.category);
+        if (p.version) meta.push("v" + p.version);
+        meta.push("id: " + p.id);
+        if (p.dataDir) meta.push("数据: " + p.dataDir);
+        if (p.dir) meta.push("目录: " + p.dir);
+        if (p.installedAt && p.source === "installed") meta.push("安装于 " + fmtTime(p.installedAt));
+
+        let action;
+        if (p.source === "installed") {
+          action = `<button data-remove="${esc(p.id)}" class="rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-[11px] text-rose-600 transition hover:bg-rose-50">卸载</button>`;
+        } else if (p.source === "external") {
+          action = `<span class="text-[11px] text-slate-300">外部只读</span>`;
+        } else {
+          action = `<span class="text-[11px] text-slate-300">随内核编译</span>`;
+        }
+
+        card.innerHTML = `
+          <div class="flex items-start gap-3">
+            ${iconTile(p)}
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <h3 class="truncate text-sm font-semibold text-slate-900">${esc(p.name || p.id)}</h3>
+                ${sourceBadge}
+                ${p.backend ? `<span class="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] text-sky-600">提供后端 API</span>` : ""}
+              </div>
+              <p class="mt-1 line-clamp-2 text-xs text-slate-500">${esc(p.description || "无描述")}</p>
+              <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] text-slate-400">
+                ${meta.map((m) => `<span class="truncate">${esc(m)}</span>`).join("")}
+              </div>
+            </div>
+            <div class="flex-none">${action}</div>
+          </div>`;
+        listEl.appendChild(card);
+      }
+    }
+
+    async function loadPlugins() {
+      const resp = await fetch("/api/plugins", { headers: { Accept: "application/json" } });
+      if (!resp.ok) throw new Error(`读取插件列表失败 (${resp.status})`);
+      state.plugins = await resp.json();
+      renderStats();
+      renderList();
+    }
+
+    function notifyDesktop(message) {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "devos:apps-changed", message }, "*");
+      }
+    }
+
+    async function parseJSON(resp) {
+      try {
+        return await resp.json();
+      } catch (_) {
+        return {};
+      }
+    }
+
+    async function installFile(file, action, id) {
+      if (state.busy) return;
+      state.busy = true;
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        if (action) form.append("action", action);
+        if (id) form.append("id", id);
+
+        const resp = await fetch("/api/plugins/install", { method: "POST", body: form });
+        const data = await parseJSON(resp);
+
+        if (resp.status === 409 && data.conflict) {
+          openConflict(file, data);
+          return;
+        }
+        if (!resp.ok) {
+          throw new Error(data.error || data.message || `安装失败 (${resp.status})`);
+        }
+
+        closeConflict();
+        await loadPlugins();
+        const name = (data.plugin && data.plugin.name) || data.name || "插件";
+        if (data.status === "kept") {
+          toast(`已保留现有版本：${name}`);
+        } else {
+          toast(`安装成功：${name}${action === "overwrite" ? "（已覆盖）" : ""}`);
+          notifyDesktop(`应用列表已更新：${name}`);
+        }
+      } catch (err) {
+        toast(err.message || "安装失败", "err");
+      } finally {
+        state.busy = false;
+      }
+    }
+
+    function openConflict(file, data) {
+      state.pendingFile = file;
+      state.pendingConflict = data;
+      state.copyMode = false;
+      $("#conflictHint").textContent = data.error || "目标插件已安装，请选择处理方式。";
+
+      const describe = (p) => `
+        <div class="truncate font-medium text-slate-800">${esc(p.name || p.id)}</div>
+        <div class="font-mono text-[10px] text-slate-400">${esc(p.id)} · v${esc(p.version || "0.0.0")}</div>`;
+      $("#existingBox").innerHTML = describe(data.existing || {});
+      $("#incomingBox").innerHTML = describe(data.incoming || {});
+
+      const relationText = {
+        newer: "新包版本更新，可直接覆盖升级。",
+        older: "新包版本更旧，覆盖将降级现有插件。",
+        same: "两个版本相同，覆盖会重新写入文件。",
+      }[data.relation] || "请确认如何处理。";
+      $("#conflictHint").textContent = (data.error || "插件已安装") + " · " + relationText;
+
+      const baseID = (data.existing && data.existing.id) || "plugin";
+      $("#copyId").value = `${baseID}-copy`;
+      $("#copyRow").classList.add("hidden");
+      $("#copyRow").classList.remove("flex");
+      mask.classList.remove("hidden");
+      mask.classList.add("flex");
+    }
+
+    function closeConflict() {
+      mask.classList.add("hidden");
+      mask.classList.remove("flex");
+      $("#copyRow").classList.add("hidden");
+      $("#copyRow").classList.remove("flex");
+      state.pendingFile = null;
+      state.pendingConflict = null;
+      state.copyMode = false;
+    }
+
+    async function removePlugin(id) {
+      if (!confirm(`确认卸载插件 ${id}？数据目录会保留。`)) return;
+      try {
+        const resp = await fetch(`/api/plugins/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const data = await parseJSON(resp);
+        if (!resp.ok) throw new Error(data.error || data.message || `卸载失败 (${resp.status})`);
+        await loadPlugins();
+        toast(`已卸载：${id}`);
+        notifyDesktop(`已卸载插件：${id}`);
+      } catch (err) {
+        toast(err.message || "卸载失败", "err");
+      }
+    }
+
+    function pickFile(file) {
+      if (!file) return;
+      if (!/\.zip$/i.test(file.name)) {
+        toast("请选择 .zip 插件包", "err");
+        return;
+      }
+      installFile(file);
+    }
+
+    $("#installBtn").addEventListener("click", () => fileInput.click());
+    $("#refreshBtn").addEventListener("click", async () => {
+      try {
+        await loadPlugins();
+        toast("插件列表已刷新");
+      } catch (err) {
+        toast(err.message, "err");
+      }
+    });
+    dropZone.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => {
+      pickFile(fileInput.files && fileInput.files[0]);
+      fileInput.value = "";
+    });
+    dropZone.addEventListener("dragover", (event) => {
+      event.preventDefault();
+      dropZone.classList.add("border-sky-400", "bg-sky-50/60");
+    });
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("border-sky-400", "bg-sky-50/60");
+    });
+    dropZone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      dropZone.classList.remove("border-sky-400", "bg-sky-50/60");
+      pickFile(event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]);
+    });
+
+    listEl.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-remove]");
+      if (btn) removePlugin(btn.dataset.remove);
+    });
+
+    $("#overwriteBtn").addEventListener("click", () => {
+      if (state.pendingFile) installFile(state.pendingFile, "overwrite");
+    });
+    $("#keepBtn").addEventListener("click", () => {
+      if (state.pendingFile) installFile(state.pendingFile, "keep");
+    });
+    $("#copyBtn").addEventListener("click", () => {
+      if (!state.pendingFile) return;
+      if (!state.copyMode) {
+        state.copyMode = true;
+        $("#copyRow").classList.remove("hidden");
+        $("#copyRow").classList.add("flex");
+        $("#copyId").focus();
+        $("#copyId").select();
+        return;
+      }
+      const id = $("#copyId").value.trim();
+      if (!id) {
+        toast("请填写新的插件 id", "err");
+        return;
+      }
+      installFile(state.pendingFile, "copy", id);
+    });
+    $("#cancelBtn").addEventListener("click", closeConflict);
+    mask.addEventListener("click", (event) => {
+      if (event.target === mask) closeConflict();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !mask.classList.contains("hidden")) closeConflict();
+    });
+
+    loadPlugins().catch((err) => toast(err.message, "err"));
+  </script>
+</body>
+</html>

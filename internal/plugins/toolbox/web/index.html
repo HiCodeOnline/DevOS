@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>工具集</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: {
+      sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'system-ui', 'sans-serif'],
+      mono: ['JetBrains Mono', 'Cascadia Code', 'Consolas', 'monospace']
+    } } } };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body class="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-700 antialiased">
+  <aside class="flex w-[200px] flex-none flex-col border-r border-slate-200 bg-white/80">
+    <div class="flex items-center gap-2 px-4 py-4">
+      <span class="grid h-8 w-8 place-items-center rounded-lg bg-violet-50 text-violet-600">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0 5 5L21 10l-7.5 7.5-2.4 2.4a2 2 0 0 1-2.8 0l-1.2-1.2a2 2 0 0 1 0-2.8L9.5 13.5 17 6l-2.3-1.1Z"/><path d="M4 20l3-3"/></svg>
+      </span>
+      <div>
+        <div class="text-sm font-semibold text-slate-900">工具集</div>
+        <div class="text-[10px] text-slate-400">日常开发小工具</div>
+      </div>
+    </div>
+    <nav id="nav" class="space-y-0.5 px-2 pt-1"></nav>
+    <div class="mt-auto px-4 py-3 text-[10px] leading-relaxed text-slate-400">所有计算均在浏览器本地完成，数据不会上传。</div>
+  </aside>
+
+  <main class="min-w-0 flex-1 overflow-y-auto p-4">
+    <!-- JSON -->
+    <section data-panel="json" class="panel">
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-slate-900">JSON 格式化</h2>
+          <span id="jsonStatus" class="text-[10.5px] text-slate-400"></span>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <textarea id="jsonIn" rows="12" class="w-full resize-none rounded-lg border border-slate-200 p-3 font-mono text-[11px] outline-none focus:border-violet-400" placeholder='{"name":"devos","apps":["ssh","sftp"]}'></textarea>
+          <textarea id="jsonOut" rows="12" readonly class="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] outline-none"></textarea>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button data-json="pretty" class="rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-500">格式化</button>
+          <button data-json="minify" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">压缩</button>
+          <button data-json="validate" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">校验</button>
+          <button data-copy="jsonOut" class="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">复制结果</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Base64 -->
+    <section data-panel="base64" class="panel hidden">
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900">Base64 编解码</h2>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <textarea id="b64In" rows="10" class="w-full resize-none rounded-lg border border-slate-200 p-3 font-mono text-[11px] outline-none focus:border-violet-400" placeholder="输入文本或 Base64"></textarea>
+          <textarea id="b64Out" rows="10" readonly class="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] outline-none"></textarea>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button data-b64="encode" class="rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-500">编码</button>
+          <button data-b64="decode" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">解码</button>
+          <button data-copy="b64Out" class="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">复制结果</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- URL -->
+    <section data-panel="url" class="panel hidden">
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900">URL 编解码</h2>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <textarea id="urlIn" rows="10" class="w-full resize-none rounded-lg border border-slate-200 p-3 font-mono text-[11px] outline-none focus:border-violet-400" placeholder="https://example.com/search?q=你好"></textarea>
+          <textarea id="urlOut" rows="10" readonly class="w-full resize-none rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] outline-none"></textarea>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button data-url="encode" class="rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-500">编码</button>
+          <button data-url="decode" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">解码</button>
+          <button data-copy="urlOut" class="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">复制结果</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 时间戳 -->
+    <section data-panel="time" class="panel hidden">
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-slate-900">时间戳转换</h2>
+          <span id="nowTime" class="font-mono text-[11px] text-slate-400"></span>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-4">
+          <div>
+            <label class="mb-1 block text-[10.5px] font-medium text-slate-500">Unix 时间戳（秒 / 毫秒均可）</label>
+            <input id="tsIn" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-violet-400" placeholder="1735689600" />
+            <button id="tsToDate" class="mt-2 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-500">转换为时间</button>
+            <div id="tsDateOut" class="mt-2 rounded-lg bg-slate-50 p-3 font-mono text-[11px] text-slate-700">—</div>
+          </div>
+          <div>
+            <label class="mb-1 block text-[10.5px] font-medium text-slate-500">日期时间</label>
+            <input id="dtIn" type="datetime-local" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-violet-400" />
+            <button id="dateToTs" class="mt-2 rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-500">转换为时间戳</button>
+            <div id="tsOut" class="mt-2 rounded-lg bg-slate-50 p-3 font-mono text-[11px] text-slate-700">—</div>
+          </div>
+        </div>
+        <button id="fillNow" class="mt-3 rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">使用当前时间</button>
+      </div>
+    </section>
+
+    <!-- UUID -->
+    <section data-panel="uuid" class="panel hidden">
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900">UUID 生成</h2>
+        <div class="mt-3 flex items-center gap-2">
+          <input id="uuidCount" type="number" min="1" max="50" value="5" class="w-20 rounded-lg border border-slate-200 px-3 py-2 text-[11px] outline-none focus:border-violet-400" />
+          <button id="genUuid" class="rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-500">生成</button>
+          <button data-copy="uuidOut" class="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">复制全部</button>
+        </div>
+        <pre id="uuidOut" class="mt-3 max-h-[420px] overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] leading-relaxed text-slate-700"></pre>
+      </div>
+    </section>
+
+    <!-- 哈希 -->
+    <section data-panel="hash" class="panel hidden">
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 class="text-sm font-semibold text-slate-900">哈希计算</h2>
+        <textarea id="hashIn" rows="6" class="mt-3 w-full resize-none rounded-lg border border-slate-200 p-3 font-mono text-[11px] outline-none focus:border-violet-400" placeholder="输入要计算哈希的文本"></textarea>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <button data-hash="SHA-1" class="rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-500">SHA-1</button>
+          <button data-hash="SHA-256" class="rounded-lg bg-violet-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-500">SHA-256</button>
+          <span id="hashAlgo" class="text-[10.5px] text-slate-400"></span>
+          <button data-copy="hashOut" class="ml-auto rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">复制结果</button>
+        </div>
+        <pre id="hashOut" class="mt-3 overflow-auto rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-[11px] leading-relaxed text-slate-700">—</pre>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-900 px-4 py-2 text-[11px] text-white opacity-0 transition-opacity"></div>
+
+  <script>
+    const TOOLS = [
+      { id: "json", name: "JSON 格式化", icon: "M9 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3M15 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" },
+      { id: "base64", name: "Base64 编解码", icon: "M4 7h16M4 12h16M4 17h10" },
+      { id: "url", name: "URL 编解码", icon: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.5 1.5M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5" },
+      { id: "time", name: "时间戳转换", icon: "M12 8v4l3 2M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" },
+      { id: "uuid", name: "UUID 生成", icon: "M9 7h6M9 12h6M9 17h4M6 3h12a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" },
+      { id: "hash", name: "哈希计算", icon: "M4 9h16M4 15h16M10 3l-1 18M15 3l-1 18" }
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    const state = { active: "json" };
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[ch]));
+    }
+
+    function toast(text) {
+      const node = $("toast");
+      node.textContent = text;
+      node.style.opacity = "1";
+      clearTimeout(node._timer);
+      node._timer = setTimeout(() => { node.style.opacity = "0"; }, 1800);
+    }
+
+    function renderNav() {
+      $("nav").innerHTML = TOOLS.map((tool) => `
+        <button data-tool="${tool.id}" class="tool-btn flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[11.5px] transition">
+          <svg class="h-4 w-4 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${tool.icon}"/></svg>
+          <span>${esc(tool.name)}</span>
+        </button>`).join("");
+      document.querySelectorAll(".tool-btn").forEach((btn) => {
+        btn.addEventListener("click", () => switchTool(btn.dataset.tool));
+      });
+      switchTool(state.active);
+    }
+
+    function switchTool(id) {
+      state.active = id;
+      document.querySelectorAll(".panel").forEach((panel) => {
+        panel.classList.toggle("hidden", panel.dataset.panel !== id);
+      });
+      document.querySelectorAll(".tool-btn").forEach((btn) => {
+        const active = btn.dataset.tool === id;
+        btn.className = "tool-btn flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[11.5px] transition " +
+          (active ? "bg-violet-50 font-medium text-violet-700" : "text-slate-600 hover:bg-slate-50");
+      });
+    }
+
+    // JSON
+    document.querySelectorAll("[data-json]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const raw = $("jsonIn").value.trim();
+        if (!raw) return;
+        try {
+          const data = JSON.parse(raw);
+          if (btn.dataset.json === "minify") {
+            $("jsonOut").value = JSON.stringify(data);
+            $("jsonStatus").textContent = "已压缩";
+          } else if (btn.dataset.json === "validate") {
+            $("jsonStatus").textContent = "JSON 合法";
+            $("jsonOut").value = JSON.stringify(data, null, 2);
+          } else {
+            $("jsonOut").value = JSON.stringify(data, null, 2);
+            $("jsonStatus").textContent = "已格式化";
+          }
+          $("jsonStatus").className = "text-[10.5px] text-emerald-600";
+        } catch (err) {
+          $("jsonOut").value = "";
+          $("jsonStatus").textContent = "解析失败：" + err.message;
+          $("jsonStatus").className = "text-[10.5px] text-rose-500";
+        }
+      });
+    });
+
+    // Base64
+    document.querySelectorAll("[data-b64]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const raw = $("b64In").value;
+        try {
+          $("b64Out").value = btn.dataset.b64 === "encode"
+            ? btoa(unescape(encodeURIComponent(raw)))
+            : decodeURIComponent(escape(atob(raw.trim())));
+        } catch (err) {
+          $("b64Out").value = "处理失败：" + err.message;
+        }
+      });
+    });
+
+    // URL
+    document.querySelectorAll("[data-url]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const raw = $("urlIn").value;
+        try {
+          $("urlOut").value = btn.dataset.url === "encode"
+            ? encodeURIComponent(raw)
+            : decodeURIComponent(raw);
+        } catch (err) {
+          $("urlOut").value = "处理失败：" + err.message;
+        }
+      });
+    });
+
+    // 时间戳
+    function showNow() {
+      const now = new Date();
+      $("nowTime").textContent = `当前 ${Math.floor(now.getTime() / 1000)} · ${now.toLocaleString("zh-CN")}`;
+    }
+    $("tsToDate").addEventListener("click", () => {
+      const raw = $("tsIn").value.trim();
+      if (!raw) return;
+      let num = Number(raw);
+      if (Number.isNaN(num)) { $("tsDateOut").textContent = "请输入数字时间戳"; return; }
+      if (num < 1e12) num *= 1000;
+      const d = new Date(num);
+      $("tsDateOut").textContent = `${d.toLocaleString("zh-CN")}\nISO: ${d.toISOString()}\nUTC: ${d.toUTCString()}`;
+      $("tsDateOut").style.whiteSpace = "pre-wrap";
+    });
+    $("dateToTs").addEventListener("click", () => {
+      const raw = $("dtIn").value;
+      if (!raw) return;
+      const d = new Date(raw);
+      $("tsOut").textContent = `秒: ${Math.floor(d.getTime() / 1000)}\n毫秒: ${d.getTime()}`;
+      $("tsOut").style.whiteSpace = "pre-wrap";
+    });
+    $("fillNow").addEventListener("click", () => {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      $("dtIn").value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      $("tsIn").value = String(Math.floor(now.getTime() / 1000));
+      showNow();
+    });
+
+    // UUID
+    function uuidv4() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    }
+    $("genUuid").addEventListener("click", () => {
+      const count = Math.min(50, Math.max(1, parseInt($("uuidCount").value, 10) || 1));
+      $("uuidOut").textContent = Array.from({ length: count }, () => uuidv4()).join("\n");
+    });
+
+    // 哈希
+    document.querySelectorAll("[data-hash]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const raw = $("hashIn").value;
+        const algo = btn.dataset.hash;
+        $("hashAlgo").textContent = `算法 ${algo}`;
+        try {
+          const buffer = await crypto.subtle.digest(algo, new TextEncoder().encode(raw));
+          const hex = [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
+          $("hashOut").textContent = hex;
+        } catch (err) {
+          $("hashOut").textContent = "计算失败：" + err.message;
+        }
+      });
+    });
+
+    // 复制
+    document.querySelectorAll("[data-copy]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const node = $(btn.dataset.copy);
+        const text = node.value !== undefined ? node.value : node.textContent;
+        if (!text || text === "—") return toast("没有可复制的内容");
+        try {
+          await navigator.clipboard.writeText(text);
+          toast("已复制");
+        } catch (_) {
+          toast("复制失败，请手动选择");
+        }
+      });
+    });
+
+    renderNav();
+    showNow();
+    setInterval(showNow, 1000);
+    $("genUuid").click();
+  </script>
+</body>
+</html>

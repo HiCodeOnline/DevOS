@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SSH 终端</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: {
+      sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'system-ui', 'sans-serif'],
+      mono: ['JetBrains Mono', 'Cascadia Code', 'Consolas', 'monospace']
+    } } } };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.45); border-radius: 999px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    .xterm { height: 100%; }
+    .xterm-viewport { background-color: transparent !important; }
+    .term-pane { position: absolute; inset: 0; padding: 8px 6px 4px; }
+    .group-body.collapsed { display: none; }
+    .tab-dot { box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
+  </style>
+</head>
+<body class="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-700 antialiased">
+  <aside class="flex w-[286px] flex-none flex-col border-r border-slate-200 bg-white/85">
+    <div class="flex items-center gap-2 border-b border-slate-200 px-4 py-3">
+      <span class="grid h-8 w-8 place-items-center rounded-lg bg-sky-50 text-sky-600">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9l3 3-3 3"/><path d="M13 15h4"/></svg>
+      </span>
+      <div class="min-w-0">
+        <div class="text-sm font-semibold text-slate-900">会话库</div>
+        <div class="text-[10px] text-slate-400">与 SFTP 应用共享</div>
+      </div>
+      <div class="ml-auto flex items-center gap-1">
+        <button id="newBtn" class="rounded-md bg-slate-900 px-2 py-1 text-[10.5px] font-medium text-white hover:bg-slate-700" title="新建会话">新建</button>
+        <button id="moreBtn" class="rounded-md border border-slate-200 p-1 text-slate-500 hover:bg-slate-50" title="导入 / 导出">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="space-y-2 px-3 py-2.5">
+      <div class="relative">
+        <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="search" placeholder="搜索会话 / 主机…" class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-[11px] outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100" />
+      </div>
+      <div class="flex gap-1.5">
+        <input id="quickInput" placeholder="快速连接 user@host:port" class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-mono text-[10.5px] outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100" />
+        <button id="quickBtn" class="rounded-lg bg-sky-600 px-2.5 py-1.5 text-[10.5px] font-medium text-white hover:bg-sky-500">连接</button>
+      </div>
+    </div>
+
+    <div id="sessionList" class="min-h-0 flex-1 overflow-y-auto px-2 pb-2"></div>
+
+    <div class="flex items-center justify-between border-t border-slate-200 px-3 py-2 text-[10px] text-slate-400">
+      <span id="profileCount">—</span>
+      <button id="importBtn" class="hover:text-slate-700">导入</button>
+      <button id="exportBtn" class="hover:text-slate-700">导出</button>
+      <input id="importFile" type="file" accept="application/json,.json" class="hidden" />
+    </div>
+  </aside>
+
+  <section class="flex min-w-0 flex-1 flex-col">
+    <div class="flex h-10 flex-none items-end gap-1 border-b border-slate-200 bg-white/70 px-2 pt-1.5">
+      <div id="tabbar" class="flex min-w-0 flex-1 items-end gap-1 overflow-x-auto no-scrollbar"></div>
+      <button id="newTabBtn" class="mb-1 grid h-7 w-7 flex-none place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800" title="新建会话">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+
+    <div class="flex h-11 flex-none items-center gap-2 border-b border-slate-200 bg-white/60 px-3">
+      <span id="crumb" class="min-w-0 truncate text-[11.5px] text-slate-500">未打开会话</span>
+      <span id="statusPill" class="flex-none rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">空闲</span>
+      <div id="tools" class="ml-auto flex flex-none items-center gap-0.5 text-slate-500">
+        <button data-act="reconnect" class="tool-btn" title="重新连接">重连</button>
+        <span class="mx-1 h-4 w-px bg-slate-200"></span>
+        <button data-act="copy" class="tool-btn" title="复制选中 (Ctrl+Shift+C)">复制</button>
+        <button data-act="paste" class="tool-btn" title="粘贴 (Ctrl+Shift+V)">粘贴</button>
+        <button data-act="search" class="tool-btn" title="查找 (Ctrl+Shift+F)">查找</button>
+        <button data-act="clear" class="tool-btn" title="清屏">清屏</button>
+        <span class="mx-1 h-4 w-px bg-slate-200"></span>
+        <button data-act="fontDown" class="tool-btn w-7" title="缩小字号">A-</button>
+        <button data-act="fontUp" class="tool-btn w-7" title="放大字号">A+</button>
+        <span class="mx-1 h-4 w-px bg-slate-200"></span>
+        <button data-act="sftp" class="tool-btn" title="用 SFTP 打开当前服务器">SFTP</button>
+        <button data-act="settings" class="tool-btn" title="当前会话属性">设置</button>
+      </div>
+    </div>
+
+    <div id="searchbar" class="hidden h-10 flex-none items-center gap-2 border-b border-slate-200 bg-amber-50/60 px-3">
+      <svg class="h-3.5 w-3.5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="searchInput" placeholder="在终端中查找（区分大小写可选）" class="min-w-0 flex-1 rounded-md border border-amber-200 bg-white px-2 py-1 text-[11px] outline-none focus:border-amber-400" />
+      <label class="flex items-center gap-1 text-[10.5px] text-amber-700"><input id="searchCase" type="checkbox" class="rounded border-amber-300" />区分大小写</label>
+      <button id="searchPrev" class="rounded-md border border-amber-200 bg-white px-2 py-0.5 text-[10.5px] text-amber-700 hover:bg-amber-50">上一个</button>
+      <button id="searchNext" class="rounded-md border border-amber-200 bg-white px-2 py-0.5 text-[10.5px] text-amber-700 hover:bg-amber-50">下一个</button>
+      <button id="searchClose" class="rounded-md p-1 text-amber-700 hover:bg-amber-100">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+
+    <div class="relative min-h-0 flex-1 bg-[#0b1120]">
+      <div id="terminals" class="absolute inset-0"></div>
+      <div id="empty" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400">
+        <div class="grid h-16 w-16 place-items-center rounded-2xl border border-slate-700 bg-slate-800/60 text-sky-400">
+          <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M7 9l3 3-3 3"/><path d="M13 15h4"/></svg>
+        </div>
+        <p class="text-xs">从左侧选择会话，或使用上方快速连接</p>
+        <p class="text-[10.5px] text-slate-500">支持多标签、跳板机、GBK 编码、会话日志</p>
+      </div>
+    </div>
+
+    <footer class="flex h-7 flex-none items-center gap-4 border-t border-slate-200 bg-white/80 px-3 text-[10.5px] text-slate-500">
+      <span id="statText">就绪</span>
+      <span id="statSize" class="hidden font-mono"></span>
+      <span id="statUptime" class="hidden font-mono"></span>
+      <span id="statLatency" class="hidden font-mono"></span>
+      <span id="statLog" class="ml-auto truncate opacity-0 transition-opacity"></span>
+    </footer>
+  </section>
+
+  <!-- 会话属性 -->
+  <div id="formPanel" class="fixed inset-0 z-30 hidden bg-slate-900/30 backdrop-blur-sm">
+    <div class="absolute right-0 top-0 flex h-full w-[430px] flex-col border-l border-slate-200 bg-white shadow-2xl">
+      <div class="flex flex-none items-center justify-between border-b border-slate-200 px-5 py-3.5">
+        <div>
+          <h2 id="formTitle" class="text-sm font-semibold text-slate-900">新建会话</h2>
+          <p class="text-[10.5px] text-slate-400">连接、认证、终端与高级选项</p>
+        </div>
+        <button id="closeForm" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
+      <div class="flex flex-none gap-1 border-b border-slate-200 px-4 pt-2">
+        <button data-ftab="conn" class="ftab">连接</button>
+        <button data-ftab="auth" class="ftab">认证</button>
+        <button data-ftab="term" class="ftab">终端</button>
+        <button data-ftab="adv" class="ftab">高级</button>
+      </div>
+
+      <form id="profileForm" class="flex min-h-0 flex-1 flex-col">
+        <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <input type="hidden" id="fId" />
+
+          <div data-fpanel="conn" class="space-y-3">
+            <label class="block">
+              <span class="field-label">会话名称</span>
+              <input id="fName" required placeholder="生产环境" class="field" />
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="block">
+                <span class="field-label">分组</span>
+                <input id="fGroup" placeholder="默认分组" list="groupOptions" class="field" />
+                <datalist id="groupOptions"></datalist>
+              </label>
+              <label class="block">
+                <span class="field-label">描述（可选）</span>
+                <input id="fDesc" placeholder="备注信息" class="field" />
+              </label>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="col-span-2 block">
+                <span class="field-label">主机</span>
+                <input id="fHost" required placeholder="127.0.0.1" class="field" />
+              </label>
+              <label class="block">
+                <span class="field-label">端口</span>
+                <input id="fPort" type="number" value="22" class="field" />
+              </label>
+            </div>
+            <label class="block">
+              <span class="field-label">用户名</span>
+              <input id="fUser" required placeholder="root" class="field" />
+            </label>
+            <label class="block">
+              <span class="field-label">跳板机（可选）</span>
+              <select id="fJump" class="field"></select>
+            </label>
+          </div>
+
+          <div data-fpanel="auth" class="hidden space-y-3">
+            <label class="block">
+              <span class="field-label">认证方式</span>
+              <select id="fAuth" class="field">
+                <option value="password">密码</option>
+                <option value="key">公钥 / 私钥</option>
+              </select>
+            </label>
+            <div id="passwordBox">
+              <label class="block">
+                <span class="field-label">密码</span>
+                <input id="fPassword" type="password" autocomplete="off" class="field" />
+              </label>
+            </div>
+            <div id="keyBox" class="hidden space-y-3">
+              <label class="block">
+                <span class="field-label">私钥内容</span>
+                <textarea id="fKey" rows="7" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" class="field resize-none font-mono text-[10.5px]"></textarea>
+              </label>
+              <label class="block">
+                <span class="field-label">私钥口令（可选）</span>
+                <input id="fPassphrase" type="password" class="field" />
+              </label>
+            </div>
+            <p class="rounded-lg bg-slate-50 px-3 py-2 text-[10.5px] leading-relaxed text-slate-500">
+              凭据仅保存在本机数据目录（profiles.json），导出会话时请妥善保管。
+            </p>
+          </div>
+
+          <div data-fpanel="term" class="hidden space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+              <label class="block">
+                <span class="field-label">终端类型</span>
+                <select id="fTermType" class="field">
+                  <option value="xterm-256color">xterm-256color</option>
+                  <option value="xterm">xterm</option>
+                  <option value="screen-256color">screen-256color</option>
+                  <option value="vt100">vt100</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="field-label">编码</span>
+                <select id="fEncoding" class="field">
+                  <option value="utf-8">UTF-8</option>
+                  <option value="gbk">GBK</option>
+                  <option value="gb18030">GB18030</option>
+                  <option value="big5">BIG5</option>
+                  <option value="euc-jp">EUC-JP</option>
+                  <option value="shift-jis">Shift-JIS</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="field-label">字号</span>
+                <input id="fFontSize" type="number" min="9" max="22" value="13" class="field" />
+              </label>
+              <label class="block">
+                <span class="field-label">配色方案</span>
+                <select id="fScheme" class="field">
+                  <option value="devos">DevOS 深色</option>
+                  <option value="dracula">Dracula</option>
+                  <option value="solarized">Solarized Dark</option>
+                  <option value="light">高对比亮色</option>
+                </select>
+              </label>
+            </div>
+            <label class="block">
+              <span class="field-label">登录后执行命令（可选）</span>
+              <input id="fStartup" placeholder="例如 cd /var/www && ls" class="field" />
+            </label>
+          </div>
+
+          <div data-fpanel="adv" class="hidden space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+              <label class="block">
+                <span class="field-label">保活间隔（秒，0 关闭）</span>
+                <input id="fKeepAlive" type="number" min="0" max="600" value="30" class="field" />
+              </label>
+              <div class="space-y-2 pt-5">
+                <label class="flex items-center gap-2 text-[11px] text-slate-600">
+                  <input id="fLog" type="checkbox" class="rounded border-slate-300" />记录会话日志
+                </label>
+                <label class="flex items-center gap-2 text-[11px] text-slate-600">
+                  <input id="fReconnect" type="checkbox" class="rounded border-slate-300" />断线自动重连
+                </label>
+              </div>
+            </div>
+            <p class="rounded-lg bg-slate-50 px-3 py-2 text-[10.5px] leading-relaxed text-slate-500">
+              会话日志保存在 DevOS 数据目录的 apps/ssh/logs 下，按会话名与时间命名。
+            </p>
+          </div>
+
+          <p id="formNote" class="hidden rounded-lg px-3 py-2 text-[10.5px]"></p>
+        </div>
+
+        <div class="flex flex-none items-center gap-2 border-t border-slate-200 px-5 py-3">
+          <button type="button" id="testBtn" class="rounded-lg border border-slate-200 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50">测试连接</button>
+          <div class="ml-auto flex gap-2">
+            <button type="button" id="cancelForm" class="rounded-lg border border-slate-200 px-3 py-2 text-[11px] text-slate-600 hover:bg-slate-50">取消</button>
+            <button type="submit" class="rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-medium text-white hover:bg-slate-700">保存</button>
+            <button type="button" id="saveConnectBtn" class="rounded-lg bg-sky-600 px-3 py-2 text-[11px] font-medium text-white hover:bg-sky-500">保存并连接</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="menu" class="fixed z-40 hidden w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-[11px] shadow-xl"></div>
+  <div id="toasts" class="pointer-events-none fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-search@0.15.0/lib/addon-search.js"></script>
+  <script>
+    const API = "/api/apps/ssh";
+    const $ = (id) => document.getElementById(id);
+    const state = {
+      profiles: [],
+      tabs: new Map(),
+      active: null,
+      filter: "",
+      collapsed: new Set(),
+      editing: null,
+      connectAfterSave: false,
+    };
+    let seq = 0;
+
+    const THEMES = {
+      devos: {
+        background: "#0b1120", foreground: "#e2e8f0", cursor: "#38bdf8",
+        selectionBackground: "rgba(56,189,248,.25)",
+        black: "#0f172a", brightBlack: "#475569", red: "#fb7185", brightRed: "#fda4af",
+        green: "#34d399", brightGreen: "#6ee7b7", yellow: "#fbbf24", brightYellow: "#fde68a",
+        blue: "#60a5fa", brightBlue: "#93c5fd", magenta: "#c084fc", brightMagenta: "#d8b4fe",
+        cyan: "#22d3ee", brightCyan: "#67e8f9", white: "#e2e8f0", brightWhite: "#f8fafc",
+      },
+      dracula: {
+        background: "#282a36", foreground: "#f8f8f2", cursor: "#f8f8f2",
+        selectionBackground: "rgba(68,71,90,.75)",
+        black: "#21222c", brightBlack: "#6272a4", red: "#ff5555", brightRed: "#ff6e6e",
+        green: "#50fa7b", brightGreen: "#69ff94", yellow: "#f1fa8c", brightYellow: "#ffffa5",
+        blue: "#bd93f9", brightBlue: "#d6acff", magenta: "#ff79c6", brightMagenta: "#ff92df",
+        cyan: "#8be9fd", brightCyan: "#a4ffff", white: "#f8f8f2", brightWhite: "#ffffff",
+      },
+      solarized: {
+        background: "#002b36", foreground: "#93a1a1", cursor: "#93a1a1",
+        selectionBackground: "rgba(147,161,161,.25)",
+        black: "#073642", brightBlack: "#586e75", red: "#dc322f", brightRed: "#cb4b16",
+        green: "#859900", brightGreen: "#586e75", yellow: "#b58900", brightYellow: "#657b83",
+        blue: "#268bd2", brightBlue: "#839496", magenta: "#d33682", brightMagenta: "#6c71c4",
+        cyan: "#2aa198", brightCyan: "#93a1a1", white: "#eee8d5", brightWhite: "#fdf6e3",
+      },
+      light: {
+        background: "#f8fafc", foreground: "#1e293b", cursor: "#0ea5e9",
+        selectionBackground: "rgba(14,165,233,.18)",
+        black: "#0f172a", brightBlack: "#64748b", red: "#dc2626", brightRed: "#ef4444",
+        green: "#059669", brightGreen: "#10b981", yellow: "#b45309", brightYellow: "#d97706",
+        blue: "#2563eb", brightBlue: "#3b82f6", magenta: "#7c3aed", brightMagenta: "#8b5cf6",
+        cyan: "#0e7490", brightCyan: "#06b6d4", white: "#e2e8f0", brightWhite: "#ffffff",
+      },
+    };
+
+    function esc(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[ch]));
+    }
+
+    function toast(text, tone = "info") {
+      const node = document.createElement("div");
+      const color = tone === "error" ? "bg-rose-600" : "bg-slate-900";
+      node.className = `rounded-xl ${color} px-4 py-2 text-[11px] text-white shadow-lg`;
+      node.textContent = text;
+      $("toasts").appendChild(node);
+      setTimeout(() => {
+        node.style.transition = "all .25s ease";
+        node.style.opacity = "0";
+        node.style.transform = "translateY(6px)";
+        setTimeout(() => node.remove(), 260);
+      }, 2600);
+    }
+
+    async function api(path, options = {}) {
+      const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+      const resp = await fetch(API + path, { ...options, headers });
+      if (!resp.ok) {
+        let message = `请求失败 (${resp.status})`;
+        try {
+          const data = await resp.json();
+          message = data.message || data.error || message;
+        } catch (_) {}
+        throw new Error(message);
+      }
+      if (resp.status === 204) return null;
+      return resp.json();
+    }
+
+    // ---------- 会话列表 ----------
+    async function loadProfiles() {
+      state.profiles = await api("/profiles");
+      renderSessions();
+      $("profileCount").textContent = `${state.profiles.length} 个会话`;
+      const groups = [...new Set(state.profiles.map((p) => p.group || "默认分组"))];
+      $("groupOptions").innerHTML = groups.map((g) => `<option value="${esc(g)}"></option>`).join("");
+      renderJumpOptions();
+    }
+
+    function renderJumpOptions() {
+      const current = state.editing ? state.editing.id : "";
+      const options = state.profiles
+        .filter((p) => p.id !== current)
+        .map((p) => `<option value="${esc(p.id)}">${esc(p.name)}（${esc(p.user)}@${esc(p.host)}）</option>`)
+        .join("");
+      $("fJump").innerHTML = `<option value="">不使用跳板机</option>` + options;
+    }
+
+    function renderSessions() {
+      const keyword = state.filter.trim().toLowerCase();
+      const groups = new Map();
+      for (const p of state.profiles) {
+        const hay = `${p.name} ${p.host} ${p.user} ${p.group} ${p.description}`.toLowerCase();
+        if (keyword && !hay.includes(keyword)) continue;
+        const key = p.group || "默认分组";
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(p);
+      }
+
+      const list = $("sessionList");
+      if (groups.size === 0) {
+        list.innerHTML = `<div class="mt-6 rounded-xl border border-dashed border-slate-200 px-3 py-8 text-center text-[11px] leading-relaxed text-slate-400">${keyword ? "没有匹配的会话" : "还没有会话<br/>点击「新建」或使用快速连接"}</div>`;
+        return;
+      }
+
+      let html = "";
+      for (const [group, items] of groups) {
+        const collapsed = state.collapsed.has(group);
+        html += `<div class="mb-1">
+          <button data-group="${esc(group)}" class="group-head flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-[10.5px] font-medium text-slate-500 hover:bg-slate-50">
+            <svg class="h-3 w-3 transition-transform ${collapsed ? "-rotate-90" : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m6 9 6 6 6-6"/></svg>
+            <span class="truncate">${esc(group)}</span>
+            <span class="ml-auto text-[9.5px] text-slate-400">${items.length}</span>
+          </button>
+          <div class="group-body ${collapsed ? "collapsed" : ""} space-y-0.5">`;
+        for (const p of items) {
+          const active = getActiveTab() && getActiveTab().profileId === p.id;
+          html += `<div data-id="${esc(p.id)}" class="session-row group flex cursor-pointer items-center gap-2 rounded-xl border px-2 py-1.5 ${active ? "border-sky-200 bg-sky-50/70" : "border-transparent hover:border-slate-200 hover:bg-slate-50"}">
+            <span class="grid h-7 w-7 flex-none place-items-center rounded-lg bg-slate-900 text-[10px] font-semibold text-white">${esc((p.name || p.host).slice(0, 1).toUpperCase())}</span>
+            <span class="min-w-0 flex-1">
+              <span class="flex items-center gap-1">
+                <span class="truncate text-[11.5px] font-medium text-slate-800">${esc(p.name)}</span>
+                ${p.jumpProfileId ? '<span class="flex-none rounded bg-violet-50 px-1 text-[8.5px] text-violet-600">跳板</span>' : ""}
+                ${p.logEnabled ? '<span class="flex-none rounded bg-amber-50 px-1 text-[8.5px] text-amber-600">日志</span>' : ""}
+              </span>
+              <span class="block truncate font-mono text-[9.5px] text-slate-400">${esc(p.user)}@${esc(p.host)}:${esc(p.port)}</span>
+            </span>
+            <span class="flex flex-none items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
+              <button data-act="edit" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="编辑">
+                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4l10-10-4-4L4 16v4Z"/></svg>
+              </button>
+              <button data-act="copy" class="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700" title="复制会话">
+                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/></svg>
+              </button>
+              <button data-act="delete" class="rounded p-1 text-slate-400 hover:bg-white hover:text-rose-600" title="删除">
+                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M7 7l1 13h8l1-13"/></svg>
+              </button>
+            </span>
+          </div>`;
+        }
+        html += `</div></div>`;
+      }
+      list.innerHTML = html;
+
+      list.querySelectorAll("[data-group]").forEach((node) => {
+        node.addEventListener("click", () => {
+          const group = node.dataset.group;
+          if (state.collapsed.has(group)) state.collapsed.delete(group);
+          else state.collapsed.add(group);
+          renderSessions();
+        });
+      });
+
+      list.querySelectorAll("[data-id]").forEach((node) => {
+        const profile = state.profiles.find((p) => p.id === node.dataset.id);
+        if (!profile) return;
+        node.addEventListener("click", (event) => {
+          const act = event.target.closest("[data-act]");
+          if (!act) {
+            openSession(profile.id);
+            return;
+          }
+          event.stopPropagation();
+          if (act.dataset.act === "edit") openForm(profile, false);
+          if (act.dataset.act === "copy") duplicateProfile(profile);
+          if (act.dataset.act === "delete") deleteProfile(profile);
+        });
+      });
+    }
+
+    function avatar(profile) {
+      return `<span class="grid h-8 w-8 flex-none place-items-center rounded-lg bg-slate-900 text-[10px] font-semibold text-white">${esc((profile.name || profile.host).slice(0, 1).toUpperCase())}</span>`;
+    }
+
+    // ---------- 标签 ----------
+    function getActiveTab() {
+      return state.active ? state.tabs.get(state.active) : null;
+    }
+
+    function openSession(profileId) {
+      const profile = state.profiles.find((p) => p.id === profileId);
+      if (!profile) {
+        toast("会话不存在：" + profileId, "error");
+        return;
+      }
+      const existing = [...state.tabs.values()].find((t) => t.profileId === profileId);
+      if (existing) {
+        activateTab(existing.id);
+        return;
+      }
+      createTab(profile);
+    }
+
+    function createTab(profile) {
+      const id = "t" + (++seq);
+      const pane = document.createElement("div");
+      pane.className = "term-pane hidden";
+      $("terminals").appendChild(pane);
+
+      const scheme = THEMES[profile.colorScheme] || THEMES.devos;
+      const term = new Terminal({
+        cursorBlink: true,
+        fontSize: profile.fontSize || 13,
+        fontFamily: "'JetBrains Mono', 'Cascadia Code', Consolas, monospace",
+        lineHeight: 1.25,
+        scrollback: 8000,
+        allowProposedApi: true,
+        theme: scheme,
+      });
+      const fit = new FitAddon.FitAddon();
+      term.loadAddon(fit);
+      let search = null;
+      if (window.SearchAddon && window.SearchAddon.SearchAddon) {
+        search = new SearchAddon.SearchAddon();
+        term.loadAddon(search);
+      }
+      term.open(pane);
+
+      const tab = {
+        id,
+        profileId: profile.id,
+        profile,
+        term,
+        fit,
+        search,
+        pane,
+        ws: null,
+        status: "idle",
+        encoding: profile.encoding || "utf-8",
+        logPath: "",
+        startedAt: 0,
+        latency: null,
+        attempts: 0,
+        fontSize: profile.fontSize || 13,
+        closed: false,
+        pingTimer: null,
+        pingSent: 0,
+      };
+      state.tabs.set(id, tab);
+
+      term.onData((data) => sendInput(tab, data));
+      term.onResize(() => {
+        sendSize(tab);
+        updateStatusBar();
+      });
+      new ResizeObserver(() => {
+        if (state.active === tab.id) fitTab(tab);
+      }).observe($("terminals"));
+
+      activateTab(id);
+      connectTab(tab);
+    }
+
+    function activateTab(id) {
+      const tab = state.tabs.get(id);
+      if (!tab) return;
+      state.active = id;
+      for (const item of state.tabs.values()) {
+        item.pane.classList.toggle("hidden", item.id !== id);
+      }
+      $("empty").style.display = state.tabs.size ? "none" : "flex";
+      renderTabs();
+      renderSessions();
+      updateToolbar();
+      requestAnimationFrame(() => {
+        fitTab(tab);
+        tab.term.focus();
+      });
+      updateStatusBar();
+    }
+
+    function fitTab(tab) {
+      try {
+        tab.fit.fit();
+        tab.term.options.fontSize = tab.fontSize;
+        sendSize(tab);
+      } catch (_) {}
+    }
+
+    function renderTabs() {
+      const box = $("tabbar");
+      box.innerHTML = "";
+      for (const tab of state.tabs.values()) {
+        const dotColor = {
+          idle: "bg-slate-400", connecting: "bg-amber-400 animate-pulse",
+          ok: "bg-emerald-500", error: "bg-rose-500", closed: "bg-slate-400",
+        }[tab.status] || "bg-slate-400";
+        const btn = document.createElement("div");
+        btn.className = `group flex h-8 cursor-pointer items-center gap-2 rounded-t-lg border border-b-0 px-2.5 text-[11px] transition ${
+          tab.id === state.active
+            ? "border-slate-200 bg-slate-50 text-slate-800 shadow-[inset_0_2px_0_0_rgb(14,165,233)]"
+            : "border-transparent text-slate-500 hover:bg-slate-100/70"
+        }`;
+        btn.innerHTML = `<span class="tab-dot h-1.5 w-1.5 flex-none rounded-full ${dotColor}"></span>
+          <span class="max-w-[160px] truncate">${esc(tab.profile.name)}</span>
+          <button class="ml-1 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700" title="关闭">
+            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>`;
+        btn.addEventListener("click", (event) => {
+          if (event.target.closest("button")) {
+            closeTab(tab.id);
+            return;
+          }
+          activateTab(tab.id);
+        });
+        btn.addEventListener("auxclick", (event) => {
+          if (event.button === 1) closeTab(tab.id);
+        });
+        box.appendChild(btn);
+      }
+    }
+
+    function closeTab(id) {
+      const tab = state.tabs.get(id);
+      if (!tab) return;
+      tab.closed = true;
+      stopPing(tab);
+      if (tab.ws) {
+        tab.ws.onclose = null;
+        tab.ws.close();
+        tab.ws = null;
+      }
+      tab.term.dispose();
+      tab.pane.remove();
+      state.tabs.delete(id);
+      if (state.active === id) {
+        const next = [...state.tabs.keys()].pop();
+        state.active = null;
+        if (next) activateTab(next);
+        else {
+          renderTabs();
+          renderSessions();
+          updateToolbar();
+          $("empty").style.display = "flex";
+          updateStatusBar();
+        }
+      } else {
+        renderTabs();
+        updateToolbar();
+      }
+    }
+
+    function updateToolbar() {
+      const tab = getActiveTab();
+      const pill = $("statusPill");
+      const buttons = document.querySelectorAll("#tools .tool-btn");
+      buttons.forEach((btn) => {
+        btn.disabled = !tab;
+        btn.classList.toggle("opacity-40", !tab);
+        btn.classList.toggle("cursor-not-allowed", !tab);
+      });
+      if (!tab) {
+        $("crumb").textContent = "未打开会话";
+        pill.textContent = "空闲";
+        pill.className = "flex-none rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500";
+        return;
+      }
+      const p = tab.profile;
+      $("crumb").textContent = `${p.name} · ${p.user}@${p.host}:${p.port}`;
+      const map = {
+        idle: ["未连接", "bg-slate-100 text-slate-500"],
+        connecting: ["连接中…", "bg-amber-50 text-amber-600"],
+        ok: ["已连接", "bg-emerald-50 text-emerald-600"],
+        error: ["连接失败", "bg-rose-50 text-rose-600"],
+        closed: ["已断开", "bg-slate-100 text-slate-500"],
+      };
+      const info = map[tab.status] || map.idle;
+      pill.textContent = info[0];
+      pill.className = `flex-none rounded-full px-2 py-0.5 text-[10px] font-medium ${info[1]}`;
+    }
+
+    // ---------- 连接 ----------
+    function connectTab(tab) {
+      if (tab.closed) return;
+      stopPing(tab);
+      if (tab.ws) {
+        tab.ws.onclose = null;
+        tab.ws.close();
+        tab.ws = null;
+      }
+      tab.status = "connecting";
+      updateToolbar();
+      renderTabs();
+      updateStatusBar();
+
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const cols = tab.term.cols || 110;
+      const rows = tab.term.rows || 32;
+      const url = `${proto}://${location.host}${API}/ws?profile=${encodeURIComponent(tab.profileId)}&cols=${cols}&rows=${rows}`;
+      const ws = new WebSocket(url);
+      ws.binaryType = "arraybuffer";
+      tab.ws = ws;
+
+      ws.onopen = () => {
+        tab.startedAt = Date.now();
+        tab.attempts = 0;
+        tab.status = "ok";
+        updateToolbar();
+        renderTabs();
+        updateStatusBar();
+        fitTab(tab);
+        sendSize(tab);
+        startPing(tab);
+        tab.term.focus();
+      };
+
+      ws.onmessage = (event) => {
+        if (typeof event.data === "string") {
+          let msg = null;
+          try { msg = JSON.parse(event.data); } catch (_) { return; }
+          handleControl(tab, msg);
+          return;
+        }
+        tab.term.write(new Uint8Array(event.data));
+        if (tab.status !== "ok") {
+          tab.status = "ok";
+          updateToolbar();
+          renderTabs();
+        }
+      };
+
+      ws.onerror = () => {
+        if (tab.status === "ok") return;
+        tab.status = "error";
+        updateToolbar();
+        renderTabs();
+      };
+
+      ws.onclose = () => {
+        if (tab.ws !== ws) return;
+        tab.ws = null;
+        stopPing(tab);
+        if (tab.closed) return;
+        const wasConnected = tab.status === "ok";
+        tab.status = "closed";
+        updateToolbar();
+        renderTabs();
+        updateStatusBar();
+        if (!wasConnected) return;
+        const auto = tab.profile.autoReconnect;
+        if (auto && tab.attempts < 5) {
+          tab.attempts += 1;
+          tab.term.writeln(`\r\n\x1b[33m连接已断开，${1.5 * tab.attempts}s 后进行第 ${tab.attempts} 次重连…\x1b[0m`);
+          setTimeout(() => {
+            if (!tab.closed && !tab.ws) connectTab(tab);
+          }, 1500 * tab.attempts);
+        }
+      };
+    }
+
+    function handleControl(tab, msg) {
+      switch (msg.t) {
+        case "status":
+          tab.status = "connecting";
+          updateToolbar();
+          break;
+        case "ready": {
+          const parts = String(msg.d || "").split("|");
+          tab.encoding = parts[0] || "utf-8";
+          tab.logPath = parts[1] || "";
+          tab.status = "ok";
+          updateToolbar();
+          renderTabs();
+          updateStatusBar();
+          break;
+        }
+        case "error":
+          tab.status = "error";
+          tab.term.writeln(`\r\n\x1b[31m${msg.d}\x1b[0m`);
+          updateToolbar();
+          renderTabs();
+          break;
+        case "exit":
+          tab.term.writeln(`\r\n\x1b[33m会话已结束（退出码 ${msg.code ?? 0}）\x1b[0m`);
+          tab.status = "closed";
+          updateToolbar();
+          renderTabs();
+          break;
+        case "pong":
+          tab.latency = Date.now() - tab.pingSent;
+          updateStatusBar();
+          break;
+      }
+    }
+
+    function sendSize(tab) {
+      if (tab.ws && tab.ws.readyState === WebSocket.OPEN) {
+        tab.ws.send(JSON.stringify({ t: "r", cols: tab.term.cols, rows: tab.term.rows }));
+      }
+    }
+
+    function sendInput(tab, data) {
+      if (!data) return;
+      if (tab.ws && tab.ws.readyState === WebSocket.OPEN) {
+        tab.ws.send(JSON.stringify({ t: "i", d: data }));
+      }
+    }
+
+    function startPing(tab) {
+      stopPing(tab);
+      tab.pingTimer = setInterval(() => {
+        if (tab.ws && tab.ws.readyState === WebSocket.OPEN) {
+          tab.pingSent = Date.now();
+          tab.ws.send(JSON.stringify({ t: "p" }));
+        }
+      }, 5000);
+    }
+
+    function stopPing(tab) {
+      if (tab.pingTimer) {
+        clearInterval(tab.pingTimer);
+        tab.pingTimer = null;
+      }
+      tab.latency = null;
+    }
+
+    function updateStatusBar() {
+      const tab = getActiveTab();
+      if (!tab) {
+        $("statText").textContent = "就绪";
+        ["statSize", "statUptime", "statLatency", "statLog"].forEach((id) => $(id).classList.add("hidden"));
+        return;
+      }
+      const statusMap = {
+        idle: "未连接", connecting: "正在连接…", ok: "已连接",
+        error: "连接失败", closed: "已断开",
+      };
+      $("statText").textContent = `${statusMap[tab.status] || "就绪"} · ${tab.encoding.toUpperCase()}`;
+      $("statSize").textContent = `${tab.term.cols}×${tab.term.rows}`;
+      $("statSize").classList.remove("hidden");
+      if (tab.startedAt && tab.status === "ok") {
+        const secs = Math.floor((Date.now() - tab.startedAt) / 1000);
+        $("statUptime").textContent = `在线 ${fmtDuration(secs)}`;
+        $("statUptime").classList.remove("hidden");
+      } else {
+        $("statUptime").classList.add("hidden");
+      }
+      if (tab.latency != null) {
+        $("statLatency").textContent = `延迟 ${tab.latency}ms`;
+        $("statLatency").classList.remove("hidden");
+      } else {
+        $("statLatency").classList.add("hidden");
+      }
+      if (tab.logPath) {
+        $("statLog").textContent = `日志 ${tab.logPath}`;
+        $("statLog").title = tab.logPath;
+        $("statLog").classList.remove("opacity-0");
+      } else {
+        $("statLog").classList.add("opacity-0");
+      }
+    }
+
+    function fmtDuration(secs) {
+      const h = Math.floor(secs / 3600);
+      const m = Math.floor((secs % 3600) / 60);
+      const s = secs % 60;
+      const pad = (v) => String(v).padStart(2, "0");
+      return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    }
+
+    // ---------- 工具栏 ----------
+    document.querySelectorAll("#tools .tool-btn").forEach((btn) => {
+      btn.className = "tool-btn rounded-md px-1.5 py-1 text-[10.5px] hover:bg-slate-100 hover:text-slate-800 disabled:hover:bg-transparent";
+      btn.addEventListener("click", () => {
+        const tab = getActiveTab();
+        if (!tab) return;
+        const act = btn.dataset.act;
+        if (act === "reconnect") connectTab(tab);
+        if (act === "copy") copySelection(tab);
+        if (act === "paste") pasteToTab(tab);
+        if (act === "search") toggleSearch(true);
+        if (act === "clear") tab.term.clear();
+        if (act === "fontDown") changeFont(tab, -1);
+        if (act === "fontUp") changeFont(tab, +1);
+        if (act === "sftp") openSftp(tab);
+        if (act === "settings") openForm(tab.profile, false);
+      });
+    });
+
+    async function copySelection(tab) {
+      const text = tab.term.getSelection();
+      if (!text) {
+        toast("请先在终端中选择要复制的文本");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        toast("已复制 " + text.length + " 个字符");
+      } catch (_) {
+        toast("复制失败，请使用 Ctrl+Shift+C", "error");
+      }
+    }
+
+    async function pasteToTab(tab) {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) sendInput(tab, text);
+      } catch (_) {
+        toast("浏览器拒绝读取剪贴板，请使用 Ctrl+Shift+V", "error");
+      }
+    }
+
+    function changeFont(tab, delta) {
+      tab.fontSize = Math.min(22, Math.max(9, tab.fontSize + delta));
+      tab.term.options.fontSize = tab.fontSize;
+      fitTab(tab);
+    }
+
+    function openSftp(tab) {
+      try {
+        if (window.parent && typeof window.parent.openApp === "function") {
+          window.parent.openApp("sftp", { profile: tab.profileId });
+          return;
+        }
+      } catch (_) {}
+      window.open(`/apps/sftp/index.html?profile=${encodeURIComponent(tab.profileId)}`, "_blank");
+    }
+
+    // ---------- 查找 ----------
+    function toggleSearch(show) {
+      const bar = $("searchbar");
+      const tab = getActiveTab();
+      if (!tab || !tab.search) {
+        toast("当前环境未加载查找插件");
+        return;
+      }
+      if (!show) {
+        bar.classList.add("hidden");
+        tab.term.focus();
+        return;
+      }
+      bar.classList.remove("hidden");
+      bar.classList.add("flex");
+      $("searchInput").focus();
+      $("searchInput").select();
+    }
+
+    function runSearch(direction) {
+      const tab = getActiveTab();
+      if (!tab || !tab.search) return;
+      const term = $("searchInput").value;
+      if (!term) return;
+      const options = { caseSensitive: $("searchCase").checked, incremental: false };
+      if (direction < 0) tab.search.findPrevious(term, options);
+      else tab.search.findNext(term, options);
+    }
+
+    $("searchInput").addEventListener("input", () => runSearch(1));
+    $("searchInput").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        runSearch(event.shiftKey ? -1 : 1);
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        toggleSearch(false);
+      }
+    });
+    $("searchNext").addEventListener("click", () => runSearch(1));
+    $("searchPrev").addEventListener("click", () => runSearch(-1));
+    $("searchClose").addEventListener("click", () => toggleSearch(false));
+
+    // ---------- 快捷操作 ----------
+    document.addEventListener("keydown", (event) => {
+      const tab = getActiveTab();
+      if (!tab) return;
+      if (!event.ctrlKey && !event.metaKey) return;
+      if (!event.shiftKey) return;
+      const key = event.key.toLowerCase();
+      if (key === "c") {
+        event.preventDefault();
+        copySelection(tab);
+      } else if (key === "v") {
+        event.preventDefault();
+        pasteToTab(tab);
+      } else if (key === "f") {
+        event.preventDefault();
+        toggleSearch(true);
+      } else if (key === "r") {
+        event.preventDefault();
+        connectTab(tab);
+      }
+    });
+
+    // ---------- 会话表单 ----------
+    const FIELD_TABS = ["conn", "auth", "term", "adv"];
+    document.querySelectorAll(".ftab").forEach((btn) => {
+      btn.className = "ftab rounded-t-lg px-3 py-1.5 text-[11px] font-medium text-slate-500 hover:bg-slate-50";
+      btn.addEventListener("click", () => switchFormTab(btn.dataset.ftab));
+    });
+
+    function switchFormTab(name) {
+      document.querySelectorAll(".ftab").forEach((btn) => {
+        const active = btn.dataset.ftab === name;
+        btn.className = "ftab rounded-t-lg px-3 py-1.5 text-[11px] font-medium " +
+          (active ? "bg-sky-50 text-sky-700 shadow-[inset_0_-2px_0_0_rgb(14,165,233)]" : "text-slate-500 hover:bg-slate-50");
+      });
+      document.querySelectorAll("[data-fpanel]").forEach((panel) => {
+        panel.classList.toggle("hidden", panel.dataset.fpanel !== name);
+      });
+    }
+
+    function openForm(profile, quick) {
+      state.editing = profile || null;
+      state.connectAfterSave = false;
+      $("formPanel").classList.remove("hidden");
+      $("formTitle").textContent = profile ? "编辑会话" : "新建会话";
+      $("formNote").classList.add("hidden");
+      $("fId").value = profile ? profile.id : "";
+      $("fName").value = profile ? profile.name : (quick ? quick.name : "");
+      $("fGroup").value = profile ? profile.group || "" : "";
+      $("fDesc").value = profile ? profile.description || "" : "";
+      $("fHost").value = profile ? profile.host : (quick ? quick.host : "");
+      $("fPort").value = profile ? profile.port : (quick ? quick.port : 22);
+      $("fUser").value = profile ? profile.user : (quick ? quick.user : "");
+      $("fAuth").value = profile ? profile.auth || "password" : "password";
+      $("fPassword").value = profile ? profile.password || "" : "";
+      $("fKey").value = profile ? profile.privateKey || "" : "";
+      $("fPassphrase").value = profile ? profile.passphrase || "" : "";
+      $("fTermType").value = profile ? profile.terminalType || "xterm-256color" : "xterm-256color";
+      $("fEncoding").value = profile ? profile.encoding || "utf-8" : "utf-8";
+      $("fFontSize").value = profile ? profile.fontSize || 13 : 13;
+      $("fScheme").value = profile ? profile.colorScheme || "devos" : "devos";
+      $("fStartup").value = profile ? profile.startupCommand || "" : "";
+      $("fKeepAlive").value = profile ? (profile.keepAliveSec ?? 30) : 30;
+      $("fLog").checked = !!(profile && profile.logEnabled);
+      $("fReconnect").checked = !!(profile && profile.autoReconnect);
+      renderJumpOptions();
+      $("fJump").value = profile ? profile.jumpProfileId || "" : "";
+      switchFormTab("conn");
+      toggleAuth();
+      setTimeout(() => $("fName").focus(), 30);
+    }
+
+    function closeForm() {
+      $("formPanel").classList.add("hidden");
+      state.editing = null;
+    }
+
+    function toggleAuth() {
+      const auth = $("fAuth").value;
+      $("passwordBox").classList.toggle("hidden", auth !== "password");
+      $("keyBox").classList.toggle("hidden", auth !== "key");
+    }
+
+    function collectForm() {
+      return {
+        id: $("fId").value,
+        name: $("fName").value.trim(),
+        group: $("fGroup").value.trim(),
+        description: $("fDesc").value.trim(),
+        host: $("fHost").value.trim(),
+        port: parseInt($("fPort").value, 10) || 22,
+        user: $("fUser").value.trim(),
+        auth: $("fAuth").value,
+        password: $("fPassword").value,
+        privateKey: $("fKey").value,
+        passphrase: $("fPassphrase").value,
+        jumpProfileId: $("fJump").value,
+        terminalType: $("fTermType").value,
+        encoding: $("fEncoding").value,
+        fontSize: parseInt($("fFontSize").value, 10) || 13,
+        colorScheme: $("fScheme").value,
+        startupCommand: $("fStartup").value.trim(),
+        keepAliveSec: Math.max(0, parseInt($("fKeepAlive").value, 10) || 0),
+        logEnabled: $("fLog").checked,
+        autoReconnect: $("fReconnect").checked,
+      };
+    }
+
+    function showFormNote(text, tone) {
+      const note = $("formNote");
+      note.textContent = text;
+      note.className = "rounded-lg px-3 py-2 text-[10.5px] " +
+        (tone === "error" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600");
+    }
+
+    async function saveProfile(connectAfter) {
+      const payload = collectForm();
+      if (!payload.name || !payload.host || !payload.user) {
+        showFormNote("请填写会话名称、主机与用户名", "error");
+        return;
+      }
+      try {
+        const saved = await api("/profiles", { method: "POST", body: JSON.stringify(payload) });
+        closeForm();
+        await loadProfiles();
+        if (connectAfter) openSession(saved.id);
+        else toast("会话已保存");
+      } catch (err) {
+        showFormNote("保存失败：" + err.message, "error");
+      }
+    }
+
+    async function duplicateProfile(profile) {
+      try {
+        await api(`/profiles/${encodeURIComponent(profile.id)}/duplicate`, { method: "POST" });
+        await loadProfiles();
+        toast("已复制会话");
+      } catch (err) {
+        toast("复制失败：" + err.message, "error");
+      }
+    }
+
+    async function deleteProfile(profile) {
+      if (!confirm(`确定删除会话「${profile.name}」？`)) return;
+      try {
+        await api(`/profiles/${encodeURIComponent(profile.id)}`, { method: "DELETE" });
+        for (const tab of [...state.tabs.values()]) {
+          if (tab.profileId === profile.id) closeTab(tab.id);
+        }
+        await loadProfiles();
+        toast("会话已删除");
+      } catch (err) {
+        toast("删除失败：" + err.message, "error");
+      }
+    }
+
+    $("newBtn").addEventListener("click", () => openForm(null));
+    $("newTabBtn").addEventListener("click", () => openForm(null));
+    $("closeForm").addEventListener("click", closeForm);
+    $("cancelForm").addEventListener("click", closeForm);
+    $("fAuth").addEventListener("change", toggleAuth);
+    $("profileForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      saveProfile(false);
+    });
+    $("saveConnectBtn").addEventListener("click", () => saveProfile(true));
+
+    $("testBtn").addEventListener("click", async () => {
+      const payload = collectForm();
+      if (!payload.host || !payload.user) {
+        showFormNote("请填写主机与用户名", "error");
+        return;
+      }
+      $("testBtn").disabled = true;
+      $("testBtn").textContent = "测试中…";
+      try {
+        const data = await api("/test", { method: "POST", body: JSON.stringify({ id: payload.id, profile: payload }) });
+        if (data.ok) {
+          showFormNote(`连接成功 · ${data.latencyMs}ms · 回显 ${data.echo || "ok"}`, "ok");
+        } else {
+          showFormNote("连接失败：" + (data.error || "未知错误"), "error");
+        }
+      } catch (err) {
+        showFormNote("测试失败：" + err.message, "error");
+      } finally {
+        $("testBtn").disabled = false;
+        $("testBtn").textContent = "测试连接";
+      }
+    });
+
+    // ---------- 快速连接 ----------
+    function parseQuick(raw) {
+      let text = raw.trim();
+      if (!text) return null;
+      let user = "";
+      const at = text.indexOf("@");
+      if (at > 0) {
+        user = text.slice(0, at);
+        text = text.slice(at + 1);
+      }
+      let port = 22;
+      let host = text;
+      const colon = text.lastIndexOf(":");
+      if (colon > 0 && /^\d+$/.test(text.slice(colon + 1))) {
+        port = parseInt(text.slice(colon + 1), 10);
+        host = text.slice(0, colon);
+      }
+      if (!host) return null;
+      return { host, port, user: user || "", name: `${user ? user + "@" : ""}${host}` };
+    }
+
+    $("quickBtn").addEventListener("click", () => {
+      const parsed = parseQuick($("quickInput").value);
+      if (!parsed) {
+        toast("请输入 user@host:port", "error");
+        return;
+      }
+      if (!parsed.user) parsed.user = "root";
+      openForm(null, parsed);
+    });
+    $("quickInput").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        $("quickBtn").click();
+      }
+    });
+
+    $("search").addEventListener("input", () => {
+      state.filter = $("search").value;
+      renderSessions();
+    });
+
+    // ---------- 导入导出 ----------
+    $("exportBtn").addEventListener("click", () => {
+      const link = document.createElement("a");
+      link.href = API + "/export";
+      link.download = "devos-sessions.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast("已导出会话（含凭据，请妥善保管）");
+    });
+
+    $("importBtn").addEventListener("click", () => $("importFile").click());
+    $("importFile").addEventListener("change", async () => {
+      const file = $("importFile").files[0];
+      if (!file) return;
+      $("importFile").value = "";
+      try {
+        const text = await file.text();
+        const data = await api("/import", { method: "POST", body: text });
+        await loadProfiles();
+        toast(`已导入 ${data.imported} 个会话`);
+      } catch (err) {
+        toast("导入失败：" + err.message, "error");
+      }
+    });
+
+    $("moreBtn").addEventListener("click", (event) => {
+      event.stopPropagation();
+      const menu = $("menu");
+      if (!menu.classList.contains("hidden")) {
+        menu.classList.add("hidden");
+        return;
+      }
+      const rect = $("moreBtn").getBoundingClientRect();
+      menu.style.left = rect.left - 80 + "px";
+      menu.style.top = rect.bottom + 6 + "px";
+      menu.innerHTML = `
+        <button data-m="import" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-50">导入会话</button>
+        <button data-m="export" class="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-50">导出会话</button>`;
+      menu.classList.remove("hidden");
+      menu.querySelectorAll("[data-m]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          menu.classList.add("hidden");
+          if (btn.dataset.m === "import") $("importBtn").click();
+          else $("exportBtn").click();
+        });
+      });
+    });
+    document.addEventListener("click", () => $("menu").classList.add("hidden"));
+
+    // ---------- 初始化 ----------
+    setInterval(updateStatusBar, 1000);
+
+    async function init() {
+      try {
+        await loadProfiles();
+      } catch (err) {
+        toast("加载会话失败：" + err.message, "error");
+      }
+      renderTabs();
+      updateToolbar();
+      updateStatusBar();
+      const target = new URLSearchParams(location.search).get("profile");
+      if (target) openSession(target);
+    }
+
+    init();
+  </script>
+</body>
+</html>

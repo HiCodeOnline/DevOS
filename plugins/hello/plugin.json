@@ -1,0 +1,14 @@
+{
+  "id": "hello",
+  "name": "Hello 插件",
+  "description": "运行时加载的 Web 插件示例，图标来自插件路径",
+  "version": "0.1.0",
+  "category": "示例",
+  "specVersion": 1,
+  "icon": "icon.svg",
+  "accent": "#ec4899",
+  "entry": "index.html",
+  "width": 780,
+  "height": 540,
+  "multi": true
+}

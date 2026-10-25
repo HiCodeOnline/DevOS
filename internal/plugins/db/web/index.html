@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数据库</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: {
+      sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'system-ui', 'sans-serif'],
+      mono: ['JetBrains Mono', 'Cascadia Code', 'Consolas', 'monospace']
+    } } } };
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    .pane { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
+    .pane.hidden { display: none; }
+    .modal.hidden { display: none; }
+    .modal { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; }
+    #tree::-webkit-scrollbar, .grid-wrap::-webkit-scrollbar, .sql-input::-webkit-scrollbar { width: 9px; height: 9px; }
+    #tree::-webkit-scrollbar-thumb, .grid-wrap::-webkit-scrollbar-thumb, .sql-input::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+    #tree::-webkit-scrollbar-track, .grid-wrap::-webkit-scrollbar-track { background: transparent; }
+    .kbd { border: 1px solid #e2e8f0; border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; font-size: 9px; color: #64748b; background: #fff; }
+    .grid-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+    .grid-table th, .grid-table td { border-bottom: 1px solid #e2e8f0; border-right: 1px solid #f1f5f9; padding: 5px 10px; font-size: 11px; white-space: nowrap; }
+    .grid-table thead th { position: sticky; top: 0; z-index: 2; background: #f8fafc; text-align: left; font-weight: 600; color: #475569; }
+    .grid-table tbody tr:hover td { background: #f8fafc; }
+    .grid-table td.null { color: #94a3b8; font-style: italic; }
+    .grid-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .tree-row { user-select: none; }
+    .tree-row:hover { background: #f1f5f9; }
+    .tree-row.active { background: #ecfdf5; }
+    .tree-actions { display: none; }
+    .tree-row:hover .tree-actions { display: flex; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="flex h-screen flex-col overflow-hidden bg-slate-50 font-sans text-slate-700 antialiased">
+  <header class="flex flex-none items-center gap-2 border-b border-slate-200 bg-white/85 px-3 py-2">
+    <span class="grid h-8 w-8 place-items-center rounded-lg bg-emerald-50 text-emerald-600">
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+    </span>
+    <div class="mr-2 leading-tight">
+      <div class="text-[12px] font-semibold text-slate-800">数据库</div>
+      <div class="text-[10px] text-slate-400">MySQL · PostgreSQL · SQLite</div>
+    </div>
+    <button id="newConnBtn" class="rounded-lg bg-slate-900 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-slate-700">新建连接</button>
+    <button id="importBtn" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">导入连接</button>
+    <button id="exportBtn" class="rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">导出连接</button>
+    <input id="importFile" type="file" accept=".json" class="hidden" />
+    <span class="ml-auto flex items-center gap-1.5 text-[10px] text-slate-400">
+      <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+      <span id="connCount">0 个连接</span>
+    </span>
+  </header>
+
+  <div class="flex min-h-0 flex-1">
+    <aside class="flex w-[276px] flex-none flex-col border-r border-slate-200 bg-white/80">
+      <div class="flex-none p-2">
+        <div class="relative">
+          <svg class="pointer-events-none absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="searchInput" placeholder="搜索连接…" class="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-[11px] outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-50" />
+        </div>
+      </div>
+      <div id="tree" class="min-h-0 flex-1 overflow-y-auto px-1 pb-3"></div>
+    </aside>
+
+    <main class="relative flex min-w-0 flex-1 flex-col">
+      <div id="tabbar" class="flex flex-none items-end gap-1 border-b border-slate-200 bg-white/60 px-2 pt-1.5 empty:hidden"></div>
+      <div id="panes" class="relative min-h-0 flex-1"></div>
+      <div id="emptyState" class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center">
+        <span class="grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-500">
+          <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></svg>
+        </span>
+        <div>
+          <p class="text-[13px] font-medium text-slate-600">选择左侧连接开始使用</p>
+          <p class="mt-1 text-[11px] text-slate-400">双击表名浏览数据，或在连接上新建查询</p>
+        </div>
+        <button id="emptyNewBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">新建数据库连接</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- 连接编辑弹窗 -->
+  <div id="connModal" class="modal hidden bg-slate-900/30 p-4 backdrop-blur-sm">
+    <div class="max-h-[92vh] w-[600px] overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 id="connTitle" class="text-sm font-semibold text-slate-900">新建连接</h2>
+        <button id="closeConnModal" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <form id="connForm" class="space-y-3">
+        <input type="hidden" id="fId" />
+        <div class="grid grid-cols-3 gap-2">
+          <label class="col-span-2 block">
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">连接名称</span>
+            <input id="fName" placeholder="例如：本地 MySQL" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
+          </label>
+          <label class="block">
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">分组</span>
+            <input id="fGroup" placeholder="未分组" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
+          </label>
+        </div>
+        <label class="block">
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500">数据库类型</span>
+          <select id="fDriver" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-emerald-400"></select>
+          <span id="driverHint" class="mt-1 block text-[10px] text-slate-400"></span>
+        </label>
+
+        <div id="serverFields" class="space-y-3">
+          <div class="grid grid-cols-3 gap-2">
+            <label class="col-span-2 block">
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">主机</span>
+              <input id="fHost" placeholder="127.0.0.1" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">端口</span>
+              <input id="fPort" type="number" placeholder="3306" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
+            </label>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="block">
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">用户名</span>
+              <input id="fUser" autocomplete="off" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
+            </label>
+            <label class="block">
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">密码</span>
+              <input id="fPassword" type="password" autocomplete="new-password" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-emerald-400" />
+            </label>
+          </div>
+          <label class="block" id="dbFieldWrap">
+            <span id="dbLabelText" class="mb-1 block text-[10.5px] font-medium text-slate-500">默认数据库（可选）</span>
+            <input id="fDatabase" placeholder="不填则连接后选择" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
+          </label>
+        </div>
+
+        <div id="sqliteFields" class="hidden">
+          <label class="block">
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">数据库文件路径</span>
+            <input id="fFile" placeholder="D:\data\demo.db（不存在将自动创建）" class="w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11px] outline-none focus:border-emerald-400" />
+            <span class="mt-1 block text-[10px] text-slate-400">支持绝对路径；文件不存在时会在首次连接时自动创建。</span>
+          </label>
+        </div>
+
+        <details class="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
+          <summary class="cursor-pointer text-[11px] font-medium text-slate-600">高级选项</summary>
+          <div class="mt-2 space-y-2">
+            <div class="grid grid-cols-2 gap-2">
+              <label id="charsetWrap" class="block">
+                <span class="mb-1 block text-[10.5px] font-medium text-slate-500">字符集</span>
+                <input id="fCharset" placeholder="utf8mb4" class="w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-[11px] outline-none focus:border-emerald-400" />
+              </label>
+              <label id="sslWrap" class="block">
+                <span class="mb-1 block text-[10.5px] font-medium text-slate-500">SSL 模式</span>
+                <select id="fSSLMode" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-[11px] outline-none focus:border-emerald-400">
+                  <option value="disable">disable</option>
+                  <option value="require">require</option>
+                  <option value="verify-full">verify-full</option>
+                </select>
+              </label>
+            </div>
+            <label class="block">
+              <span class="mb-1 block text-[10.5px] font-medium text-slate-500">附加参数（k=v&amp;k2=v2）</span>
+              <input id="fParams" placeholder="例如 timezone=Local" class="w-full rounded-lg border border-slate-200 px-3 py-1.5 font-mono text-[11px] outline-none focus:border-emerald-400" />
+            </label>
+            <label class="flex items-center gap-2 pt-1">
+              <input id="fReadOnly" type="checkbox" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-400" />
+              <span class="text-[11px] text-slate-600">只读模式（拒绝执行写操作）</span>
+            </label>
+          </div>
+        </details>
+
+        <p id="connError" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-600"></p>
+        <p id="connTestResult" class="hidden rounded-lg px-3 py-2 text-[11px]"></p>
+
+        <div class="flex items-center gap-2 pt-1">
+          <button type="button" id="testConnBtn" class="rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] text-slate-600 hover:bg-slate-50">测试连接</button>
+          <button type="button" id="cancelConnBtn" class="ml-auto rounded-lg border border-slate-200 px-4 py-2 text-[11.5px] text-slate-600 hover:bg-slate-50">取消</button>
+          <button type="submit" class="rounded-lg bg-emerald-500 px-5 py-2 text-[11.5px] font-semibold text-white hover:bg-emerald-400">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="pointer-events-none fixed bottom-5 left-1/2 z-50 hidden -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2 text-[11.5px] text-white shadow-lg"></div>
+
+<script>
+const API = '/api/apps/db';
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const keyOf = (...parts) => JSON.stringify(parts);
+
+const S = {
+  connections: [],
+  expanded: new Set(),
+  cache: new Map(),
+  loading: new Set(),
+  tabs: [],
+  active: null,
+  seq: 0,
+  search: '',
+  nodeMap: new Map(),
+};
+
+/* ---------- 通用 ---------- */
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  const text = await res.text();
+  let data;
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+  if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+
+let toastTimer = null;
+function toast(msg, type = 'ok') {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.className = 'pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-lg px-4 py-2 text-[11.5px] text-white shadow-lg ' +
+    (type === 'err' ? 'bg-rose-600' : 'bg-slate-900');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
+}
+
+function iconSvg(name, cls = 'h-3.5 w-3.5') {
+  const map = {
+    chevron: '<path d="m9 6 6 6-6 6"/>',
+    chevronDown: '<path d="m6 9 6 6 6-6"/>',
+    db: '<ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/><path d="M4 11.5v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/>',
+    table: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/>',
+    view: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    column: '<path d="M4 6h16M4 12h10M4 18h13"/>',
+    schema: '<path d="M3 7h6l2 3h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',
+    sql: '<path d="M8 4H6a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h2"/><path d="M16 4h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-2"/>',
+    edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
+    trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
+    plug: '<path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0V8Z"/><path d="M12 16v6"/>',
+    refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+    download: '<path d="M12 3v12"/><path d="m7 11 5 5 5-5"/><path d="M5 21h14"/>',
+    close: '<path d="M6 6l12 12M18 6L6 18"/>',
+    play: '<path d="m6 4 14 8-14 8V4Z"/>',
+  };
+  return `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${map[name] || ''}</svg>`;
+}
+
+const FALLBACK_TYPES = [
+  { id: 'mysql', name: 'MySQL', family: 'mysql', group: '常用', defaultPort: 3306, color: '#0ea5e9', databaseLabel: '默认数据库（可选）' },
+  { id: 'postgres', name: 'PostgreSQL', family: 'postgres', group: '常用', defaultPort: 5432, schemaLevel: true, color: '#336791', databaseLabel: '默认数据库（可选）' },
+  { id: 'sqlite', name: 'SQLite', family: 'sqlite', group: '常用', file: true, color: '#10b981' },
+];
+let TYPES = FALLBACK_TYPES;
+let TYPE_MAP = Object.fromEntries(FALLBACK_TYPES.map((t) => [t.id, t]));
+
+function typeOf(conn) {
+  return TYPE_MAP[conn?.driver] || FALLBACK_TYPES[0];
+}
+function objectSchema(conn, database) {
+  return typeOf(conn).family === 'sqlite' ? 'main' : (database || '');
+}
+async function loadTypes() {
+  try {
+    const list = await api('/types');
+    if (Array.isArray(list) && list.length) TYPES = list;
+  } catch {
+    TYPES = FALLBACK_TYPES;
+  }
+  TYPE_MAP = Object.fromEntries(TYPES.map((t) => [t.id, t]));
+}
+
+const findConn = (id) => S.connections.find((c) => c.id === id);
+
+/* ---------- 连接列表 ---------- */
+async function loadConnections() {
+  try {
+    S.connections = await api('/connections');
+  } catch (err) {
+    toast('加载连接失败：' + err.message, 'err');
+    S.connections = [];
+  }
+  $('#connCount').textContent = `${S.connections.length} 个连接`;
+  renderTree();
+}
+
+/* ---------- 对象树 ---------- */
+function renderTree() {
+  S.nodeMap.clear();
+  const tree = $('#tree');
+  if (!S.connections.length) {
+    tree.innerHTML = `<div class="px-3 py-10 text-center text-[11px] text-slate-400">暂无连接<br/>点击「新建连接」开始</div>`;
+    return;
+  }
+  const kw = S.search.toLowerCase();
+  const visible = S.connections.filter((c) => {
+    if (!kw) return true;
+    return [c.name, c.host, c.group, c.database, c.file, c.driver].filter(Boolean).some((v) => String(v).toLowerCase().includes(kw));
+  });
+  if (!visible.length) {
+    tree.innerHTML = `<div class="px-3 py-10 text-center text-[11px] text-slate-400">没有匹配的连接</div>`;
+    return;
+  }
+  const groups = new Map();
+  for (const c of visible) {
+    const g = c.group || '未分组';
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(c);
+  }
+  let html = '';
+  for (const [group, conns] of [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], 'zh'))) {
+    html += `<div class="mt-1 px-2 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">${esc(group)}</div>`;
+    for (const conn of conns) html += renderConn(conn);
+  }
+  tree.innerHTML = html;
+}
+
+function renderConn(conn) {
+  const p = keyOf('conn', conn.id);
+  S.nodeMap.set(p, { kind: 'conn', path: p, connId: conn.id });
+  const t = typeOf(conn);
+  const open = S.expanded.has(p);
+  const loading = S.loading.has(p);
+  const dbs = S.cache.get(p);
+  const active = S.tabs.some((t2) => t2.connId === conn.id && t2.id === S.active) ? ' active' : '';
+  return `
+    <div class="tree-row${active} mx-1 flex items-center gap-1 rounded-md px-1 py-1" data-node="${esc(p)}">
+      <button data-act="toggle" class="grid h-4 w-4 flex-none place-items-center rounded text-slate-400 hover:bg-slate-200">
+        ${loading ? iconSvg('refresh', 'h-3 w-3 spin') : iconSvg(open ? 'chevronDown' : 'chevron', 'h-3 w-3')}
+      </button>
+      <span class="h-2 w-2 flex-none rounded-full" style="background:${t.color || '#0ea5e9'}"></span>
+      ${iconSvg('db', 'h-3.5 w-3.5 flex-none text-slate-400')}
+      <span class="min-w-0 flex-1 truncate text-[11.5px] font-medium text-slate-700" data-act="toggle" title="${esc(conn.name)} · ${esc(t.name)}">${esc(conn.name)}</span>
+      <span class="tree-actions flex-none items-center gap-0.5">
+        <button data-act="query" title="新建查询" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
+        <button data-act="ping" title="测试连接" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-sky-600">${iconSvg('plug', 'h-3 w-3')}</button>
+        <button data-act="edit" title="编辑" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-slate-700">${iconSvg('edit', 'h-3 w-3')}</button>
+        <button data-act="dup" title="复制" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-slate-700">${iconSvg('copy', 'h-3 w-3')}</button>
+        <button data-act="del" title="删除" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-rose-600">${iconSvg('trash', 'h-3 w-3')}</button>
+      </span>
+    </div>
+    ${open ? renderConnChildren(conn, dbs, loading) : ''}`;
+}
+
+function renderConnChildren(conn, dbs, loading) {
+  if (loading) return `<div class="pl-9 py-1 text-[10.5px] text-slate-400">加载中…</div>`;
+  if (!dbs || !dbs.length) return `<div class="pl-9 py-1 text-[10.5px] text-slate-400">无数据库</div>`;
+  return dbs.map((db) => renderDb(conn, db)).join('');
+}
+
+function renderDb(conn, db) {
+  const t = typeOf(conn);
+  const p = keyOf('db', conn.id, db);
+  S.nodeMap.set(p, { kind: 'db', path: p, connId: conn.id, database: db });
+  const open = S.expanded.has(p);
+  const loading = S.loading.has(p);
+  const children = S.cache.get(p);
+  const suffix = t.schemaLevel ? ' (数据库)' : (t.family === 'oracle' ? ' (模式)' : '');
+  return `
+    <div class="tree-row mx-1 flex items-center gap-1 rounded-md py-0.5 pl-3 pr-1" data-node="${esc(p)}">
+      <button data-act="toggle" class="grid h-4 w-4 flex-none place-items-center rounded text-slate-400 hover:bg-slate-200">
+        ${loading ? iconSvg('refresh', 'h-3 w-3 spin') : iconSvg(open ? 'chevronDown' : 'chevron', 'h-3 w-3')}
+      </button>
+      ${iconSvg(t.schemaLevel || t.family === 'oracle' ? 'schema' : 'db', 'h-3.5 w-3.5 flex-none text-slate-400')}
+      <span class="min-w-0 flex-1 truncate text-[11px] text-slate-600" data-act="toggle" title="${esc(db)}">${esc(db + suffix)}</span>
+      <span class="tree-actions flex-none items-center">
+        <button data-act="query" title="在此库新建查询" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
+      </span>
+    </div>
+    ${open ? renderDbChildren(conn, db, children, loading) : ''}`;
+}
+
+function renderDbChildren(conn, db, children, loading) {
+  if (loading) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">加载中…</div>`;
+  if (typeOf(conn).schemaLevel) {
+    if (!children || !children.length) return `<div class="pl-12 py-1 text-[10.5px] text-slate-400">无模式</div>`;
+    return children.map((s) => renderSchema(conn, db, s)).join('');
+  }
+  return renderObjects(conn, db, objectSchema(conn, db), children, 4);
+}
+
+function renderSchema(conn, db, schema) {
+  const p = keyOf('schema', conn.id, db, schema);
+  S.nodeMap.set(p, { kind: 'schema', path: p, connId: conn.id, database: db, schema });
+  const open = S.expanded.has(p);
+  const loading = S.loading.has(p);
+  return `
+    <div class="tree-row mx-1 flex items-center gap-1 rounded-md py-0.5 pl-7 pr-1" data-node="${esc(p)}">
+      <button data-act="toggle" class="grid h-4 w-4 flex-none place-items-center rounded text-slate-400 hover:bg-slate-200">
+        ${loading ? iconSvg('refresh', 'h-3 w-3 spin') : iconSvg(open ? 'chevronDown' : 'chevron', 'h-3 w-3')}
+      </button>
+      ${iconSvg('schema', 'h-3.5 w-3.5 flex-none text-amber-500/70')}
+      <span class="min-w-0 flex-1 truncate text-[11px] text-slate-600" data-act="toggle" title="${esc(schema)}">${esc(schema)}</span>
+      <span class="tree-actions flex-none items-center">
+        <button data-act="query" title="在此模式新建查询" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
+      </span>
+    </div>
+    ${open ? renderObjects(conn, db, schema, S.cache.get(p), 6) : ''}`;
+}
+
+function renderObjects(conn, db, schema, objects, indent) {
+  if (!objects) return `<div class="pl-${indent * 3} py-1" style="padding-left:${indent * 12 + 20}px"><span class="text-[10.5px] text-slate-400">加载中…</span></div>`;
+  if (!objects.length) return `<div style="padding-left:${indent * 12 + 20}px" class="py-1 text-[10.5px] text-slate-400">无表</div>`;
+  return objects.map((obj) => renderObject(conn, db, schema, obj, indent)).join('');
+}
+
+function renderObject(conn, db, schema, obj, indent) {
+  const p = keyOf(obj.type, conn.id, db, schema, obj.name);
+  S.nodeMap.set(p, { kind: obj.type, path: p, connId: conn.id, database: db, schema, table: obj.name });
+  const open = S.expanded.has(p);
+  const loading = S.loading.has(p);
+  const cols = S.cache.get(p);
+  return `
+    <div class="tree-row mx-1 flex items-center gap-1 rounded-md py-0.5 pr-1" style="padding-left:${indent * 12 + 12}px" data-node="${esc(p)}">
+      <button data-act="toggle" class="grid h-4 w-4 flex-none place-items-center rounded text-slate-400 hover:bg-slate-200">
+        ${loading ? iconSvg('refresh', 'h-3 w-3 spin') : iconSvg(open ? 'chevronDown' : 'chevron', 'h-3 w-3')}
+      </button>
+      ${iconSvg(obj.type === 'view' ? 'view' : 'table', 'h-3.5 w-3.5 flex-none ' + (obj.type === 'view' ? 'text-violet-400' : 'text-emerald-500/80'))}
+      <span class="min-w-0 flex-1 truncate text-[11px] text-slate-600" data-act="open" title="${esc(obj.name)}">${esc(obj.name)}</span>
+      <span class="tree-actions flex-none items-center">
+        <button data-act="query" title="新建查询" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
+      </span>
+    </div>
+    ${open ? renderColumns(cols, indent + 1) : ''}`;
+}
+
+function renderColumns(cols, indent) {
+  if (!cols) return `<div style="padding-left:${indent * 12 + 30}px" class="py-0.5 text-[10.5px] text-slate-400">加载中…</div>`;
+  if (!cols.length) return '';
+  return cols.map((col) => `
+    <div class="mx-1 flex items-center gap-1 rounded-md py-0.5" style="padding-left:${indent * 12 + 20}px">
+      ${iconSvg('column', 'h-3 w-3 flex-none text-slate-300')}
+      <span class="truncate text-[10.5px] text-slate-500" title="${esc(col.type)} ${esc(col.comment || '')}">${esc(col.name)}</span>
+      <span class="ml-auto truncate pl-1 text-[9.5px] text-slate-400">${esc(col.type)}</span>
+    </div>`).join('');
+}
+
+/* ---------- 树交互 ---------- */
+async function toggleNode(node) {
+  const p = node.path;
+  if (S.expanded.has(p)) {
+    S.expanded.delete(p);
+    renderTree();
+    return;
+  }
+  S.expanded.add(p);
+  renderTree();
+  if (S.cache.has(p) || S.loading.has(p)) return;
+  S.loading.add(p);
+  renderTree();
+  try {
+    const conn = findConn(node.connId);
+    let data = null;
+    if (node.kind === 'conn') {
+      data = await api('/databases?id=' + encodeURIComponent(node.connId));
+    } else if (node.kind === 'db') {
+      if (typeOf(conn).schemaLevel) {
+        data = await api(`/schemas?id=${encodeURIComponent(node.connId)}&database=${encodeURIComponent(node.database)}`);
+      } else {
+        const schema = objectSchema(conn, node.database);
+        data = await api(`/objects?id=${encodeURIComponent(node.connId)}&database=${encodeURIComponent(node.database)}&schema=${encodeURIComponent(schema)}`);
+      }
+    } else if (node.kind === 'schema') {
+      data = await api(`/objects?id=${encodeURIComponent(node.connId)}&database=${encodeURIComponent(node.database)}&schema=${encodeURIComponent(node.schema)}`);
+    } else if (node.kind === 'table' || node.kind === 'view') {
+      data = await api(`/columns?id=${encodeURIComponent(node.connId)}&database=${encodeURIComponent(node.database || '')}&schema=${encodeURIComponent(node.schema || '')}&table=${encodeURIComponent(node.table)}`);
+    }
+    S.cache.set(p, data);
+  } catch (err) {
+    toast('加载失败：' + err.message, 'err');
+    S.expanded.delete(p);
+  } finally {
+    S.loading.delete(p);
+    renderTree();
+  }
+}
+
+async function ensureDatabases(conn) {
+  const p = keyOf('conn', conn.id);
+  if (!S.cache.has(p)) {
+    S.cache.set(p, await api('/databases?id=' + encodeURIComponent(conn.id)));
+  }
+  return S.cache.get(p) || [];
+}
+
+$('#tree').addEventListener('click', async (ev) => {
+  const row = ev.target.closest('[data-node]');
+  if (!row) return;
+  const node = S.nodeMap.get(row.dataset.node);
+  if (!node) return;
+  const actEl = ev.target.closest('[data-act]');
+  const act = actEl ? actEl.dataset.act : 'toggle';
+  const conn = findConn(node.connId);
+  if (!conn) return;
+
+  if (act === 'toggle') {
+    ev.stopPropagation();
+    if (node.kind === 'table' || node.kind === 'view') {
+      await toggleNode(node);
+    } else {
+      await toggleNode(node);
+    }
+    return;
+  }
+  if (act === 'open') {
+    openDataTab(node);
+    return;
+  }
+  if (act === 'query') {
+    openQueryTab(node.connId, node.database || conn.database || '', '');
+    return;
+  }
+  if (act === 'ping') {
+    toast('正在测试连接…');
+    try {
+      const res = await api('/ping?id=' + encodeURIComponent(node.connId));
+      toast(res.ok ? `连接成功 · ${res.latencyMs}ms · ${res.version || ''}` : '连接失败');
+    } catch (err) {
+      toast('连接失败：' + err.message, 'err');
+    }
+    return;
+  }
+  if (act === 'edit') {
+    openConnModal(conn);
+    return;
+  }
+  if (act === 'dup') {
+    try {
+      await api('/connections/' + encodeURIComponent(conn.id) + '/duplicate', { method: 'POST' });
+      await loadConnections();
+      toast('已复制连接');
+    } catch (err) {
+      toast('复制失败：' + err.message, 'err');
+    }
+    return;
+  }
+  if (act === 'del') {
+    if (!confirm(`确定删除连接「${conn.name}」吗？`)) return;
+    try {
+      await api('/connections/' + encodeURIComponent(conn.id), { method: 'DELETE' });
+      S.cache.delete(keyOf('conn', conn.id));
+      await loadConnections();
+      toast('已删除');
+    } catch (err) {
+      toast('删除失败：' + err.message, 'err');
+    }
+  }
+});
+
+/* ---------- 标签页 ---------- */
+function tabTitle(tab) {
+  if (tab.type === 'query') return `查询 · ${tab.database || (findConn(tab.connId)?.name ?? '')}`;
+  return tab.table;
+}
+
+function renderTabs() {
+  const bar = $('#tabbar');
+  bar.innerHTML = S.tabs.map((t) => `
+    <div data-tab="${t.id}" class="group flex cursor-pointer items-center gap-1.5 rounded-t-lg border border-b-0 px-3 py-1.5 text-[11px] ${t.id === S.active ? 'border-slate-200 bg-white font-medium text-slate-800' : 'border-transparent text-slate-500 hover:bg-slate-100'}">
+      ${t.type === 'data' ? iconSvg(t.table && S.nodeMap.get(t.path)?.kind === 'view' ? 'view' : 'table', 'h-3 w-3') : iconSvg('sql', 'h-3 w-3')}
+      <span class="max-w-[160px] truncate">${esc(tabTitle(t))}</span>
+      <button data-close="${t.id}" class="ml-1 grid h-4 w-4 place-items-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700">${iconSvg('close', 'h-2.5 w-2.5')}</button>
+    </div>`).join('');
+  $('#emptyState').style.display = S.tabs.length ? 'none' : 'flex';
+  for (const t of S.tabs) if (t.el) t.el.classList.toggle('hidden', t.id !== S.active);
+}
+
+$('#tabbar').addEventListener('click', (ev) => {
+  const closeBtn = ev.target.closest('[data-close]');
+  if (closeBtn) {
+    ev.stopPropagation();
+    closeTab(Number(closeBtn.dataset.close));
+    return;
+  }
+  const tabEl = ev.target.closest('[data-tab]');
+  if (tabEl) activateTab(Number(tabEl.dataset.tab));
+});
+
+function activateTab(id) {
+  S.active = id;
+  renderTabs();
+  renderTree();
+}
+
+function closeTab(id) {
+  const idx = S.tabs.findIndex((t) => t.id === id);
+  if (idx < 0) return;
+  const [tab] = S.tabs.splice(idx, 1);
+  tab.el?.remove();
+  if (S.active === id) S.active = S.tabs.length ? S.tabs[Math.max(0, idx - 1)].id : null;
+  renderTabs();
+  renderTree();
+}
+
+function openQueryTab(connId, database, sql) {
+  const tab = {
+    id: ++S.seq,
+    type: 'query',
+    connId,
+    database: database || '',
+    sql: sql || '',
+    result: null,
+    error: '',
+    busy: false,
+    status: '',
+  };
+  S.tabs.push(tab);
+  createQueryPane(tab);
+  S.active = tab.id;
+  renderTabs();
+  renderTree();
+  setTimeout(() => tab.el?.querySelector('.sql-input')?.focus(), 30);
+}
+
+function openDataTab(node) {
+  const existing = S.tabs.find((t) => t.type === 'data' && t.connId === node.connId && t.database === node.database && t.schema === node.schema && t.table === node.table);
+  if (existing) {
+    activateTab(existing.id);
+    return;
+  }
+  const tab = {
+    id: ++S.seq,
+    type: 'data',
+    path: node.path,
+    connId: node.connId,
+    database: node.database || '',
+    schema: node.schema || '',
+    table: node.table,
+    view: 'data',
+    page: 1,
+    pageSize: 100,
+    total: -1,
+    sort: '',
+    dir: 'asc',
+    data: null,
+    structure: null,
+    error: '',
+    busy: false,
+    status: '',
+  };
+  S.tabs.push(tab);
+  createDataPane(tab);
+  S.active = tab.id;
+  renderTabs();
+  renderTree();
+  loadTableData(tab);
+}
+
+/* ---------- 查询面板 ---------- */
+function createQueryPane(tab) {
+  const el = document.createElement('section');
+  el.className = 'pane hidden';
+  el.innerHTML = `
+    <div class="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
+      <select class="db-select rounded-lg border border-slate-200 bg-white px-2 py-1.5 font-mono text-[11px] outline-none focus:border-emerald-400">
+        <option value="">（默认库）</option>
+      </select>
+      <button class="exec-btn flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-[11.5px] font-semibold text-white hover:bg-emerald-400 disabled:opacity-50">
+        ${iconSvg('play', 'h-3 w-3')} 执行 <span class="kbd !text-white/80 !border-white/30 !bg-white/10">Ctrl+Enter</span>
+      </button>
+      <label class="flex items-center gap-1 text-[10.5px] text-slate-500">行数
+        <input class="max-rows w-16 rounded-md border border-slate-200 px-1.5 py-1 font-mono text-[10.5px] outline-none focus:border-emerald-400" type="number" min="1" max="20000" value="1000" />
+      </label>
+      <button class="export-btn flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${iconSvg('download', 'h-3 w-3')} 导出 CSV</button>
+      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制结果</button>
+      <span class="query-hint ml-auto text-[10px] text-slate-400"></span>
+    </div>
+    <textarea class="sql-input min-h-0 flex-none resize-none border-b border-slate-200 bg-white p-3 font-mono text-[11.5px] leading-relaxed text-slate-700 outline-none" style="height:38%;flex:0 0 38%" spellcheck="false" placeholder="-- 输入 SQL，Ctrl+Enter 执行&#10;SELECT * FROM users LIMIT 100;"></textarea>
+    <div class="query-status flex-none border-b border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>
+    <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>`;
+  $('#panes').appendChild(el);
+  tab.el = el;
+
+  const conn = findConn(tab.connId);
+  const select = $('.db-select', el);
+  const input = $('.sql-input', el);
+  input.value = tab.sql || '';
+
+  (async () => {
+    try {
+      const dbs = await ensureDatabases(conn);
+      for (const db of dbs) {
+        const opt = document.createElement('option');
+        opt.value = db;
+        opt.textContent = db;
+        select.appendChild(opt);
+      }
+      if (tab.database && dbs.includes(tab.database)) select.value = tab.database;
+      else if (!tab.database && conn.database && dbs.includes(conn.database)) {
+        tab.database = conn.database;
+        select.value = tab.database;
+      } else if (!tab.database && dbs.length) {
+        tab.database = dbs[0];
+        select.value = tab.database;
+      }
+    } catch (err) {
+      $('.query-hint', el).textContent = '库列表加载失败：' + err.message;
+    }
+  })();
+
+  select.addEventListener('change', () => { tab.database = select.value; renderTabs(); });
+  input.addEventListener('input', () => { tab.sql = input.value; });
+  input.addEventListener('keydown', (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+      ev.preventDefault();
+      execQuery(tab);
+    }
+  });
+  $('.exec-btn', el).addEventListener('click', () => execQuery(tab));
+  $('.export-btn', el).addEventListener('click', () => exportCSV(tab));
+  $('.copy-btn', el).addEventListener('click', () => copyResult(tab));
+}
+
+async function execQuery(tab) {
+  if (tab.busy) return;
+  const el = tab.el;
+  const sql = $('.sql-input', el).value;
+  if (!sql.trim()) { toast('请输入 SQL'); return; }
+  tab.busy = true;
+  const btn = $('.exec-btn', el);
+  btn.disabled = true;
+  $('.query-status', el).textContent = '执行中…';
+  $('.query-hint', el).textContent = '';
+  try {
+    const res = await api('/query', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: tab.connId,
+        database: tab.database,
+        sql,
+        maxRows: Number($('.max-rows', el).value) || 1000,
+      }),
+    });
+    tab.result = res;
+    tab.error = '';
+    const wrap = $('.grid-wrap', el);
+    if (res.kind === 'exec') {
+      wrap.innerHTML = `<div class="p-8 text-center text-[11.5px] text-slate-500">执行成功，影响行数 <b class="text-emerald-600">${res.affected}</b>${res.lastId ? ` · 自增 ID ${res.lastId}` : ''}</div>`;
+      $('.query-status', el).textContent = `影响 ${res.affected} 行 · ${res.durationMs} ms`;
+    } else {
+      wrap.innerHTML = renderGrid(res.columns, res.rows, {});
+      $('.query-status', el).textContent = `${res.rowCount} 行${res.truncated ? '（已截断）' : ''} · ${res.durationMs} ms`;
+    }
+  } catch (err) {
+    tab.error = err.message;
+    tab.result = null;
+    $('.grid-wrap', el).innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
+    $('.query-status', el).textContent = '执行失败';
+  } finally {
+    tab.busy = false;
+    btn.disabled = false;
+  }
+}
+
+/* ---------- 表数据面板 ---------- */
+function createDataPane(tab) {
+  const el = document.createElement('section');
+  el.className = 'pane hidden';
+  el.innerHTML = `
+    <div class="flex flex-none flex-wrap items-center gap-2 border-b border-slate-200 bg-white/70 px-3 py-2">
+      <span class="table-title min-w-0 max-w-[280px] truncate font-mono text-[11.5px] font-medium text-slate-800"></span>
+      <div class="flex overflow-hidden rounded-lg border border-slate-200">
+        <button data-view="data" class="view-btn px-2.5 py-1 text-[10.5px] font-medium">数据</button>
+        <button data-view="structure" class="view-btn border-l border-slate-200 px-2.5 py-1 text-[10.5px] font-medium">结构</button>
+      </div>
+      <button class="refresh-btn grid h-6 w-6 place-items-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50" title="刷新">${iconSvg('refresh', 'h-3 w-3')}</button>
+      <div class="pager flex items-center gap-1 text-[10.5px] text-slate-500">
+        <select class="page-size rounded-md border border-slate-200 bg-white px-1 py-1 text-[10px] outline-none focus:border-emerald-400">
+          <option value="50">50 行</option>
+          <option value="100" selected>100 行</option>
+          <option value="200">200 行</option>
+          <option value="500">500 行</option>
+        </select>
+        <button class="prev-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">上一页</button>
+        <span class="page-label">1 / 1</span>
+        <button class="next-btn rounded-md border border-slate-200 px-2 py-0.5 hover:bg-slate-50">下一页</button>
+      </div>
+      <button class="export-btn ml-auto flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${iconSvg('download', 'h-3 w-3')} 导出 CSV</button>
+      <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">复制</button>
+    </div>
+    <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>
+    <div class="data-status flex-none border-t border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">就绪</div>`;
+  $('#panes').appendChild(el);
+  tab.el = el;
+
+  const conn = findConn(tab.connId);
+  const t = typeOf(conn);
+  const label = t.family === 'sqlite'
+    ? tab.table
+    : t.schemaLevel
+      ? `${tab.database} / ${tab.schema}.${tab.table}`
+      : (tab.database ? `${tab.database}.${tab.table}` : tab.table);
+  $('.table-title', el).textContent = label;
+  $('.page-size', el).value = String(tab.pageSize);
+
+  el.querySelectorAll('.view-btn').forEach((b) => b.addEventListener('click', () => {
+    if (tab.view === b.dataset.view) return;
+    tab.view = b.dataset.view;
+    updateDataToolbar(tab);
+    if (tab.view === 'data') loadTableData(tab);
+    else loadStructure(tab);
+  }));
+  $('.refresh-btn', el).addEventListener('click', () => tab.view === 'data' ? loadTableData(tab) : loadStructure(tab));
+  $('.prev-btn', el).addEventListener('click', () => {
+    if (tab.page <= 1) return;
+    tab.page--;
+    loadTableData(tab);
+  });
+  $('.next-btn', el).addEventListener('click', () => {
+    const pages = tab.total >= 0 ? Math.max(1, Math.ceil(tab.total / tab.pageSize)) : Infinity;
+    if (tab.page >= pages) return;
+    tab.page++;
+    loadTableData(tab);
+  });
+  $('.page-size', el).addEventListener('change', (ev) => {
+    tab.pageSize = Number(ev.target.value) || 100;
+    tab.page = 1;
+    loadTableData(tab);
+  });
+  $('.export-btn', el).addEventListener('click', () => exportCSV(tab));
+  $('.copy-btn', el).addEventListener('click', () => copyResult(tab));
+  updateDataToolbar(tab);
+}
+
+function updateDataToolbar(tab) {
+  const el = tab.el;
+  el.querySelectorAll('.view-btn').forEach((b) => {
+    b.className = 'view-btn px-2.5 py-1 text-[10.5px] font-medium ' +
+      (tab.view === b.dataset.view ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50');
+    if (b.dataset.view === 'structure') b.classList.add('border-l', 'border-slate-200');
+  });
+  $('.pager', el).style.display = tab.view === 'data' ? 'flex' : 'none';
+}
+
+async function loadTableData(tab) {
+  const el = tab.el;
+  const wrap = $('.grid-wrap', el);
+  $('.data-status', el).textContent = '加载中…';
+  try {
+    const params = new URLSearchParams({
+      id: tab.connId,
+      database: tab.database || '',
+      schema: tab.schema || '',
+      table: tab.table,
+      page: String(tab.page),
+      pageSize: String(tab.pageSize),
+    });
+    if (tab.sort) {
+      params.set('sort', tab.sort);
+      params.set('dir', tab.dir);
+    }
+    const res = await api('/table-data?' + params.toString());
+    tab.data = res;
+    wrap.innerHTML = renderGrid(res.columns, res.rows, { sortable: true, sort: tab.sort, dir: tab.dir });
+    bindSortHeaders(tab);
+    const pages = res.total >= 0 ? Math.max(1, Math.ceil(res.total / tab.pageSize)) : '?';
+    $('.page-label', el).textContent = `${tab.page} / ${pages}`;
+    $('.data-status', el).textContent =
+      `共 ${res.total >= 0 ? res.total : '未知'} 行 · 本页 ${res.rowCount} 行 · ${res.durationMs} ms` +
+      (res.total >= 0 ? ` · 第 ${(tab.page - 1) * tab.pageSize + 1}-${(tab.page - 1) * tab.pageSize + res.rowCount} 行` : '');
+  } catch (err) {
+    tab.data = null;
+    wrap.innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
+    $('.data-status', el).textContent = '加载失败';
+  }
+}
+
+function bindSortHeaders(tab) {
+  tab.el.querySelectorAll('.grid-table th[data-col]').forEach((th) => {
+    th.classList.add('cursor-pointer');
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (tab.sort === col) tab.dir = tab.dir === 'asc' ? 'desc' : 'asc';
+      else { tab.sort = col; tab.dir = 'asc'; }
+      tab.page = 1;
+      loadTableData(tab);
+    });
+  });
+}
+
+async function loadStructure(tab) {
+  const el = tab.el;
+  const wrap = $('.grid-wrap', el);
+  $('.data-status', el).textContent = '加载中…';
+  try {
+    const params = new URLSearchParams({
+      id: tab.connId,
+      database: tab.database || '',
+      schema: tab.schema || '',
+      table: tab.table,
+    });
+    const cols = await api('/columns?' + params.toString());
+    tab.structure = cols;
+    const rows = cols.map((c) => [c.name, c.type, c.nullable, c.key || '', c.default || '', c.extra || '', c.comment || '']);
+    wrap.innerHTML = renderGrid(['字段', '类型', '可空', '键', '默认值', '额外', '备注'], rows, {});
+    $('.data-status', el).textContent = `共 ${cols.length} 个字段`;
+  } catch (err) {
+    tab.structure = null;
+    wrap.innerHTML = `<div class="m-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-600 whitespace-pre-wrap">${esc(err.message)}</div>`;
+    $('.data-status', el).textContent = '加载失败';
+  }
+}
+
+/* ---------- 结果表格 ---------- */
+function renderGrid(columns, rows, opts = {}) {
+  if (!columns || !columns.length) {
+    return `<div class="p-8 text-center text-[11px] text-slate-400">无结果集</div>`;
+  }
+  const head = columns.map((c) => {
+    let arrow = '';
+    if (opts.sortable && opts.sort === c) arrow = opts.dir === 'desc' ? ' ↓' : ' ↑';
+    return `<th ${opts.sortable ? `data-col="${esc(c)}"` : ''}>${esc(c)}${arrow}</th>`;
+  }).join('');
+  const body = rows.map((row) => `<tr>${row.map((v) => cellHtml(v)).join('')}</tr>`).join('');
+  return `<table class="grid-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function cellHtml(v) {
+  if (v === null || v === undefined) return `<td class="null">NULL</td>`;
+  const str = String(v);
+  const cls = typeof v === 'number' ? 'num' : (str.length > 200 ? '' : '');
+  const display = str.length > 500 ? str.slice(0, 500) + '…' : str;
+  return `<td class="${cls}" title="${esc(str)}">${esc(display)}</td>`;
+}
+
+function copyResult(tab) {
+  let columns = [];
+  let rows = [];
+  if (tab.type === 'query' && tab.result && tab.result.kind === 'rows') {
+    columns = tab.result.columns;
+    rows = tab.result.rows;
+  } else if (tab.type === 'data' && tab.view === 'data' && tab.data) {
+    columns = tab.data.columns;
+    rows = tab.data.rows;
+  } else if (tab.type === 'data' && tab.structure) {
+    columns = ['字段', '类型', '可空', '键', '默认值', '额外', '备注'];
+    rows = tab.structure.map((c) => [c.name, c.type, c.nullable, c.key || '', c.default || '', c.extra || '', c.comment || '']);
+  }
+  if (!columns.length) { toast('没有可复制的结果'); return; }
+  const text = [columns.join('\t'), ...rows.map((r) => r.map((v) => v === null ? 'NULL' : String(v)).join('\t'))].join('\n');
+  navigator.clipboard.writeText(text)
+    .then(() => toast(`已复制 ${rows.length} 行`))
+    .catch(() => toast('复制失败', 'err'));
+}
+
+async function exportCSV(tab) {
+  const body = { id: tab.connId, database: tab.database };
+  if (tab.type === 'data') {
+    body.schema = tab.schema;
+    body.table = tab.table;
+    if (tab.sort) { body.sort = tab.sort; body.dir = tab.dir; }
+  } else {
+    const sql = $('.sql-input', tab.el).value;
+    if (!sql.trim()) { toast('请输入 SQL'); return; }
+    body.database = tab.database;
+    body.sql = sql;
+  }
+  toast('正在导出…');
+  try {
+    const res = await fetch(API + '/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      let msg = 'HTTP ' + res.status;
+      try { const j = await res.json(); if (j.error) msg = j.error; } catch {}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (tab.type === 'data' ? tab.table : 'query') + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    toast('导出完成');
+  } catch (err) {
+    toast('导出失败：' + err.message, 'err');
+  }
+}
+
+/* ---------- 连接编辑 ---------- */
+let editingDriver = 'mysql';
+
+function fillDriverOptions() {
+  const sel = $('#fDriver');
+  const groups = new Map();
+  for (const t of TYPES) {
+    if (!groups.has(t.group)) groups.set(t.group, []);
+    groups.get(t.group).push(t);
+  }
+  sel.innerHTML = [...groups.entries()].map(([group, items]) =>
+    `<optgroup label="${esc(group)}">${items.map((t) => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</optgroup>`
+  ).join('');
+}
+
+function currentFormConn() {
+  const driver = editingDriver;
+  return {
+    id: $('#fId').value || '',
+    name: $('#fName').value.trim(),
+    group: $('#fGroup').value.trim(),
+    driver,
+    host: $('#fHost').value.trim(),
+    port: Number($('#fPort').value) || (TYPE_MAP[driver]?.defaultPort || 0),
+    user: $('#fUser').value.trim(),
+    password: $('#fPassword').value,
+    database: $('#fDatabase').value.trim(),
+    file: $('#fFile').value.trim(),
+    charset: $('#fCharset').value.trim(),
+    sslMode: $('#fSSLMode').value,
+    params: $('#fParams').value.trim(),
+    readOnly: $('#fReadOnly').checked,
+  };
+}
+
+function setDriver(driver) {
+  const t = TYPE_MAP[driver] || FALLBACK_TYPES[0];
+  const prevDefault = TYPE_MAP[editingDriver]?.defaultPort ? String(TYPE_MAP[editingDriver].defaultPort) : '';
+  editingDriver = t.id;
+  $('#fDriver').value = t.id;
+  $('#driverHint').textContent = t.hint || '';
+
+  const isFile = !!t.file;
+  $('#serverFields').classList.toggle('hidden', isFile);
+  $('#dbFieldWrap').classList.toggle('hidden', isFile);
+  $('#sqliteFields').classList.toggle('hidden', !isFile);
+  $('#charsetWrap').classList.toggle('hidden', t.family !== 'mysql');
+  $('#sslWrap').classList.toggle('hidden', t.family !== 'postgres');
+  $('#dbLabelText').textContent = t.databaseLabel || '默认数据库（可选）';
+  $('#fDatabase').placeholder = t.family === 'oracle'
+    ? (t.id === 'dm' ? '默认模式，如 SYSDBA' : '服务名，如 ORCL')
+    : '不填则连接后选择';
+
+  const portText = t.defaultPort ? String(t.defaultPort) : '';
+  $('#fPort').placeholder = portText;
+  const current = $('#fPort').value;
+  if (!current || current === prevDefault) $('#fPort').value = portText;
+}
+
+function openConnModal(conn) {
+  $('#connError').classList.add('hidden');
+  $('#connTestResult').classList.add('hidden');
+  const f = $('#connForm');
+  f.reset();
+  $('#fId').value = conn?.id || '';
+  $('#fName').value = conn?.name || '';
+  $('#fGroup').value = conn?.group || '';
+  $('#fHost').value = conn?.host || '127.0.0.1';
+  $('#fPort').value = conn?.port || '';
+  $('#fUser').value = conn?.user || '';
+  $('#fPassword').value = conn?.password || '';
+  $('#fDatabase').value = conn?.database || '';
+  $('#fFile').value = conn?.file || '';
+  $('#fCharset').value = conn?.charset || '';
+  $('#fSSLMode').value = conn?.sslMode || 'disable';
+  $('#fParams').value = conn?.params || '';
+  $('#fReadOnly').checked = !!conn?.readOnly;
+  setDriver(conn?.driver || 'mysql');
+  $('#connTitle').textContent = conn ? '编辑连接' : '新建连接';
+  $('#connModal').classList.remove('hidden');
+  setTimeout(() => $('#fName').focus(), 30);
+}
+
+function closeConnModal() { $('#connModal').classList.add('hidden'); }
+
+$('#newConnBtn').addEventListener('click', () => openConnModal(null));
+$('#emptyNewBtn').addEventListener('click', () => openConnModal(null));
+$('#closeConnModal').addEventListener('click', closeConnModal);
+$('#cancelConnBtn').addEventListener('click', closeConnModal);
+$('#connModal').addEventListener('click', (ev) => { if (ev.target === $('#connModal')) closeConnModal(); });
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeConnModal(); });
+
+$('#fDriver').addEventListener('change', () => setDriver($('#fDriver').value));
+
+$('#testConnBtn').addEventListener('click', async () => {
+  const box = $('#connTestResult');
+  box.className = 'rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500';
+  box.textContent = '正在测试…';
+  box.classList.remove('hidden');
+  try {
+    const res = await api('/test', { method: 'POST', body: JSON.stringify({ connection: currentFormConn() }) });
+    if (res.ok) {
+      box.className = 'rounded-lg bg-emerald-50 px-3 py-2 text-[11px] text-emerald-700';
+      box.textContent = `连接成功 · ${res.latencyMs} ms${res.version ? ' · ' + res.version : ''}`;
+    } else {
+      box.className = 'rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-600';
+      box.textContent = res.error || '连接失败';
+    }
+  } catch (err) {
+    box.className = 'rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-600';
+    box.textContent = err.message;
+  }
+});
+
+$('#connForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const errBox = $('#connError');
+  errBox.classList.add('hidden');
+  const conn = currentFormConn();
+  if (!conn.name) { conn.name = TYPE_MAP[conn.driver]?.file ? (conn.file.split(/[\\/]/).pop() || 'SQLite') : conn.host; }
+  try {
+    await api('/connections', { method: 'POST', body: JSON.stringify(conn) });
+    closeConnModal();
+    await loadConnections();
+    toast('连接已保存');
+  } catch (err) {
+    errBox.textContent = err.message;
+    errBox.classList.remove('hidden');
+  }
+});
+
+/* ---------- 导入导出 / 搜索 ---------- */
+$('#searchInput').addEventListener('input', (ev) => {
+  S.search = ev.target.value.trim();
+  renderTree();
+});
+$('#exportBtn').addEventListener('click', () => window.open(API + '/connections/export', '_blank'));
+$('#importBtn').addEventListener('click', () => $('#importFile').click());
+$('#importFile').addEventListener('change', async (ev) => {
+  const file = ev.target.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const items = JSON.parse(text);
+    if (!Array.isArray(items)) throw new Error('文件应为连接数组');
+    const res = await api('/connections/import', { method: 'POST', body: JSON.stringify(items) });
+    toast(`已导入 ${res.imported} 个连接`);
+    await loadConnections();
+  } catch (err) {
+    toast('导入失败：' + err.message, 'err');
+  }
+  ev.target.value = '';
+});
+
+/* ---------- 启动 ---------- */
+(async () => {
+  await loadTypes();
+  fillDriverOptions();
+  await loadConnections();
+})();
+</script>
+</body>
+</html>
