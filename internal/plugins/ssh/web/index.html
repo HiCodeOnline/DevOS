@@ -22,7 +22,8 @@
     ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.45); border-radius: 999px; }
     ::-webkit-scrollbar-track { background: transparent; }
     .xterm { height: 100%; }
-    .xterm-viewport { background-color: transparent !important; }
+    /* 由 xterm 依据配色主题绘制视口背景，不再强制透明，否则切换主题时看不到底色变化。 */
+    .xterm-viewport { background-color: inherit; }
     .term-pane { position: absolute; inset: 0; padding: 8px 6px 4px; }
     .group-body.collapsed { display: none; }
     .tab-dot { box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
