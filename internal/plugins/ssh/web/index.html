@@ -12,9 +12,9 @@
     } } } };
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/assets/ui.css?v=1" />
+  <link rel="stylesheet" href="/assets/ui.css?v=2" />
   <script src="/assets/app-i18n.js?v=2"></script>
-  <script src="/assets/locales/apps/ssh.js?v=1"></script>
+  <script src="/assets/locales/apps/ssh.js?v=2"></script>
   <script src="/assets/secure-ui.js?v=2"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
   <style>
@@ -26,6 +26,33 @@
     .term-pane { position: absolute; inset: 0; padding: 8px 6px 4px; }
     .group-body.collapsed { display: none; }
     .tab-dot { box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
+
+    /* 自绘下拉：保留真实 select 作为数据源，触发器 + fixed 浮层替代原生弹出层。 */
+    .ui-select { position: relative; }
+    .ui-select-trigger { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; color: #334155; font-size: 11.5px; line-height: 1.45; text-align: left; transition: border-color .15s ease, box-shadow .15s ease; }
+    .ui-select-trigger:hover { border-color: #cbd5e1; }
+    .ui-select-trigger:focus-visible, .ui-select-trigger[aria-expanded="true"] { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 3px rgba(56,189,248,.16); }
+    .ui-select-value { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .ui-select-caret { width: 12px; height: 12px; flex: none; color: #94a3b8; transition: transform .15s ease; }
+    .ui-select-trigger[aria-expanded="true"] .ui-select-caret { transform: rotate(180deg); }
+    .ui-select-menu { position: fixed; z-index: 60; max-height: 300px; overflow-y: auto; padding: 4px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; box-shadow: 0 24px 50px -22px rgba(15,23,42,.4), 0 2px 8px rgba(15,23,42,.06); }
+    .ui-select-menu.hidden { display: none; }
+    .ui-select-menu::-webkit-scrollbar { width: 8px; }
+    .ui-select-menu::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+    .ui-select-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 8px; font-size: 11.5px; color: #334155; text-align: left; }
+    .ui-select-item:hover, .ui-select-item.is-highlight { background: #f1f5f9; }
+    .ui-select-item.is-active { background: #e0f2fe; color: #0369a1; font-weight: 600; }
+    .ui-select-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .ui-select-check { width: 13px; height: 13px; flex: none; color: #0284c7; opacity: 0; }
+    .ui-select-item.is-active .ui-select-check { opacity: 1; }
+
+    /* 自定义终端主题：颜色选择器统一为紧凑圆角样式。 */
+    .theme-color { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 5px 7px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; font-size: 10px; color: #64748b; cursor: pointer; }
+    .theme-color:hover { border-color: #cbd5e1; }
+    .theme-swatch { width: 18px; height: 18px; flex: none; padding: 0; border: 0; border-radius: 5px; background: transparent; cursor: pointer; }
+    .theme-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+    .theme-swatch::-webkit-color-swatch { border: 1px solid rgba(15,23,42,.12); border-radius: 5px; }
+    .theme-swatch::-moz-color-swatch { border: 1px solid rgba(15,23,42,.12); border-radius: 5px; }
   </style>
 </head>
 <body class="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-700 antialiased">
@@ -179,20 +206,32 @@
               <span class="field-label" data-i18n="ssh.form.user">用户名</span>
               <input id="fUser" required placeholder="root" class="field" />
             </label>
-            <label class="block">
+            <div class="block">
               <span class="field-label" data-i18n="ssh.form.jump">跳板机（可选）</span>
-              <select id="fJump" class="field"></select>
-            </label>
+              <div class="ui-select" data-ui-select="fJump">
+                <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="ui-select-value"></span>
+                  <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+                </button>
+                <select id="fJump" class="sr-only" tabindex="-1"></select>
+              </div>
+            </div>
           </div>
 
           <div data-fpanel="auth" class="hidden space-y-3">
-            <label class="block">
+            <div class="block">
               <span class="field-label" data-i18n="ssh.form.authMethod">认证方式</span>
-              <select id="fAuth" class="field">
-                <option value="password" data-i18n="ssh.form.authPassword">密码</option>
-                <option value="key" data-i18n="ssh.form.authKey">公钥 / 私钥</option>
-              </select>
-            </label>
+              <div class="ui-select" data-ui-select="fAuth">
+                <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                  <span class="ui-select-value"></span>
+                  <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+                </button>
+                <select id="fAuth" class="sr-only" tabindex="-1">
+                  <option value="password" data-i18n="ssh.form.authPassword">密码</option>
+                  <option value="key" data-i18n="ssh.form.authKey">公钥 / 私钥</option>
+                </select>
+              </div>
+            </div>
             <div id="passwordBox">
               <label class="block">
                 <span class="field-label" data-i18n="ssh.form.password">密码</span>
@@ -216,39 +255,74 @@
 
           <div data-fpanel="term" class="hidden space-y-3">
             <div class="grid grid-cols-2 gap-2">
-              <label class="block">
+              <div class="block">
                 <span class="field-label" data-i18n="ssh.form.termType">终端类型</span>
-                <select id="fTermType" class="field">
-                  <option value="xterm-256color">xterm-256color</option>
-                  <option value="xterm">xterm</option>
-                  <option value="screen-256color">screen-256color</option>
-                  <option value="vt100">vt100</option>
-                </select>
-              </label>
-              <label class="block">
+                <div class="ui-select" data-ui-select="fTermType">
+                  <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ui-select-value"></span>
+                    <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+                  </button>
+                  <select id="fTermType" class="sr-only" tabindex="-1">
+                    <option value="xterm-256color">xterm-256color</option>
+                    <option value="xterm">xterm</option>
+                    <option value="screen-256color">screen-256color</option>
+                    <option value="vt100">vt100</option>
+                  </select>
+                </div>
+              </div>
+              <div class="block">
                 <span class="field-label" data-i18n="ssh.form.encoding">编码</span>
-                <select id="fEncoding" class="field">
-                  <option value="utf-8">UTF-8</option>
-                  <option value="gbk">GBK</option>
-                  <option value="gb18030">GB18030</option>
-                  <option value="big5">BIG5</option>
-                  <option value="euc-jp">EUC-JP</option>
-                  <option value="shift-jis">Shift-JIS</option>
-                </select>
-              </label>
+                <div class="ui-select" data-ui-select="fEncoding">
+                  <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ui-select-value"></span>
+                    <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+                  </button>
+                  <select id="fEncoding" class="sr-only" tabindex="-1">
+                    <option value="utf-8">UTF-8</option>
+                    <option value="gbk">GBK</option>
+                    <option value="gb18030">GB18030</option>
+                    <option value="big5">BIG5</option>
+                    <option value="euc-jp">EUC-JP</option>
+                    <option value="shift-jis">Shift-JIS</option>
+                  </select>
+                </div>
+              </div>
               <label class="block">
                 <span class="field-label" data-i18n="ssh.form.fontSize">字号</span>
                 <input id="fFontSize" type="number" min="9" max="22" value="13" class="field" />
               </label>
-              <label class="block">
+              <div class="block">
                 <span class="field-label" data-i18n="ssh.form.colorScheme">配色方案</span>
-                <select id="fScheme" class="field">
-                  <option value="devos" data-i18n="ssh.form.schemeDevos">DevOS 深色</option>
-                  <option value="dracula">Dracula</option>
-                  <option value="solarized">Solarized Dark</option>
-                  <option value="light" data-i18n="ssh.form.schemeLight">高对比亮色</option>
-                </select>
-              </label>
+                <div class="ui-select" data-ui-select="fScheme">
+                  <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ui-select-value"></span>
+                    <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+                  </button>
+                  <select id="fScheme" class="sr-only" tabindex="-1">
+                    <option value="devos" data-i18n="ssh.form.schemeDevos">DevOS 深色</option>
+                    <option value="dracula">Dracula</option>
+                    <option value="solarized">Solarized Dark</option>
+                    <option value="onedark" data-i18n="ssh.form.schemeOneDark">One Dark</option>
+                    <option value="nord" data-i18n="ssh.form.schemeNord">Nord</option>
+                    <option value="gruvbox" data-i18n="ssh.form.schemeGruvbox">Gruvbox Dark</option>
+                    <option value="light" data-i18n="ssh.form.schemeLight">高对比亮色</option>
+                    <option value="custom" data-i18n="ssh.form.schemeCustom">自定义</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div id="customThemeBox" class="hidden space-y-2.5 rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+              <div class="flex flex-wrap items-center justify-between gap-1.5">
+                <span class="text-[10.5px] font-medium text-slate-500" data-i18n="ssh.theme.customTitle">自定义配色</span>
+                <span class="flex gap-1.5">
+                  <button type="button" id="loadThemePresetBtn" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50" data-i18n="ssh.theme.loadPreset">从当前预设载入</button>
+                  <button type="button" id="resetThemeBtn" class="rounded-md border border-slate-200 bg-white px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50" data-i18n="ssh.theme.reset">重置为 DevOS 深色</button>
+                </span>
+              </div>
+              <div id="themeBaseGrid" class="grid grid-cols-2 gap-2"></div>
+              <div class="text-[10px] font-medium text-slate-400" data-i18n="ssh.theme.ansi">ANSI 颜色</div>
+              <div id="themeAnsiGrid" class="grid grid-cols-4 gap-2"></div>
+              <p class="text-[10px] leading-relaxed text-slate-400" data-i18n="ssh.theme.note">颜色修改会即时预览，并保存在本机。</p>
             </div>
             <label class="block">
               <span class="field-label" data-i18n="ssh.form.startup">登录后执行命令（可选）</span>
@@ -339,6 +413,30 @@
         blue: "#268bd2", brightBlue: "#839496", magenta: "#d33682", brightMagenta: "#6c71c4",
         cyan: "#2aa198", brightCyan: "#93a1a1", white: "#eee8d5", brightWhite: "#fdf6e3",
       },
+      onedark: {
+        background: "#282c34", foreground: "#abb2bf", cursor: "#528bff",
+        selectionBackground: "rgba(62,68,81,.75)",
+        black: "#1e2127", brightBlack: "#5c6370", red: "#e06c75", brightRed: "#be5046",
+        green: "#98c379", brightGreen: "#98c379", yellow: "#e5c07b", brightYellow: "#d19a66",
+        blue: "#61afef", brightBlue: "#61afef", magenta: "#c678dd", brightMagenta: "#c678dd",
+        cyan: "#56b6c2", brightCyan: "#56b6c2", white: "#abb2bf", brightWhite: "#ffffff",
+      },
+      nord: {
+        background: "#2e3440", foreground: "#d8dee9", cursor: "#d8dee9",
+        selectionBackground: "rgba(136,192,208,.25)",
+        black: "#3b4252", brightBlack: "#4c566a", red: "#bf616a", brightRed: "#bf616a",
+        green: "#a3be8c", brightGreen: "#a3be8c", yellow: "#ebcb8b", brightYellow: "#ebcb8b",
+        blue: "#81a1c1", brightBlue: "#81a1c1", magenta: "#b48ead", brightMagenta: "#b48ead",
+        cyan: "#88c0d0", brightCyan: "#8fbcbb", white: "#e5e9f0", brightWhite: "#eceff4",
+      },
+      gruvbox: {
+        background: "#282828", foreground: "#ebdbb2", cursor: "#ebdbb2",
+        selectionBackground: "rgba(146,131,116,.35)",
+        black: "#282828", brightBlack: "#928374", red: "#cc241d", brightRed: "#fb4934",
+        green: "#98971a", brightGreen: "#b8bb26", yellow: "#d79921", brightYellow: "#fabd2f",
+        blue: "#458588", brightBlue: "#83a598", magenta: "#b16286", brightMagenta: "#d3869b",
+        cyan: "#689d6a", brightCyan: "#8ec07c", white: "#a89984", brightWhite: "#ebdbb2",
+      },
       light: {
         background: "#f8fafc", foreground: "#1e293b", cursor: "#0ea5e9",
         selectionBackground: "rgba(14,165,233,.18)",
@@ -348,6 +446,400 @@
         cyan: "#0e7490", brightCyan: "#06b6d4", white: "#e2e8f0", brightWhite: "#ffffff",
       },
     };
+
+    // ---------- 终端主题 ----------
+    const CUSTOM_THEME_KEY = "devos.ssh.customTheme";
+    const THEME_BASE_KEYS = ["background", "foreground", "cursor", "selectionBackground"];
+    const THEME_ANSI_KEYS = [
+      "black", "brightBlack", "red", "brightRed",
+      "green", "brightGreen", "yellow", "brightYellow",
+      "blue", "brightBlue", "magenta", "brightMagenta",
+      "cyan", "brightCyan", "white", "brightWhite",
+    ];
+    const THEME_LABEL_KEYS = {
+      background: "ssh.theme.background",
+      foreground: "ssh.theme.foreground",
+      cursor: "ssh.theme.cursor",
+      selectionBackground: "ssh.theme.selection",
+      black: "ssh.theme.black",
+      brightBlack: "ssh.theme.brightBlack",
+      red: "ssh.theme.red",
+      brightRed: "ssh.theme.brightRed",
+      green: "ssh.theme.green",
+      brightGreen: "ssh.theme.brightGreen",
+      yellow: "ssh.theme.yellow",
+      brightYellow: "ssh.theme.brightYellow",
+      blue: "ssh.theme.blue",
+      brightBlue: "ssh.theme.brightBlue",
+      magenta: "ssh.theme.magenta",
+      brightMagenta: "ssh.theme.brightMagenta",
+      cyan: "ssh.theme.cyan",
+      brightCyan: "ssh.theme.brightCyan",
+      white: "ssh.theme.white",
+      brightWhite: "ssh.theme.brightWhite",
+    };
+    const ALL_THEME_KEYS = [...THEME_BASE_KEYS, ...THEME_ANSI_KEYS];
+    let lastPresetScheme = "devos";
+    let customThemeParseWarned = false;
+
+    function isValidThemeColor(value) {
+      if (typeof value !== "string") return false;
+      const text = value.trim();
+      if (/^#[0-9a-f]{6}$/i.test(text)) return true;
+      if (/^transparent$/i.test(text)) return true;
+      const match = /^rgba?\(([^)]+)\)$/i.exec(text);
+      if (!match) return false;
+      const parts = match[1].split(",").map((part) => part.trim());
+      if (parts.length < 3 || parts.length > 4) return false;
+      const nums = parts.slice(0, 3).map(Number);
+      if (nums.some((n) => !Number.isFinite(n) || n < 0 || n > 255)) return false;
+      if (parts.length === 4) {
+        const alpha = Number(parts[3]);
+        if (!Number.isFinite(alpha) || alpha < 0 || alpha > 1) return false;
+      }
+      return true;
+    }
+
+    // 逐个键校验，非法值忽略并回退到 DevOS 深色，避免残缺主题破坏终端。
+    function sanitizeTheme(raw, fallback) {
+      const base = fallback || THEMES.devos;
+      const theme = {};
+      for (const key of ALL_THEME_KEYS) {
+        const value = raw && typeof raw === "object" ? raw[key] : null;
+        theme[key] = isValidThemeColor(value) ? String(value).trim() : base[key];
+      }
+      return theme;
+    }
+
+    function loadCustomTheme(notify) {
+      let raw = "";
+      try {
+        raw = localStorage.getItem(CUSTOM_THEME_KEY) || "";
+      } catch (_) {
+        return null;
+      }
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid");
+        return sanitizeTheme(parsed, THEMES.devos);
+      } catch (_) {
+        if (notify && !customThemeParseWarned) {
+          customThemeParseWarned = true;
+          toast(tr("ssh.theme.invalid"), "error");
+        }
+        return null;
+      }
+    }
+
+    function saveCustomTheme(theme) {
+      try {
+        localStorage.setItem(CUSTOM_THEME_KEY, JSON.stringify(sanitizeTheme(theme, THEMES.devos)));
+      } catch (_) {}
+    }
+
+    function resolveTheme(scheme) {
+      if (scheme === "custom") return loadCustomTheme(true) || THEMES.devos;
+      return THEMES[scheme] || THEMES.devos;
+    }
+
+    function toHexColor(value, fallback) {
+      const def = fallback || "#000000";
+      if (typeof value !== "string") return def;
+      const text = value.trim();
+      if (/^#[0-9a-f]{6}$/i.test(text)) return text.toLowerCase();
+      const match = /^rgba?\(([^)]+)\)$/i.exec(text);
+      if (!match) return def;
+      const parts = match[1].split(",").map((part) => Number(part.trim()));
+      if (parts.length < 3 || parts.slice(0, 3).some((n) => !Number.isFinite(n) || n < 0 || n > 255)) return def;
+      return "#" + parts.slice(0, 3).map((n) => Math.round(n).toString(16).padStart(2, "0")).join("");
+    }
+
+    function themeColorField(key) {
+      const labelKey = THEME_LABEL_KEYS[key];
+      return `<label class="theme-color">
+        <input type="color" class="theme-swatch" data-theme-key="${esc(key)}" />
+        <span class="truncate" data-i18n="${esc(labelKey)}">${esc(tr(labelKey))}</span>
+      </label>`;
+    }
+
+    function buildThemeEditor() {
+      $("themeBaseGrid").innerHTML = THEME_BASE_KEYS.map((key) => themeColorField(key)).join("");
+      $("themeAnsiGrid").innerHTML = THEME_ANSI_KEYS.map((key) => themeColorField(key)).join("");
+      document.querySelectorAll("#customThemeBox input[data-theme-key]").forEach((input) => {
+        input.addEventListener("input", onThemeEditorInput);
+        input.addEventListener("change", onThemeEditorInput);
+      });
+    }
+
+    function collectThemeEditor() {
+      const theme = {};
+      document.querySelectorAll("#customThemeBox input[data-theme-key]").forEach((input) => {
+        theme[input.dataset.themeKey] = input.value;
+      });
+      return sanitizeTheme(theme, THEMES.devos);
+    }
+
+    function onThemeEditorInput() {
+      const theme = collectThemeEditor();
+      saveCustomTheme(theme);
+      applyCustomThemeToTabs(theme);
+    }
+
+    function syncThemeEditor(theme) {
+      document.querySelectorAll("#customThemeBox input[data-theme-key]").forEach((input) => {
+        const key = input.dataset.themeKey;
+        input.value = toHexColor(theme[key], toHexColor(THEMES.devos[key], "#000000"));
+      });
+    }
+
+    // 自定义主题即时应用到正在编辑的会话，以及所有使用 custom 方案的已打开标签。
+    function applyCustomThemeToTabs(theme) {
+      const editId = state.editing ? state.editing.id : "";
+      for (const tab of state.tabs.values()) {
+        if ((editId && tab.profileId === editId) || tab.profile.colorScheme === "custom") {
+          tab.term.options.theme = theme;
+        }
+      }
+    }
+
+    function previewEditedSession(theme) {
+      if (!state.editing) return;
+      for (const tab of state.tabs.values()) {
+        if (tab.profileId === state.editing.id) tab.term.options.theme = theme;
+      }
+    }
+
+    // 取消编辑时按各标签自身保存的配色回滚预览。
+    function restoreTabThemes() {
+      for (const tab of state.tabs.values()) {
+        tab.term.options.theme = resolveTheme(tab.profile.colorScheme);
+      }
+    }
+
+    function syncCustomThemeVisibility() {
+      const isCustom = $("fScheme").value === "custom";
+      $("customThemeBox").classList.toggle("hidden", !isCustom);
+      if (!isCustom) return;
+      let theme = loadCustomTheme(true);
+      if (!theme) {
+        theme = sanitizeTheme(THEMES[lastPresetScheme] || THEMES.devos, THEMES.devos);
+        saveCustomTheme(theme);
+      }
+      syncThemeEditor(theme);
+      applyCustomThemeToTabs(theme);
+    }
+
+    function onSchemeChanged() {
+      const scheme = $("fScheme").value;
+      if (scheme !== "custom") {
+        lastPresetScheme = scheme;
+        previewEditedSession(resolveTheme(scheme));
+      }
+      syncCustomThemeVisibility();
+    }
+
+    function loadPresetIntoCustomTheme() {
+      const theme = sanitizeTheme(THEMES[lastPresetScheme] || THEMES.devos, THEMES.devos);
+      syncThemeEditor(theme);
+      saveCustomTheme(theme);
+      applyCustomThemeToTabs(theme);
+    }
+
+    function resetCustomTheme() {
+      const theme = sanitizeTheme(THEMES.devos, THEMES.devos);
+      syncThemeEditor(theme);
+      saveCustomTheme(theme);
+      applyCustomThemeToTabs(theme);
+    }
+
+    // ---------- 自绘下拉 ----------
+    let activeSelectEl = null;
+    let selectHighlightIndex = 0;
+
+    function syncSelectLabel(selectEl) {
+      const ui = selectEl && selectEl._uiSelect;
+      if (!ui) return;
+      const option = selectEl.options[selectEl.selectedIndex] || selectEl.options[0] || null;
+      ui.value.textContent = option ? option.textContent : "";
+      ui.menu.querySelectorAll(".ui-select-item").forEach((item) => {
+        const on = item.dataset.value === selectEl.value;
+        item.classList.toggle("is-active", on);
+        item.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      ui.btn.disabled = selectEl.disabled;
+    }
+
+    function syncAllSelectLabels() {
+      ["fJump", "fAuth", "fTermType", "fEncoding", "fScheme"].forEach((id) => {
+        const el = $(id);
+        if (el) syncSelectLabel(el);
+      });
+    }
+
+    function buildSelectMenu(selectEl) {
+      const ui = selectEl._uiSelect;
+      ui.menu.innerHTML = [...selectEl.options].map((option) => {
+        const on = option.value === selectEl.value;
+        return `<button type="button" role="option" aria-selected="${on ? "true" : "false"}" data-value="${esc(option.value)}" class="ui-select-item${on ? " is-active" : ""}">
+          <span class="ui-select-name">${esc(option.textContent)}</span>
+          <svg class="ui-select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4 10-10"/></svg>
+        </button>`;
+      }).join("");
+      ui.menu.querySelectorAll("[data-value]").forEach((item) => {
+        item.addEventListener("click", () => chooseSelectValue(selectEl, item.dataset.value));
+      });
+    }
+
+    function chooseSelectValue(selectEl, value) {
+      if (selectEl.value !== value) selectEl.value = value;
+      syncSelectLabel(selectEl);
+      closeSelectMenu();
+      if (selectEl._uiSelect) selectEl._uiSelect.btn.focus();
+      // 保持既有 change 监听（如 toggleAuth）照常生效。
+      selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    function positionSelectMenu(btn, menu) {
+      const rect = btn.getBoundingClientRect();
+      const gap = 6;
+      const edge = 8;
+      const spaceBelow = window.innerHeight - rect.bottom - gap - edge;
+      const spaceAbove = rect.top - gap - edge;
+      const needed = Math.min(menu.scrollHeight, 300);
+      const up = spaceBelow < needed && spaceAbove > spaceBelow;
+      const available = Math.max(96, up ? spaceAbove : spaceBelow);
+      menu.style.maxHeight = `${Math.min(300, available)}px`;
+      menu.style.width = `${Math.round(rect.width)}px`;
+      menu.style.left = `${Math.round(rect.left)}px`;
+      if (up) {
+        menu.style.top = "auto";
+        menu.style.bottom = `${Math.round(window.innerHeight - rect.top + gap)}px`;
+      } else {
+        menu.style.bottom = "auto";
+        menu.style.top = `${Math.round(rect.bottom + gap)}px`;
+      }
+    }
+
+    function highlightSelectItem(index) {
+      if (!activeSelectEl) return;
+      const items = [...activeSelectEl._uiSelect.menu.querySelectorAll(".ui-select-item")];
+      if (!items.length) return;
+      selectHighlightIndex = Math.max(0, Math.min(items.length - 1, index));
+      items.forEach((item, i) => item.classList.toggle("is-highlight", i === selectHighlightIndex));
+      items[selectHighlightIndex].scrollIntoView({ block: "nearest" });
+    }
+
+    function openSelectMenu(selectEl) {
+      closeSelectMenu();
+      const ui = selectEl._uiSelect;
+      if (!ui) return;
+      buildSelectMenu(selectEl);
+      ui.menu.classList.remove("hidden");
+      ui.btn.setAttribute("aria-expanded", "true");
+      positionSelectMenu(ui.btn, ui.menu);
+      activeSelectEl = selectEl;
+      const index = [...selectEl.options].findIndex((option) => option.value === selectEl.value);
+      highlightSelectItem(index >= 0 ? index : 0);
+    }
+
+    function closeSelectMenu() {
+      if (!activeSelectEl) return false;
+      const ui = activeSelectEl._uiSelect;
+      if (ui) {
+        ui.menu.classList.add("hidden");
+        ui.btn.setAttribute("aria-expanded", "false");
+        ui.menu.innerHTML = "";
+      }
+      activeSelectEl = null;
+      return true;
+    }
+
+    function enhanceSelect(selectEl) {
+      if (!selectEl || selectEl._uiSelect) return;
+      const wrap = selectEl.closest(".ui-select");
+      if (!wrap) return;
+      const btn = wrap.querySelector(".ui-select-trigger");
+      if (!btn) return;
+      const menu = document.createElement("div");
+      menu.className = "ui-select-menu hidden";
+      menu.setAttribute("role", "listbox");
+      document.body.appendChild(menu);
+      selectEl._uiSelect = {
+        wrap,
+        btn,
+        value: wrap.querySelector(".ui-select-value"),
+        menu,
+      };
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (activeSelectEl === selectEl) closeSelectMenu();
+        else openSelectMenu(selectEl);
+      });
+      // 任何来源（用户选择或编程式赋值 + change）都同步触发器文字。
+      selectEl.addEventListener("change", () => syncSelectLabel(selectEl));
+      menu.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
+      syncSelectLabel(selectEl);
+    }
+
+    function initSelects() {
+      ["fJump", "fAuth", "fTermType", "fEncoding", "fScheme"].forEach((id) => {
+        enhanceSelect($(id));
+      });
+      syncAllSelectLabels();
+    }
+
+    document.addEventListener("click", (event) => {
+      if (!activeSelectEl) return;
+      const ui = activeSelectEl._uiSelect;
+      if (ui.btn.contains(event.target) || ui.menu.contains(event.target)) return;
+      closeSelectMenu();
+    });
+
+    // Escape 先收起下拉，再关闭表单面板；上下键移动高亮，Enter 选中。
+    document.addEventListener("keydown", (event) => {
+      if (activeSelectEl) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          const ui = activeSelectEl._uiSelect;
+          closeSelectMenu();
+          if (ui) ui.btn.focus();
+          return;
+        }
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const dir = event.key === "ArrowDown" ? 1 : -1;
+          const count = activeSelectEl.options.length;
+          if (count) highlightSelectItem((selectHighlightIndex + dir + count) % count);
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          const ui = activeSelectEl._uiSelect;
+          const item = ui.menu.querySelectorAll(".ui-select-item")[selectHighlightIndex];
+          if (item) chooseSelectValue(activeSelectEl, item.dataset.value);
+          return;
+        }
+        if (event.key === "Tab") {
+          closeSelectMenu();
+          return;
+        }
+      }
+      if (event.key === "Escape" && !$("formPanel").classList.contains("hidden")) {
+        event.preventDefault();
+        closeForm();
+      }
+    });
+
+    $("formPanel").addEventListener("scroll", (event) => {
+      if (!activeSelectEl) return;
+      if (activeSelectEl._uiSelect.menu.contains(event.target)) return;
+      closeSelectMenu();
+    }, true);
+
+    window.addEventListener("resize", closeSelectMenu);
 
     function esc(value) {
       return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
@@ -409,6 +901,7 @@
         .map((p) => `<option value="${esc(p.id)}">${esc(p.name)}（${esc(p.user)}@${esc(p.host)}）</option>`)
         .join("");
       $("fJump").innerHTML = `<option value="">${esc(tr("ssh.form.noJump"))}</option>` + options;
+      syncSelectLabel($("fJump"));
     }
 
     function renderSessions() {
@@ -522,7 +1015,7 @@
       pane.className = "term-pane hidden";
       $("terminals").appendChild(pane);
 
-      const scheme = THEMES[profile.colorScheme] || THEMES.devos;
+      const scheme = resolveTheme(profile.colorScheme);
       const term = new Terminal({
         cursorBlink: true,
         fontSize: profile.fontSize || 13,
@@ -1046,6 +1539,7 @@
       $("fEncoding").value = profile ? profile.encoding || "utf-8" : "utf-8";
       $("fFontSize").value = profile ? profile.fontSize || 13 : 13;
       $("fScheme").value = profile ? profile.colorScheme || "devos" : "devos";
+      if ($("fScheme").value !== "custom") lastPresetScheme = $("fScheme").value;
       $("fStartup").value = profile ? profile.startupCommand || "" : "";
       $("fKeepAlive").value = profile ? (profile.keepAliveSec ?? 30) : 30;
       $("fLog").checked = !!(profile && profile.logEnabled);
@@ -1054,10 +1548,15 @@
       $("fJump").value = profile ? profile.jumpProfileId || "" : "";
       switchFormTab("conn");
       toggleAuth();
+      // 编程式设置 .value 后同步自绘触发器与主题编辑区。
+      syncAllSelectLabels();
+      syncCustomThemeVisibility();
       setTimeout(() => $("fName").focus(), 30);
     }
 
     function closeForm() {
+      closeSelectMenu();
+      restoreTabThemes();
       $("formPanel").classList.add("hidden");
       state.editing = null;
     }
@@ -1108,6 +1607,12 @@
       }
       try {
         const saved = await api("/profiles", { method: "POST", body: JSON.stringify(payload) });
+        for (const tab of state.tabs.values()) {
+          if (tab.profileId === saved.id) {
+            tab.profile = saved;
+            tab.term.options.theme = resolveTheme(saved.colorScheme);
+          }
+        }
         closeForm();
         await loadProfiles();
         if (connectAfter) openSession(saved.id);
@@ -1146,6 +1651,9 @@
     $("closeForm").addEventListener("click", closeForm);
     $("cancelForm").addEventListener("click", closeForm);
     $("fAuth").addEventListener("change", toggleAuth);
+    $("fScheme").addEventListener("change", onSchemeChanged);
+    $("loadThemePresetBtn").addEventListener("click", loadPresetIntoCustomTheme);
+    $("resetThemeBtn").addEventListener("click", resetCustomTheme);
     $("profileForm").addEventListener("submit", (event) => {
       event.preventDefault();
       saveProfile(false);
@@ -1285,6 +1793,9 @@
     // ---------- 初始化 ----------
     setInterval(updateStatusBar, 1000);
 
+    initSelects();
+    buildThemeEditor();
+
     async function init() {
       try {
         await loadProfiles();
@@ -1307,6 +1818,7 @@
       const jumpValue = $("fJump").value;
       renderJumpOptions();
       $("fJump").value = jumpValue;
+      syncAllSelectLabels();
       renderSessions();
       renderTabs();
       updateToolbar();
@@ -1316,6 +1828,7 @@
       }
       if (!$("testBtn").disabled) $("testBtn").textContent = tr("ssh.form.test");
       $("menu").classList.add("hidden");
+      closeSelectMenu();
     });
 
     init();

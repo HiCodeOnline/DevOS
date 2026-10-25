@@ -151,6 +151,45 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
+/* 表单字段：与自绘下拉触发器保持一致的输入框观感。 */
+.field {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background-color: #fff;
+  color: var(--ui-text);
+  font-size: 11.5px;
+  line-height: 1.45;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field::placeholder {
+  color: var(--ui-muted);
+}
+.field:hover {
+  border-color: var(--ui-border-strong);
+}
+.field:focus {
+  outline: none;
+  border-color: var(--ui-accent);
+  box-shadow: 0 0 0 3px var(--ui-accent-soft);
+}
+.field:disabled {
+  background-color: #f8fafc;
+  color: var(--ui-muted);
+  cursor: not-allowed;
+}
+textarea.field {
+  min-height: 68px;
+}
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: #64748b;
+}
+
 /* 滚动条统一为细窄的中性样式。 */
 ::-webkit-scrollbar {
   width: 10px;
