@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -14,7 +14,88 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/ui.css?v=2" />
   <script src="/assets/app-i18n.js?v=2"></script>
-  <script src="/assets/locales/apps/api.js?v=1"></script>
+  <script src="/assets/locales/apps/api.js?v=2"></script>
+  <style>
+    .ui-select { position: relative; }
+    .ui-select-trigger { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #334155; font-size: 11.5px; line-height: 1.45; text-align: left; transition: border-color .15s ease, box-shadow .15s ease; }
+    .ui-select-trigger:hover { border-color: #cbd5e1; }
+    .ui-select-trigger:focus-visible, .ui-select-trigger[aria-expanded="true"] { outline: none; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.16); }
+    .ui-select-value { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .ui-select-caret { width: 12px; height: 12px; flex: none; color: #94a3b8; transition: transform .15s ease; }
+    .ui-select-trigger[aria-expanded="true"] .ui-select-caret { transform: rotate(180deg); }
+    .ui-select-menu { position: fixed; z-index: 80; max-height: 300px; overflow-y: auto; padding: 4px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; box-shadow: 0 24px 50px -22px rgba(15,23,42,.4), 0 2px 8px rgba(15,23,42,.06); }
+    .ui-select-menu.hidden { display: none; }
+    .ui-select-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border-radius: 8px; font-size: 11.5px; color: #334155; text-align: left; }
+    .ui-select-item:hover, .ui-select-item.is-highlight { background: #f1f5f9; }
+    .ui-select-item.is-active { background: #fffbeb; color: #b45309; font-weight: 600; }
+    .ui-select-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .ui-select-check { width: 13px; height: 13px; flex: none; color: #d97706; opacity: 0; }
+    .ui-select-item.is-active .ui-select-check { opacity: 1; }
+
+    .scroll-thin { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+    .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+    .scroll-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; }
+    .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+
+    .side-tab { border-radius: 7px; padding: 4px 9px; font-size: 11px; font-weight: 500; color: #64748b; }
+    .side-tab:hover { background: #f1f5f9; }
+    .side-tab.is-active { background: #0f172a; color: #fff; }
+
+    .method-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 42px; padding: 1px 5px; border-radius: 5px; font-family: "JetBrains Mono", Consolas, monospace; font-size: 9.5px; font-weight: 600; letter-spacing: .02em; background: #0f172a; color: #fcd34d; }
+    .method-get { background: #ecfdf5; color: #047857; }
+    .method-post { background: #fffbeb; color: #b45309; }
+    .method-put { background: #eff6ff; color: #1d4ed8; }
+    .method-patch { background: #f5f3ff; color: #6d28d9; }
+    .method-delete { background: #fff1f2; color: #be123c; }
+    .method-head, .method-any { background: #f1f5f9; color: #475569; }
+
+    .req-tab { border-bottom: 2px solid transparent; padding: 7px 2px; font-size: 11px; font-weight: 500; color: #64748b; }
+    .req-tab:hover { color: #0f172a; }
+    .req-tab.is-active { border-color: #f59e0b; color: #b45309; }
+    .req-tab .tab-count { margin-left: 4px; border-radius: 999px; background: #f1f5f9; padding: 0 5px; font-size: 9px; color: #64748b; }
+
+    .res-tab { border-radius: 7px; padding: 4px 10px; font-size: 10.5px; font-weight: 500; color: #64748b; }
+    .res-tab:hover { background: #f1f5f9; }
+    .res-tab.is-active { background: #0f172a; color: #fff; }
+
+    .kv-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1.4fr) 24px; align-items: center; gap: 6px; }
+    .kv-row input[type="text"] { width: 100%; border: 1px solid #e2e8f0; border-radius: 7px; padding: 5px 8px; font-family: "JetBrains Mono", Consolas, monospace; font-size: 10.5px; color: #334155; outline: none; background: #fff; }
+    .kv-row input[type="text"]:focus { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245,158,11,.14); }
+    .kv-row input[type="text"]:disabled { background: #f8fafc; color: #94a3b8; }
+    .kv-del { display: grid; place-items: center; height: 22px; width: 22px; border-radius: 6px; color: #94a3b8; }
+    .kv-del:hover { background: #fff1f2; color: #e11d48; }
+    .kv-empty { border: 1px dashed #e2e8f0; border-radius: 8px; padding: 14px 8px; text-align: center; font-size: 10.5px; color: #94a3b8; }
+    .kv-add { margin-top: 6px; font-size: 10.5px; font-weight: 500; color: #b45309; }
+    .kv-add:hover { color: #92400e; }
+
+    .seg-btn { border: 1px solid #e2e8f0; padding: 4px 10px; font-size: 10.5px; color: #64748b; background: #fff; }
+    .seg-btn:first-child { border-radius: 7px 0 0 7px; }
+    .seg-btn:last-child { border-radius: 0 7px 7px 0; }
+    .seg-btn + .seg-btn { border-left: none; }
+    .seg-btn.is-active { background: #0f172a; border-color: #0f172a; color: #fff; }
+
+    .switch { position: relative; display: inline-flex; height: 18px; width: 32px; flex: none; cursor: pointer; }
+    .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .switch span { position: absolute; inset: 0; border-radius: 999px; background: #cbd5e1; transition: background .15s ease; }
+    .switch span::after { content: ""; position: absolute; top: 2px; left: 2px; height: 14px; width: 14px; border-radius: 999px; background: #fff; transition: transform .15s ease; }
+    .switch input:checked + span { background: #10b981; }
+    .switch input:checked + span::after { transform: translateX(14px); }
+    .switch input:focus-visible + span { box-shadow: 0 0 0 3px rgba(16,185,129,.2); }
+
+    .btn-primary { border-radius: 8px; background: #f59e0b; padding: 7px 16px; font-size: 11.5px; font-weight: 600; color: #fff; transition: background .15s ease; }
+    .btn-primary:hover { background: #fbbf24; }
+    .btn-primary:disabled { opacity: .5; }
+    .btn-ghost { border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; padding: 6px 10px; font-size: 10.5px; color: #475569; }
+    .btn-ghost:hover { background: #f8fafc; }
+    .btn-ghost.is-active { border-color: #fcd34d; background: #fffbeb; color: #b45309; }
+    .btn-ghost:disabled, .btn-danger:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-danger { border-radius: 7px; border: 1px solid #fecdd3; background: #fff; padding: 5px 9px; font-size: 10px; color: #e11d48; }
+    .btn-danger:hover { background: #fff1f2; }
+    .chip { border-radius: 999px; padding: 1px 7px; font-size: 9.5px; font-weight: 600; }
+
+    body { background-image: radial-gradient(circle at 20% 0%, rgba(245,158,11,.06), transparent 45%); }
+    .modal-mask { background: rgba(15,23,42,.32); backdrop-filter: blur(3px); }
+  </style>
 </head>
 <body class="flex h-screen flex-col overflow-hidden bg-slate-50 font-sans text-slate-700 antialiased">
   <header class="flex flex-none items-center gap-1 border-b border-slate-200 bg-white/85 px-3 py-2">
@@ -23,156 +104,416 @@
     </span>
     <button data-tab="debug" class="tab-btn rounded-lg bg-slate-900 px-3 py-1.5 text-[11.5px] font-medium text-white" data-i18n="api.tab.debug">接口调试</button>
     <button data-tab="mock" class="tab-btn rounded-lg px-3 py-1.5 text-[11.5px] font-medium text-slate-500 hover:bg-slate-100" data-i18n="api.tab.mock">Mock 服务</button>
-    <span id="mockHint" class="ml-auto hidden text-[10.5px] text-slate-400"></span>
+    <div class="ml-auto flex items-center gap-2">
+      <span class="text-[10.5px] text-slate-400" data-i18n="api.env.select">环境</span>
+      <div class="ui-select w-[170px]" data-ui-select="envSelect">
+        <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+          <span class="ui-select-value"></span>
+          <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+        </button>
+        <select id="envSelect" class="hidden"></select>
+      </div>
+      <button id="envManageBtn" class="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" data-i18n-title="api.env.manage" title="管理环境">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
   </header>
 
-  <!-- 调试 -->
-  <section id="tabDebug" class="flex min-h-0 flex-1">
-    <aside class="flex w-[220px] flex-none flex-col border-r border-slate-200 bg-white/70">
-      <div class="flex items-center justify-between px-3 py-2.5">
-        <span class="text-[11px] font-semibold text-slate-600" data-i18n="api.debug.savedTitle">已保存请求</span>
-        <button id="saveReqBtn" class="rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white hover:bg-slate-700" data-i18n="api.common.save">保存</button>
+  <main class="min-h-0 flex-1">
+    <section id="tabDebug" class="flex h-full min-h-0">
+      <aside class="flex w-[260px] flex-none flex-col border-r border-slate-200 bg-white/70">
+        <div class="flex items-center gap-1 px-2 pb-1 pt-2">
+          <button data-side="collections" class="side-tab is-active" data-i18n="api.side.collections">集合</button>
+          <button data-side="history" class="side-tab" data-i18n="api.side.history">历史</button>
+          <button id="newCollectionBtn" class="ml-auto grid h-6 w-6 place-items-center rounded-md text-slate-500 hover:bg-slate-100" data-i18n-title="api.side.newCollection" title="新建集合">
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <div id="sideCollectionsPane" class="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2 pt-1"></div>
+        <div id="sideHistoryPane" class="scroll-thin hidden min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2 pt-1"></div>
+      </aside>
+
+      <div class="flex min-w-0 flex-1 flex-col">
+        <div class="flex-none border-b border-slate-200 bg-white/70 px-3 py-2">
+          <div class="flex items-center gap-2">
+            <div class="ui-select w-[106px] flex-none" data-ui-select="reqMethod">
+              <button type="button" class="ui-select-trigger font-mono font-semibold text-amber-700" aria-haspopup="listbox" aria-expanded="false">
+                <span class="ui-select-value"></span>
+                <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+              </button>
+              <select id="reqMethod" class="hidden">
+                <option value="GET">GET</option><option value="POST">POST</option><option value="PUT">PUT</option>
+                <option value="PATCH">PATCH</option><option value="DELETE">DELETE</option><option value="HEAD">HEAD</option><option value="OPTIONS">OPTIONS</option>
+              </select>
+            </div>
+            <input id="reqUrl" spellcheck="false" placeholder="https://api.example.com/users  ·  {{baseUrl}}/mock/hello"
+              class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-[11.5px] text-slate-700 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
+            <button id="sendBtn" class="btn-primary" data-i18n="api.req.send">发送</button>
+            <button id="mockFromReqBtn" class="btn-ghost" data-i18n-title="api.req.mock" data-i18n="api.req.mock">生成 Mock</button>
+            <button id="saveReqBtn" class="btn-ghost flex items-center gap-1"><span data-i18n="api.req.save">保存</span><span id="dirtyDot" class="hidden h-1.5 w-1.5 rounded-full bg-amber-500"></span></button>
+          </div>
+          <div id="urlResolved" class="mt-1 hidden truncate px-1 font-mono text-[9.5px] text-slate-400"></div>
+        </div>
+
+        <div class="scroll-thin min-h-0 flex-1 overflow-y-auto p-3">
+          <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div class="flex gap-4 border-b border-slate-200 px-3" id="reqTabs">
+              <button data-req-tab="params" class="req-tab is-active"><span data-i18n="api.req.tab.params">参数</span><span class="tab-count" id="paramsCount">0</span></button>
+              <button data-req-tab="auth" class="req-tab"><span data-i18n="api.req.tab.auth">鉴权</span><span class="tab-count hidden" id="authDot">•</span></button>
+              <button data-req-tab="headers" class="req-tab"><span data-i18n="api.req.tab.headers">请求头</span><span class="tab-count" id="headersCount">0</span></button>
+              <button data-req-tab="body" class="req-tab"><span data-i18n="api.req.tab.body">请求体</span><span class="tab-count hidden" id="bodyDot">•</span></button>
+              <button data-req-tab="settings" class="req-tab"><span data-i18n="api.req.tab.settings">设置</span></button>
+            </div>
+
+            <div id="paneParams" class="p-3">
+              <div class="mb-2 flex items-center gap-2">
+                <span class="text-[10.5px] text-slate-400" data-i18n="api.req.paramsHint">启用的查询参数会追加到请求地址</span>
+                <button id="syncUrlBtn" class="ml-auto text-[10.5px] font-medium text-amber-600 hover:text-amber-700" data-i18n="api.req.syncUrl">从地址同步</button>
+              </div>
+              <div id="paramsKV"></div>
+            </div>
+
+            <div id="paneAuth" class="hidden p-3">
+              <div class="flex items-center gap-2">
+                <span class="text-[10.5px] text-slate-500" data-i18n="api.req.authType">鉴权方式</span>
+                <div class="ui-select w-[180px]" data-ui-select="authType">
+                  <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="ui-select-value"></span>
+                    <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+                  </button>
+                  <select id="authType" class="hidden">
+                    <option value="none" data-i18n="api.req.auth.none">无</option>
+                    <option value="bearer" data-i18n="api.req.auth.bearer">Bearer Token</option>
+                    <option value="basic" data-i18n="api.req.auth.basic">Basic Auth</option>
+                    <option value="apikey" data-i18n="api.req.auth.apikey">API Key</option>
+                  </select>
+                </div>
+              </div>
+              <div id="authFields" class="mt-3"></div>
+            </div>
+
+            <div id="paneHeaders" class="hidden p-3">
+              <div class="mb-2 text-[10.5px] text-slate-400" data-i18n="api.req.headersHint">启用的请求头会随请求发送</div>
+              <div id="headersKV"></div>
+            </div>
+
+            <div id="paneBody" class="hidden p-3">
+              <div class="flex items-center gap-2">
+                <span class="text-[10.5px] text-slate-500" data-i18n="api.req.body.mode">请求体类型</span>
+                <div class="flex" id="bodyModes">
+                  <button data-body-mode="none" class="seg-btn is-active" data-i18n="api.req.body.none">无</button>
+                  <button data-body-mode="raw" class="seg-btn" data-i18n="api.req.body.raw">原始</button>
+                  <button data-body-mode="urlencoded" class="seg-btn">x-www-form-urlencoded</button>
+                  <button data-body-mode="formdata" class="seg-btn">form-data</button>
+                </div>
+              </div>
+              <div id="bodyRawWrap" class="mt-3 hidden">
+                <div class="mb-2 flex items-center gap-2">
+                  <span class="text-[10.5px] text-slate-500" data-i18n="api.req.rawType">格式</span>
+                  <div class="ui-select w-[120px]" data-ui-select="rawType">
+                    <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+                      <span class="ui-select-value"></span>
+                      <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+                    </button>
+                    <select id="rawType" class="hidden">
+                      <option value="json">JSON</option><option value="text">Text</option><option value="xml">XML</option><option value="html">HTML</option>
+                    </select>
+                  </div>
+                </div>
+                <textarea id="bodyRaw" rows="8" spellcheck="false" placeholder='{"name":"devos"}'
+                  class="w-full resize-y rounded-lg border border-slate-200 p-2.5 font-mono text-[10.5px] leading-relaxed outline-none focus:border-amber-400"></textarea>
+              </div>
+              <div id="bodyFieldsWrap" class="mt-3 hidden">
+                <div class="mb-2 text-[10.5px] text-slate-400" id="bodyFieldsHint"></div>
+                <div id="bodyFieldsKV"></div>
+              </div>
+            </div>
+
+            <div id="paneSettings" class="hidden p-3">
+              <div class="flex flex-wrap items-center gap-6">
+                <label class="flex items-center gap-2">
+                  <span class="text-[10.5px] text-slate-500" data-i18n="api.req.timeout">超时 (ms)</span>
+                  <input id="reqTimeout" type="number" min="1000" max="120000" step="1000" value="30000"
+                    class="w-24 rounded-lg border border-slate-200 px-2 py-1.5 font-mono text-[11px] outline-none focus:border-amber-400" />
+                </label>
+                <label class="flex cursor-pointer items-center gap-2">
+                  <span class="switch"><input id="reqFollow" type="checkbox" checked /><span></span></span>
+                  <span class="text-[10.5px] text-slate-500" data-i18n="api.req.followRedirects">跟随重定向</span>
+                </label>
+              </div>
+              <div class="mt-2 text-[10px] text-slate-400" data-i18n="api.req.settingsHint">超时默认 30000 ms，最大 120000 ms</div>
+            </div>
+          </div>
+          <div class="mt-3 rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div class="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2">
+              <span class="text-[11px] font-semibold text-slate-600" data-i18n="api.res.title">响应</span>
+              <span id="resStatus" class="chip hidden"></span>
+              <span id="resTime" class="hidden text-[10px] text-slate-400"></span>
+              <span id="resSize" class="hidden text-[10px] text-slate-400"></span>
+              <div class="ml-auto flex items-center gap-1">
+                <button id="resPrettyBtn" class="btn-ghost" data-i18n="api.res.pretty">格式化</button>
+                <button id="copyResBtn" class="btn-ghost" data-i18n="api.res.copy">复制响应</button>
+              </div>
+            </div>
+            <div class="flex gap-1 px-3 pt-2" id="resTabs">
+              <button data-res-tab="body" class="res-tab is-active" data-i18n="api.res.body">响应体</button>
+              <button data-res-tab="headers" class="res-tab"><span data-i18n="api.res.headers">响应头</span><span class="tab-count" id="resHeadersCount"></span></button>
+              <button data-res-tab="cookies" class="res-tab"><span data-i18n="api.res.cookies">Cookies</span><span class="tab-count" id="resCookiesCount"></span></button>
+            </div>
+            <div id="resHint" class="px-3 py-10 text-center text-[11px] text-slate-400" data-i18n="api.res.hint">发送请求后在此查看结果</div>
+            <pre id="resBody" class="scroll-thin mx-3 mb-3 hidden max-h-[420px] overflow-auto rounded-lg bg-slate-900 p-3 font-mono text-[10.5px] leading-relaxed text-slate-100"></pre>
+            <div id="resHeadersPane" class="hidden px-3 pb-3">
+              <div class="scroll-thin max-h-[300px] overflow-auto rounded-lg border border-slate-200">
+                <table class="w-full table-fixed text-left font-mono text-[10px]">
+                  <tbody id="resHeadersBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="resCookiesPane" class="hidden px-3 pb-3">
+              <div class="scroll-thin max-h-[300px] overflow-auto rounded-lg border border-slate-200">
+                <table class="w-full text-left text-[10px]">
+                  <thead class="bg-slate-50 text-slate-500">
+                    <tr><th class="px-2 py-1.5 font-medium">Name</th><th class="px-2 py-1.5 font-medium">Value</th><th class="px-2 py-1.5 font-medium">Domain</th><th class="px-2 py-1.5 font-medium">Path</th><th class="px-2 py-1.5 font-medium">Expires</th><th class="px-2 py-1.5 font-medium">Flags</th></tr>
+                  </thead>
+                  <tbody id="resCookiesBody" class="font-mono"></tbody>
+                </table>
+              </div>
+            </div>
+            <div id="resTruncated" class="mx-3 mb-3 hidden rounded-lg bg-amber-50 px-2.5 py-1.5 text-[10px] text-amber-700" data-i18n="api.res.truncated">响应过大，已截断显示</div>
+            <div id="resRedirect" class="mx-3 mb-3 hidden truncate font-mono text-[9.5px] text-slate-400"></div>
+          </div>
+        </div>
       </div>
-      <div id="savedList" class="flex-1 space-y-1 overflow-y-auto px-2 pb-2"></div>
-    </aside>
+    </section>
 
-    <div class="min-w-0 flex-1 overflow-y-auto p-3">
-      <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div class="flex items-center gap-2">
-          <select id="method" class="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 font-mono text-[11px] font-semibold outline-none focus:border-amber-400">
-            <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option>
-          </select>
-          <input id="url" placeholder="https://httpbin.org/get" class="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 font-mono text-[11.5px] outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100" />
-          <button id="sendBtn" class="rounded-lg bg-amber-500 px-4 py-2 text-[11.5px] font-semibold text-white transition hover:bg-amber-400 disabled:opacity-50" data-i18n="api.debug.send">发送</button>
+    <section id="tabMock" class="hidden h-full min-h-0">
+      <div class="flex h-full min-h-0">
+        <div class="flex min-w-0 flex-1 flex-col">
+          <div class="flex flex-none flex-wrap items-center gap-3 border-b border-slate-200 bg-white/70 px-3 py-2">
+            <label class="flex cursor-pointer items-center gap-2">
+              <span class="switch"><input id="mockEnabled" type="checkbox" /><span></span></span>
+              <span class="text-[11px] font-medium text-slate-600" data-i18n="api.mock.status">Mock 服务</span>
+              <span id="mockState" class="chip bg-slate-100 text-slate-500"></span>
+            </label>
+            <span class="h-4 w-px bg-slate-200"></span>
+            <span class="text-[10.5px] text-slate-400" data-i18n="api.mock.base">Mock 基础地址</span>
+            <code id="mockBase" class="rounded-md bg-slate-900 px-2 py-1 font-mono text-[10.5px] text-emerald-300">…</code>
+            <button id="copyMockBtn" class="btn-ghost" data-i18n="api.common.copy">复制</button>
+            <div class="ml-auto flex items-center gap-1.5">
+              <button id="fromRequestBtn" class="btn-ghost" data-i18n="api.mock.fromRequest">从当前请求生成</button>
+              <button id="newMockBtn" class="btn-primary" data-i18n="api.mock.newRule">新建规则</button>
+            </div>
+          </div>
+          <div class="scroll-thin min-h-0 flex-1 overflow-y-auto p-3">
+            <div id="mockList" class="space-y-2"></div>
+          </div>
         </div>
-
-        <div class="mt-3 grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.debug.headers">请求头（每行 Key: Value）</span>
-            <textarea id="reqHeaders" rows="5" class="w-full resize-none rounded-lg border border-slate-200 p-2 font-mono text-[10.5px] outline-none focus:border-amber-400" placeholder="Content-Type: application/json"></textarea>
-          </label>
-          <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.debug.body">请求体</span>
-            <textarea id="reqBody" rows="5" class="w-full resize-none rounded-lg border border-slate-200 p-2 font-mono text-[10.5px] outline-none focus:border-amber-400" placeholder='{"name":"devos"}'></textarea>
-          </label>
-        </div>
+        <aside class="flex w-[330px] flex-none flex-col border-l border-slate-200 bg-white/60">
+          <div class="flex items-center gap-2 border-b border-slate-200 px-3 py-2">
+            <span class="text-[11px] font-semibold text-slate-600" data-i18n="api.mock.logs">命中记录</span>
+            <span id="logCount" class="chip bg-slate-100 text-slate-500">0</span>
+            <button id="clearLogsBtn" class="ml-auto text-[10px] text-slate-500 hover:text-rose-600" data-i18n="api.mock.clearLogs">清空记录</button>
+          </div>
+          <div id="mockLogs" class="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto p-2"></div>
+        </aside>
       </div>
+    </section>
+  </main>
 
-      <div class="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div class="flex items-center gap-2">
-          <span class="text-[11px] font-semibold text-slate-600" data-i18n="api.debug.response">响应</span>
-          <span id="resStatus" class="hidden rounded-full px-2 py-0.5 text-[10px] font-semibold"></span>
-          <span id="resTime" class="hidden text-[10px] text-slate-400"></span>
-          <span id="resSize" class="hidden text-[10px] text-slate-400"></span>
-          <button id="copyResBtn" class="ml-auto rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50" data-i18n="api.common.copy">复制</button>
-        </div>
-        <div id="resHint" class="py-8 text-center text-[11px] text-slate-400" data-i18n="api.debug.hint">发送请求后在此查看结果</div>
-        <pre id="resBody" class="hidden max-h-[320px] overflow-auto rounded-lg bg-slate-900 p-3 font-mono text-[10.5px] leading-relaxed text-slate-100"></pre>
-        <details id="resHeadersBox" class="mt-2 hidden">
-          <summary class="cursor-pointer text-[10.5px] text-slate-500" data-i18n="api.debug.responseHeaders">响应头</summary>
-          <pre id="resHeaders" class="mt-1 max-h-40 overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-[10px] text-slate-600"></pre>
-        </details>
+  <!-- 文本输入弹窗 -->
+  <div id="textModal" class="modal-mask fixed inset-0 z-[60] hidden items-center justify-center p-4">
+    <div class="w-[380px] rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
+      <h2 id="textTitle" class="mb-3 text-sm font-semibold text-slate-900"></h2>
+      <label class="block">
+        <span id="textLabel" class="mb-1 block text-[10.5px] font-medium text-slate-500"></span>
+        <input id="textInput" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-amber-400" />
+      </label>
+      <div class="mt-4 flex justify-end gap-2">
+        <button id="textCancel" class="btn-ghost" data-i18n="api.common.cancel">取消</button>
+        <button id="textOk" class="btn-primary" data-i18n="api.common.confirm">确定</button>
       </div>
-    </div>
-  </section>
-
-  <!-- Mock -->
-  <section id="tabMock" class="hidden min-h-0 flex-1 flex-col overflow-hidden">
-    <div class="flex flex-none items-center gap-3 border-b border-slate-200 bg-white/60 px-4 py-2.5">
-      <span class="text-[11px] text-slate-500" data-i18n="api.mock.base">Mock 基础地址</span>
-      <code id="mockBase" class="rounded-md bg-slate-900 px-2 py-1 font-mono text-[10.5px] text-emerald-300">…</code>
-      <button id="copyMockBtn" class="rounded-md border border-slate-200 px-2 py-1 text-[10px] text-slate-500 hover:bg-slate-50" data-i18n="api.common.copy">复制</button>
-      <button id="newMockBtn" class="ml-auto rounded-lg bg-amber-500 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-amber-400" data-i18n="api.mock.newRule">新建规则</button>
-    </div>
-    <div class="min-h-0 flex-1 overflow-y-auto p-3">
-      <div id="mockList" class="space-y-2"></div>
-    </div>
-  </section>
-
-  <!-- Mock 编辑弹层 -->
-  <div id="mockModal" class="fixed inset-0 z-30 hidden items-center justify-center bg-slate-900/30 p-4 backdrop-blur-sm">
-    <div class="max-h-[90vh] w-[560px] overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
-      <div class="mb-3 flex items-center justify-between">
-        <h2 id="mockTitle" class="text-sm font-semibold text-slate-900" data-i18n="api.mock.titleNew">新建 Mock 规则</h2>
-        <button id="closeMockModal" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
-          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </div>
-      <form id="mockForm" class="space-y-3">
-        <input type="hidden" id="mId" />
-        <label class="block">
-          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.name">规则名称</span>
-          <input id="mName" required class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-amber-400" />
-        </label>
-        <div class="grid grid-cols-4 gap-2">
-          <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.method">方法</span>
-            <select id="mMethod" class="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs outline-none focus:border-amber-400">
-              <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>ANY</option>
-            </select>
-          </label>
-          <label class="col-span-2 block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.path">路径（支持 /api/* 通配）</span>
-            <input id="mPath" required placeholder="/hello" class="w-full rounded-lg border border-slate-200 px-2 py-2 font-mono text-[11px] outline-none focus:border-amber-400" />
-          </label>
-          <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.status">状态码</span>
-            <input id="mStatus" type="number" value="200" class="w-full rounded-lg border border-slate-200 px-2 py-2 text-xs outline-none focus:border-amber-400" />
-          </label>
-        </div>
-        <div class="grid grid-cols-4 gap-2">
-          <label class="block">
-            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.delay">延迟 (ms)</span>
-            <input id="mDelay" type="number" value="0" class="w-full rounded-lg border border-slate-200 px-2 py-2 text-xs outline-none focus:border-amber-400" />
-          </label>
-          <label class="col-span-3 flex items-end gap-2 pb-2">
-            <input id="mEnabled" type="checkbox" checked class="rounded border-slate-300" />
-            <span class="text-[11px] text-slate-600" data-i18n="api.mock.enableRule">启用该规则</span>
-          </label>
-        </div>
-        <label class="block">
-          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.resHeaders">响应头（每行 Key: Value）</span>
-          <textarea id="mHeaders" rows="3" class="w-full resize-none rounded-lg border border-slate-200 p-2 font-mono text-[10.5px] outline-none focus:border-amber-400" placeholder="Content-Type: application/json"></textarea>
-        </label>
-        <label class="block">
-          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.resBody">响应体</span>
-          <textarea id="mBody" rows="5" class="w-full resize-none rounded-lg border border-slate-200 p-2 font-mono text-[10.5px] outline-none focus:border-amber-400" placeholder='{"ok":true}'></textarea>
-        </label>
-        <p id="mockError" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-600"></p>
-        <div class="flex gap-2">
-          <button type="submit" class="flex-1 rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-400" data-i18n="api.mock.saveRule">保存规则</button>
-          <button type="button" id="cancelMock" class="rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50" data-i18n="api.common.cancel">取消</button>
-        </div>
-      </form>
     </div>
   </div>
 
-  <div id="toast" class="pointer-events-none fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-xl bg-slate-900 px-4 py-2 text-[11px] text-white opacity-0 transition-opacity"></div>
+  <!-- 确认弹窗 -->
+  <div id="confirmModal" class="modal-mask fixed inset-0 z-[60] hidden items-center justify-center p-4">
+    <div class="w-[380px] rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
+      <h2 id="confirmTitle" class="text-sm font-semibold text-slate-900"></h2>
+      <p id="confirmMessage" class="mt-2 text-[11.5px] leading-relaxed text-slate-500"></p>
+      <div class="mt-4 flex justify-end gap-2">
+        <button id="confirmCancel" class="btn-ghost" data-i18n="api.common.cancel">取消</button>
+        <button id="confirmOk" class="btn-primary" data-i18n="api.common.confirm">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 保存请求 -->
+  <div id="saveModal" class="modal-mask fixed inset-0 z-40 hidden items-center justify-center p-4">
+    <div class="w-[460px] rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-slate-900" data-i18n="api.req.saveTitle">保存请求</h2>
+        <button id="saveClose" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <label class="block">
+        <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.req.requestName">请求名称</span>
+        <input id="saveName" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-amber-400" />
+      </label>
+      <div class="mt-3">
+        <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.req.collection">所属集合</span>
+        <div class="ui-select" data-ui-select="saveCollection">
+          <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+            <span class="ui-select-value"></span>
+            <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+          <select id="saveCollection" class="hidden"></select>
+        </div>
+      </div>
+      <label class="mt-3 block">
+        <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.req.newCollectionName">新建集合名称（可选）</span>
+        <input id="saveNewCollection" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-amber-400" />
+        <span class="mt-1 block text-[9.5px] text-slate-400" data-i18n="api.req.newCollectionHint">填写后将创建新集合并保存到其中</span>
+      </label>
+      <div class="mt-4 flex justify-end gap-2">
+        <button id="saveCancel" class="btn-ghost" data-i18n="api.common.cancel">取消</button>
+        <button id="saveOk" class="btn-primary" data-i18n="api.common.save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mock 规则编辑 -->
+  <div id="mockModal" class="modal-mask fixed inset-0 z-40 hidden items-center justify-center p-4">
+    <div class="scroll-thin max-h-[92vh] w-[680px] overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 id="mockTitle" class="text-sm font-semibold text-slate-900"></h2>
+        <button id="mockClose" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <label class="block">
+        <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.name">规则名称</span>
+        <input id="mName" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-amber-400" />
+      </label>
+      <div class="mt-3 grid grid-cols-12 gap-2">
+        <div class="col-span-3">
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.method">方法</span>
+          <div class="ui-select" data-ui-select="mMethod">
+            <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+              <span class="ui-select-value"></span>
+              <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+            </button>
+            <select id="mMethod" class="hidden">
+              <option value="GET">GET</option><option value="POST">POST</option><option value="PUT">PUT</option>
+              <option value="PATCH">PATCH</option><option value="DELETE">DELETE</option><option value="ANY">ANY</option>
+            </select>
+          </div>
+        </div>
+        <label class="col-span-5 block">
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.path">路径（支持 :参数 与 * 通配）</span>
+          <input id="mPath" placeholder="/users/:id" class="w-full rounded-lg border border-slate-200 px-2 py-2 font-mono text-[11px] outline-none focus:border-amber-400" />
+        </label>
+        <label class="col-span-2 block">
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.status">状态码</span>
+          <input id="mStatus" type="number" min="100" max="599" value="200" class="w-full rounded-lg border border-slate-200 px-2 py-2 text-xs outline-none focus:border-amber-400" />
+        </label>
+        <label class="col-span-2 block">
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.delay">延迟 (ms)</span>
+          <input id="mDelay" type="number" min="0" max="10000" value="0" class="w-full rounded-lg border border-slate-200 px-2 py-2 text-xs outline-none focus:border-amber-400" />
+        </label>
+      </div>
+      <label class="mt-3 flex cursor-pointer items-center gap-2">
+        <span class="switch"><input id="mEnabled" type="checkbox" checked /><span></span></span>
+        <span class="text-[11px] text-slate-600" data-i18n="api.mock.enableRule">启用该规则</span>
+      </label>
+      <div class="mt-3">
+        <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.query">查询参数匹配</span>
+        <div id="mockQueryKV"></div>
+      </div>
+      <div class="mt-3">
+        <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.headers">响应头</span>
+        <div id="mockHeadersKV"></div>
+      </div>
+      <label class="mt-3 block">
+        <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.body">响应体</span>
+        <textarea id="mBody" rows="7" spellcheck="false" class="w-full resize-y rounded-lg border border-slate-200 p-2.5 font-mono text-[10.5px] leading-relaxed outline-none focus:border-amber-400"></textarea>
+        <span class="mt-1 block text-[9.5px] leading-relaxed text-slate-400" data-i18n="api.mock.templateHint">响应头与响应体可使用 {{参数名}} 引用路径参数或查询参数</span>
+      </label>
+      <div class="mt-4 flex justify-end gap-2">
+        <button id="mockCancel" class="btn-ghost" data-i18n="api.common.cancel">取消</button>
+        <button id="mockSave" class="btn-primary" data-i18n="api.mock.saveRule">保存规则</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 环境变量 -->
+  <div id="envModal" class="modal-mask fixed inset-0 z-40 hidden items-center justify-center p-4">
+    <div class="flex h-[520px] w-[720px] flex-col rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-slate-900" data-i18n="api.env.title">环境变量</h2>
+        <button id="envClose" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="flex min-h-0 flex-1 gap-4">
+        <div class="flex w-[180px] flex-none flex-col border-r border-slate-200 pr-3">
+          <div id="envList" class="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto"></div>
+          <button id="envNewBtn" class="btn-ghost mt-2 w-full" data-i18n="api.env.new">新建环境</button>
+        </div>
+        <div class="flex min-w-0 flex-1 flex-col">
+          <label class="block">
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.env.name">环境名称</span>
+            <input id="envName" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-amber-400" />
+          </label>
+          <div class="mt-3 flex items-center gap-2">
+            <span class="text-[10.5px] font-medium text-slate-500" data-i18n="api.env.variables">变量</span>
+            <span class="text-[9.5px] text-slate-400" data-i18n="api.env.hint">在地址、请求头、请求体中使用 {{变量}} 引用</span>
+          </div>
+          <div id="envVars" class="scroll-thin mt-1 min-h-0 flex-1 overflow-y-auto"></div>
+        </div>
+      </div>
+      <div class="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
+        <button id="envDeleteBtn" class="btn-danger" data-i18n="api.env.delete">删除环境</button>
+        <div class="ml-auto flex gap-2">
+          <button id="envCancel" class="btn-ghost" data-i18n="api.common.cancel">取消</button>
+          <button id="envSave" class="btn-primary" data-i18n="api.common.save">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-lg bg-slate-900/92 px-4 py-2 text-[11.5px] font-medium text-white opacity-0 shadow-xl transition-opacity duration-200"></div>
 
   <script>
     const I18N = window.DevOSAppI18n;
     const t = (key, params) => (I18N ? I18N.t(key, params) : key);
     const API = "/api/apps/api";
-    const state = { tab: "debug", mocks: [], baseURL: "", lastResponse: "", saved: [], lastError: "" };
-
     const $ = (id) => document.getElementById(id);
 
-    document.title = t("api.app.title");
+    const state = {
+      tab: "debug",
+      sideTab: "collections",
+      collapsed: {},
+      baseURL: "",
+      ws: { collections: [], environments: [], activeEnvironment: "", history: [], mock: { enabled: true } },
+      mocks: [],
+      logs: [],
+      draft: null,
+      active: null,
+      dirty: false,
+      response: null,
+      resError: "",
+      lastSentURL: "",
+      resTab: "body",
+      resPretty: true,
+      reqTab: "params",
+      envDraft: null,
+      mockDraft: null,
+      sending: false,
+    };
 
-    document.addEventListener("devos:locale-changed", () => {
-      document.title = t("api.app.title");
-      renderSaved();
-      renderMocks();
-      $("sendBtn").textContent = $("sendBtn").disabled ? t("api.debug.sending") : t("api.debug.send");
-      if (state.lastError) {
-        $("resHint").textContent = t("api.debug.error", { error: state.lastError });
-      } else if ($("resBody").classList.contains("hidden")) {
-        $("resHint").textContent = t("api.debug.hint");
-      }
-      if (!$("mockModal").classList.contains("hidden")) {
-        $("mockTitle").textContent = t($("mId").value ? "api.mock.titleEdit" : "api.mock.titleNew");
-      }
-    });
+    let uidSeq = 0;
+    const rid = () => "x" + Date.now().toString(36) + (uidSeq++).toString(36);
 
     function esc(value) {
       return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
@@ -192,7 +533,7 @@
       const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
       const resp = await fetch(API + path, { ...options, headers });
       if (!resp.ok) {
-        let message = t("api.debug.requestFailed", { status: resp.status });
+        let message = t("api.common.loadFailed", { error: resp.status });
         try {
           const data = await resp.json();
           message = data.message || data.error || message;
@@ -202,281 +543,1647 @@
       return resp.json();
     }
 
-    function parseHeaders(text) {
-      const out = {};
-      String(text || "").split(/\r?\n/).forEach((line) => {
-        const idx = line.indexOf(":");
-        if (idx > 0) out[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+    // ---------- 工作区持久化 ----------
+    let wsTimer = null;
+    function persistWorkspace() {
+      clearTimeout(wsTimer);
+      wsTimer = setTimeout(() => {
+        api("/workspace", { method: "POST", body: JSON.stringify(state.ws) })
+          .catch((err) => toast(t("api.common.saveFailed", { error: err.message })));
+      }, 350);
+    }
+
+    function normalizeWorkspace(ws) {
+      const out = ws || {};
+      out.collections = Array.isArray(out.collections) ? out.collections : [];
+      out.environments = Array.isArray(out.environments) ? out.environments : [];
+      out.history = Array.isArray(out.history) ? out.history : [];
+      out.mock = out.mock || { enabled: true };
+      out.collections.forEach((c) => {
+        c.requests = Array.isArray(c.requests) ? c.requests : [];
+        c.name = c.name || t("api.common.untitled");
       });
+      out.environments.forEach((e) => {
+        e.variables = Array.isArray(e.variables) ? e.variables : [];
+        e.name = e.name || t("api.common.untitled");
+      });
+      if (out.activeEnvironment && !out.environments.some((e) => e.id === out.activeEnvironment)) {
+        out.activeEnvironment = "";
+      }
       return out;
     }
 
-    function headersToText(obj) {
-      return Object.entries(obj || {}).map(([k, v]) => `${k}: ${v}`).join("\n");
+    // ---------- 环境变量 ----------
+    function activeEnv() {
+      if (!state.ws || !state.ws.activeEnvironment) return null;
+      return state.ws.environments.find((e) => e.id === state.ws.activeEnvironment) || null;
     }
 
-    function pretty(text) {
-      try { return JSON.stringify(JSON.parse(text), null, 2); } catch (_) { return text; }
+    function varMap() {
+      const map = {};
+      const env = activeEnv();
+      if (env) {
+        (env.variables || []).forEach((v) => {
+          if (v.enabled !== false && v.key) map[v.key] = v.value;
+        });
+      }
+      return map;
     }
 
-    function setTab(tab) {
-      state.tab = tab;
-      $("tabDebug").style.display = tab === "debug" ? "flex" : "none";
-      $("tabMock").style.display = tab === "mock" ? "flex" : "none";
-      document.querySelectorAll(".tab-btn").forEach((btn) => {
-        const active = btn.dataset.tab === tab;
-        btn.className = "tab-btn rounded-lg px-3 py-1.5 text-[11.5px] font-medium " +
-          (active ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100");
+    function resolveVars(text) {
+      if (typeof text !== "string" || text.indexOf("{{") < 0) return text;
+      const map = varMap();
+      return text.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (all, name) =>
+        Object.prototype.hasOwnProperty.call(map, name) ? map[name] : all);
+    }
+
+    // ---------- 草稿 ----------
+    function cleanKV(list) {
+      return (list || []).map((item) => ({
+        key: String(item.key || ""),
+        value: String(item.value || ""),
+        enabled: item.enabled !== false,
+      }));
+    }
+
+    function emptyDraft(collectionId) {
+      return {
+        id: "", name: "", collectionId: collectionId || "",
+        method: "GET", url: "",
+        params: [{ key: "", value: "", enabled: true }],
+        headers: [{ key: "", value: "", enabled: true }],
+        auth: { type: "none", token: "", username: "", password: "", key: "", value: "", in: "header" },
+        body: { mode: "none", raw: "", rawType: "json", fields: [{ key: "", value: "", enabled: true }] },
+        timeoutMs: 30000,
+        followRedirects: true,
+      };
+    }
+
+    function draftFromRequest(req, collectionId) {
+      const body = req.body || {};
+      return {
+        id: req.id || "",
+        name: req.name || "",
+        collectionId: collectionId || "",
+        method: String(req.method || "GET").toUpperCase(),
+        url: req.url || "",
+        params: ensureRow(cleanKV(req.params)),
+        headers: ensureRow(cleanKV(req.headers)),
+        auth: Object.assign({ type: "none", token: "", username: "", password: "", key: "", value: "", in: "header" }, req.auth || {}),
+        body: {
+          mode: body.mode || "none",
+          raw: body.raw || "",
+          rawType: body.rawType || "json",
+          fields: ensureRow(cleanKV(body.fields)),
+        },
+        timeoutMs: req.timeoutMs || 30000,
+        followRedirects: req.followRedirects === undefined || req.followRedirects === null ? true : !!req.followRedirects,
+      };
+    }
+
+    function ensureRow(list) {
+      const rows = Array.isArray(list) ? list : [];
+      if (!rows.length) rows.push({ key: "", value: "", enabled: true });
+      return rows;
+    }
+
+    function serializeDraft() {
+      const d = state.draft;
+      return {
+        id: d.id || rid(),
+        name: d.name,
+        method: d.method,
+        url: d.url,
+        params: cleanKV(d.params),
+        headers: cleanKV(d.headers),
+        auth: { ...d.auth },
+        body: {
+          mode: d.body.mode,
+          raw: d.body.raw,
+          rawType: d.body.rawType,
+          fields: cleanKV(d.body.fields),
+        },
+        timeoutMs: Number(d.timeoutMs) || 30000,
+        followRedirects: d.followRedirects !== false,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    function markDirty() {
+      if (!state.draft) return;
+      state.dirty = true;
+      $("dirtyDot").classList.remove("hidden");
+    }
+
+    function clearDirty() {
+      state.dirty = false;
+      $("dirtyDot").classList.add("hidden");
+    }
+
+    // ---------- 弹窗辅助 ----------
+    function showModal(id) {
+      const node = $(id);
+      node.classList.remove("hidden");
+      node.classList.add("flex");
+    }
+
+    function hideModal(id) {
+      const node = $(id);
+      node.classList.add("hidden");
+      node.classList.remove("flex");
+    }
+
+    let textResolve = null;
+    function askText(titleKey, labelKey, value) {
+      $("textTitle").textContent = t(titleKey);
+      $("textLabel").textContent = t(labelKey);
+      $("textInput").value = value || "";
+      showModal("textModal");
+      setTimeout(() => { $("textInput").focus(); $("textInput").select(); }, 20);
+      return new Promise((resolve) => { textResolve = resolve; });
+    }
+
+    function closeText(value) {
+      hideModal("textModal");
+      const fn = textResolve;
+      textResolve = null;
+      if (fn) fn(value);
+    }
+
+    let confirmResolve = null;
+    function askConfirm(titleKey, message, params) {
+      $("confirmTitle").textContent = t(titleKey);
+      $("confirmMessage").textContent = t(message, params);
+      showModal("confirmModal");
+      return new Promise((resolve) => { confirmResolve = resolve; });
+    }
+
+    function closeConfirm(ok) {
+      hideModal("confirmModal");
+      const fn = confirmResolve;
+      confirmResolve = null;
+      if (fn) fn(ok);
+    }
+
+    // ---------- 自绘下拉 ----------
+    let activeSelectEl = null;
+    let selectHighlightIndex = 0;
+
+    function syncSelectLabel(selectEl) {
+      const ui = selectEl && selectEl._uiSelect;
+      if (!ui) return;
+      const option = selectEl.options[selectEl.selectedIndex] || selectEl.options[0] || null;
+      ui.value.textContent = option ? option.textContent : "";
+      ui.menu.querySelectorAll(".ui-select-item").forEach((item) => {
+        const on = item.dataset.value === selectEl.value;
+        item.classList.toggle("is-active", on);
+        item.setAttribute("aria-selected", on ? "true" : "false");
       });
-      if (tab === "mock") loadMocks();
+      ui.btn.disabled = selectEl.disabled;
     }
 
-    document.querySelectorAll(".tab-btn").forEach((btn) => {
-      btn.addEventListener("click", () => setTab(btn.dataset.tab));
+    function buildSelectMenu(selectEl) {
+      const ui = selectEl._uiSelect;
+      ui.menu.innerHTML = [...selectEl.options].map((option) => {
+        const on = option.value === selectEl.value;
+        return `<button type="button" role="option" aria-selected="${on}" data-value="${esc(option.value)}" class="ui-select-item${on ? " is-active" : ""}">
+          <span class="ui-select-name">${esc(option.textContent)}</span>
+          <svg class="ui-select-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4 10-10"/></svg>
+        </button>`;
+      }).join("");
+      ui.menu.querySelectorAll("[data-value]").forEach((item) => {
+        item.addEventListener("click", () => chooseSelectValue(selectEl, item.dataset.value));
+      });
+    }
+
+    function chooseSelectValue(selectEl, value) {
+      if (selectEl.value !== value) selectEl.value = value;
+      syncSelectLabel(selectEl);
+      closeSelectMenu();
+      if (selectEl._uiSelect) selectEl._uiSelect.btn.focus();
+      selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    function positionSelectMenu(btn, menu) {
+      const rect = btn.getBoundingClientRect();
+      const gap = 6;
+      const edge = 8;
+      const spaceBelow = window.innerHeight - rect.bottom - gap - edge;
+      const spaceAbove = rect.top - gap - edge;
+      const needed = Math.min(menu.scrollHeight, 300);
+      const up = spaceBelow < needed && spaceAbove > spaceBelow;
+      const available = Math.max(96, up ? spaceAbove : spaceBelow);
+      menu.style.maxHeight = `${Math.min(300, available)}px`;
+      menu.style.width = `${Math.round(rect.width)}px`;
+      menu.style.left = `${Math.round(rect.left)}px`;
+      if (up) {
+        menu.style.top = "auto";
+        menu.style.bottom = `${Math.round(window.innerHeight - rect.top + gap)}px`;
+      } else {
+        menu.style.bottom = "auto";
+        menu.style.top = `${Math.round(rect.bottom + gap)}px`;
+      }
+    }
+
+    function highlightSelectItem(index) {
+      if (!activeSelectEl) return;
+      const items = [...activeSelectEl._uiSelect.menu.querySelectorAll(".ui-select-item")];
+      if (!items.length) return;
+      selectHighlightIndex = Math.max(0, Math.min(items.length - 1, index));
+      items.forEach((item, i) => item.classList.toggle("is-highlight", i === selectHighlightIndex));
+      items[selectHighlightIndex].scrollIntoView({ block: "nearest" });
+    }
+
+    function openSelectMenu(selectEl) {
+      closeSelectMenu();
+      const ui = selectEl._uiSelect;
+      if (!ui) return;
+      buildSelectMenu(selectEl);
+      ui.menu.classList.remove("hidden");
+      ui.btn.setAttribute("aria-expanded", "true");
+      positionSelectMenu(ui.btn, ui.menu);
+      activeSelectEl = selectEl;
+      const index = [...selectEl.options].findIndex((option) => option.value === selectEl.value);
+      highlightSelectItem(index >= 0 ? index : 0);
+    }
+
+    function closeSelectMenu() {
+      if (!activeSelectEl) return false;
+      const ui = activeSelectEl._uiSelect;
+      if (ui) {
+        ui.menu.classList.add("hidden");
+        ui.btn.setAttribute("aria-expanded", "false");
+        ui.menu.innerHTML = "";
+      }
+      activeSelectEl = null;
+      return true;
+    }
+
+    function enhanceSelect(selectEl) {
+      if (!selectEl || selectEl._uiSelect) return;
+      const wrap = selectEl.closest(".ui-select");
+      if (!wrap) return;
+      const btn = wrap.querySelector(".ui-select-trigger");
+      if (!btn) return;
+      const menu = document.createElement("div");
+      menu.className = "ui-select-menu hidden";
+      menu.setAttribute("role", "listbox");
+      document.body.appendChild(menu);
+      selectEl._uiSelect = { wrap, btn, value: wrap.querySelector(".ui-select-value"), menu };
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (activeSelectEl === selectEl) closeSelectMenu();
+        else openSelectMenu(selectEl);
+      });
+      selectEl.addEventListener("change", () => syncSelectLabel(selectEl));
+      menu.addEventListener("wheel", (event) => event.stopPropagation(), { passive: true });
+      syncSelectLabel(selectEl);
+    }
+
+    function initSelects() {
+      document.querySelectorAll(".ui-select select").forEach(enhanceSelect);
+    }
+
+    document.addEventListener("click", (event) => {
+      if (!activeSelectEl) return;
+      const ui = activeSelectEl._uiSelect;
+      if (ui.btn.contains(event.target) || ui.menu.contains(event.target)) return;
+      closeSelectMenu();
     });
 
-    // ---------- 调试 ----------
-    function loadSaved() {
-      try { state.saved = JSON.parse(localStorage.getItem("devos.api.saved") || "[]"); } catch (_) { state.saved = []; }
-      renderSaved();
-    }
-
-    function persistSaved() {
-      localStorage.setItem("devos.api.saved", JSON.stringify(state.saved));
-      renderSaved();
-    }
-
-    function renderSaved() {
-      const box = $("savedList");
-      if (!state.saved.length) {
-        box.innerHTML = `<div class="rounded-lg border border-dashed border-slate-200 px-2.5 py-5 text-center text-[10px] text-slate-400">${esc(t("api.debug.noSaved"))}</div>`;
+    document.addEventListener("keydown", (event) => {
+      if (!activeSelectEl) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const ui = activeSelectEl._uiSelect;
+        closeSelectMenu();
+        if (ui) ui.btn.focus();
         return;
       }
-      box.innerHTML = state.saved.map((item) => `
-        <div class="group flex cursor-pointer items-center gap-1.5 rounded-lg border border-transparent px-2 py-1.5 hover:border-slate-200 hover:bg-slate-50" data-id="${esc(item.id)}">
-          <span class="w-9 flex-none font-mono text-[9px] font-semibold text-amber-600">${esc(item.method)}</span>
-          <span class="min-w-0 flex-1 truncate text-[11px] text-slate-700">${esc(item.name || item.url)}</span>
-          <button data-del class="hidden rounded p-0.5 text-slate-400 hover:text-rose-600 group-hover:block" title="${esc(t("api.common.delete"))}">
-            <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
-          </button>
-        </div>`).join("");
-      box.querySelectorAll("[data-id]").forEach((node) => {
-        node.addEventListener("click", (event) => {
-          const item = state.saved.find((x) => x.id === node.dataset.id);
-          if (!item) return;
-          if (event.target.closest("[data-del]")) {
-            state.saved = state.saved.filter((x) => x.id !== item.id);
-            persistSaved();
-            return;
-          }
-          $("method").value = item.method;
-          $("url").value = item.url;
-          $("reqHeaders").value = headersToText(item.headers);
-          $("reqBody").value = item.body || "";
-        });
-      });
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const dir = event.key === "ArrowDown" ? 1 : -1;
+        const count = activeSelectEl.options.length;
+        if (count) highlightSelectItem((selectHighlightIndex + dir + count) % count);
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const ui = activeSelectEl._uiSelect;
+        const item = ui.menu.querySelectorAll(".ui-select-item")[selectHighlightIndex];
+        if (item) chooseSelectValue(activeSelectEl, item.dataset.value);
+        return;
+      }
+      if (event.key === "Tab") closeSelectMenu();
+    });
+
+    document.addEventListener("scroll", (event) => {
+      if (!activeSelectEl) return;
+      if (activeSelectEl._uiSelect.menu.contains(event.target)) return;
+      closeSelectMenu();
+    }, true);
+
+    window.addEventListener("resize", closeSelectMenu);
+
+    // ---------- 键值行编辑器 ----------
+    const kvViews = {};
+
+    function kvRowHTML(item, index) {
+      return `<div class="kv-row" data-row="${index}">
+        <input type="checkbox" data-kv-enabled ${item.enabled !== false ? "checked" : ""} title="${esc(t("api.kv.enabled"))}" class="h-3.5 w-3.5 rounded border-slate-300" />
+        <input type="text" data-kv-key spellcheck="false" placeholder="${esc(t("api.kv.key"))}" value="${esc(item.key || "")}" ${item.enabled === false ? "disabled" : ""} />
+        <input type="text" data-kv-value spellcheck="false" placeholder="${esc(t("api.kv.value"))}" value="${esc(item.value || "")}" ${item.enabled === false ? "disabled" : ""} />
+        <button type="button" data-kv-del class="kv-del" title="${esc(t("api.common.delete"))}">
+          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>`;
     }
 
-    $("saveReqBtn").addEventListener("click", () => {
-      const name = prompt(t("api.debug.requestName"), $("url").value || t("api.debug.newRequest"));
-      if (!name) return;
-      state.saved.unshift({
-        id: Date.now().toString(36),
-        name,
-        method: $("method").value,
-        url: $("url").value,
-        headers: parseHeaders($("reqHeaders").value),
-        body: $("reqBody").value,
+    function renderKVView(view) {
+      const list = view.getList() || [];
+      const add = `<button type="button" data-kv-add class="kv-add">+ ${esc(t("api.kv.add"))}</button>`;
+      if (!list.length) {
+        view.box.innerHTML = `<div class="kv-empty">${esc(t("api.kv.empty"))}</div>${add}`;
+        return;
+      }
+      view.box.innerHTML = list.map((item, index) => kvRowHTML(item, index)).join("") + add;
+    }
+
+    function renderAllKV() {
+      Object.values(kvViews).forEach(renderKVView);
+    }
+
+    function setupKV(id, getList) {
+      const box = $(id);
+      const view = { box, getList };
+      kvViews[id] = view;
+      box.addEventListener("input", (event) => {
+        const row = event.target.closest("[data-row]");
+        if (!row) return;
+        const list = view.getList();
+        const item = list[Number(row.dataset.row)];
+        if (!item) return;
+        if (event.target.matches("[data-kv-enabled]")) {
+          item.enabled = event.target.checked;
+          renderKVView(view);
+        } else if (event.target.matches("[data-kv-key]")) {
+          item.key = event.target.value;
+        } else if (event.target.matches("[data-kv-value]")) {
+          item.value = event.target.value;
+        }
+        if (view.onChange) view.onChange();
+        markDirty();
       });
-      persistSaved();
-      toast(t("api.debug.saved"));
-    });
+      box.addEventListener("click", (event) => {
+        const list = view.getList();
+        const add = event.target.closest("[data-kv-add]");
+        if (add) {
+          list.push({ key: "", value: "", enabled: true });
+          renderKVView(view);
+          markDirty();
+          return;
+        }
+        const del = event.target.closest("[data-kv-del]");
+        if (del) {
+          const row = del.closest("[data-row]");
+          list.splice(Number(row.dataset.row), 1);
+          renderKVView(view);
+          markDirty();
+        }
+      });
+      renderKVView(view);
+      return view;
+    }
+    // ---------- 渲染：侧栏 ----------
+    function methodBadge(method) {
+      const m = String(method || "GET").toLowerCase();
+      const known = ["get", "post", "put", "patch", "delete", "head", "any"];
+      return `<span class="method-badge method-${known.includes(m) ? m : "any"}">${esc(String(method || "GET").toUpperCase())}</span>`;
+    }
 
-    $("sendBtn").addEventListener("click", async () => {
-      const url = $("url").value.trim();
-      if (!url) return toast(t("api.debug.urlRequired"));
-      $("sendBtn").disabled = true;
-      $("sendBtn").textContent = t("api.debug.sending");
+    function miniMethod(method) {
+      const m = String(method || "GET").toUpperCase();
+      return `<span class="w-[32px] flex-none font-mono text-[9px] font-semibold text-slate-400">${esc(m)}</span>`;
+    }
+
+    function shortURL(url) {
+      const raw = String(url || "");
       try {
-        const data = await api("/send", {
-          method: "POST",
-          body: JSON.stringify({
-            method: $("method").value,
-            url,
-            headers: parseHeaders($("reqHeaders").value),
-            body: $("reqBody").value,
-          }),
+        const parsed = new URL(resolveVars(raw));
+        return (parsed.pathname || "/") + (parsed.search || "");
+      } catch (_) {
+        return raw.replace(/^https?:\/\/[^/]+/i, "") || raw;
+      }
+    }
+
+    function isActiveRequest(collId, reqId) {
+      return !!(state.active && state.active.collectionId === collId && state.active.requestId === reqId);
+    }
+
+    function renderSidebar() {
+      const pane = $("sideCollectionsPane");
+      const collections = state.ws.collections;
+      pane.classList.toggle("hidden", state.sideTab !== "collections");
+      $("sideHistoryPane").classList.toggle("hidden", state.sideTab !== "history");
+
+      if (!collections.length) {
+        pane.innerHTML = `<div class="px-2 py-8 text-center text-[10.5px] leading-relaxed text-slate-400">${esc(t("api.side.noCollections"))}</div>`;
+      } else {
+        pane.innerHTML = collections.map((coll) => {
+          const open = !state.collapsed[coll.id];
+          const requests = coll.requests || [];
+          const body = open ? (requests.length
+            ? requests.map((req) => `
+              <div data-open-request data-coll-id="${esc(coll.id)}" data-req-id="${esc(req.id)}"
+                class="group flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1.5 ${isActiveRequest(coll.id, req.id) ? "bg-amber-50" : "hover:bg-slate-100"}">
+                ${miniMethod(req.method)}
+                <span class="min-w-0 flex-1 truncate text-[11px] ${isActiveRequest(coll.id, req.id) ? "text-amber-800" : "text-slate-600"}" title="${esc(req.url)}">${esc(req.name || req.url || t("api.common.untitled"))}</span>
+                <button data-req-del class="grid h-4 w-4 place-items-center rounded text-slate-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100" title="${esc(t("api.common.delete"))}">
+                  <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+              </div>`).join("")
+            : `<div class="px-2 py-2 text-[10px] text-slate-400">${esc(t("api.side.noRequests"))}</div>`) : "";
+          return `<div class="rounded-lg" data-coll="${esc(coll.id)}">
+            <div class="group flex items-center gap-1 rounded-lg px-1 py-1 hover:bg-slate-50">
+              <button data-coll-toggle class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-slate-100">
+                <svg class="h-3 w-3 transition-transform ${open ? "rotate-90" : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+              </button>
+              <button data-coll-select class="min-w-0 flex-1 truncate px-1 text-left text-[11.5px] font-semibold text-slate-700" title="${esc(coll.name)}">${esc(coll.name)}</button>
+              <span class="text-[9px] text-slate-400">${requests.length}</span>
+              <button data-coll-add class="grid h-5 w-5 place-items-center rounded text-slate-400 opacity-0 hover:bg-amber-50 hover:text-amber-600 group-hover:opacity-100" title="${esc(t("api.side.addRequest"))}">
+                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+              <button data-coll-rename class="grid h-5 w-5 place-items-center rounded text-slate-400 opacity-0 hover:bg-slate-100 group-hover:opacity-100" title="${esc(t("api.side.rename"))}">
+                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              </button>
+              <button data-coll-del class="grid h-5 w-5 place-items-center rounded text-slate-400 opacity-0 hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100" title="${esc(t("api.side.deleteCollection"))}">
+                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
+              </button>
+            </div>
+            <div class="mt-0.5 space-y-0.5 pl-1">${body}</div>
+          </div>`;
+        }).join("");
+      }
+      renderHistory();
+    }
+
+    function statusChipClass(status) {
+      if (status >= 200 && status < 300) return "bg-emerald-50 text-emerald-700";
+      if (status >= 300 && status < 400) return "bg-sky-50 text-sky-700";
+      if (status >= 400) return "bg-rose-50 text-rose-600";
+      return "bg-amber-50 text-amber-700";
+    }
+
+    function renderHistory() {
+      const pane = $("sideHistoryPane");
+      const list = state.ws.history || [];
+      if (!list.length) {
+        pane.innerHTML = `<div class="px-2 py-8 text-center text-[10.5px] text-slate-400">${esc(t("api.side.noHistory"))}</div>`;
+        return;
+      }
+      pane.innerHTML = list.map((item) => {
+        let when = item.at || "";
+        const date = new Date(item.at);
+        if (!Number.isNaN(date.getTime())) when = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        return `<button data-history="${esc(item.id)}" class="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left hover:bg-slate-100">
+          ${miniMethod(item.method)}
+          <span class="min-w-0 flex-1">
+            <span class="block truncate font-mono text-[10px] text-slate-600" title="${esc(item.url)}">${esc(shortURL(item.url))}</span>
+            <span class="block text-[9px] text-slate-400">${item.status} · ${item.durationMs || 0} ms · ${esc(when)}</span>
+          </span>
+          <span class="h-1.5 w-1.5 flex-none rounded-full ${item.status >= 400 ? "bg-rose-400" : "bg-emerald-400"}"></span>
+        </button>`;
+      }).join("");
+    }
+
+    function renderEnvSelect() {
+      const sel = $("envSelect");
+      const envs = state.ws.environments || [];
+      sel.innerHTML = `<option value="">${esc(t("api.env.none"))}</option>` +
+        envs.map((env) => `<option value="${esc(env.id)}">${esc(env.name)}</option>`).join("");
+      const active = envs.some((env) => env.id === state.ws.activeEnvironment) ? state.ws.activeEnvironment : "";
+      sel.value = active;
+      syncSelectLabel(sel);
+      updateUrlPreview();
+    }
+
+    // ---------- 渲染：请求表单 ----------
+    function countEnabled(list) {
+      return (list || []).filter((item) => item.enabled !== false && String(item.key || "").trim()).length;
+    }
+
+    function updateCounts() {
+      const d = state.draft;
+      $("paramsCount").textContent = String(countEnabled(d.params));
+      $("headersCount").textContent = String(countEnabled(d.headers));
+      $("authDot").classList.toggle("hidden", !(d.auth && d.auth.type && d.auth.type !== "none"));
+      const bodyOn = d.body.mode !== "none" && (d.body.mode === "raw" ? !!d.body.raw.trim() : countEnabled(d.body.fields) > 0);
+      $("bodyDot").classList.toggle("hidden", !bodyOn);
+    }
+
+    function updateUrlPreview() {
+      const raw = ($("reqUrl").value || "").trim();
+      const resolved = resolveVars(raw);
+      const node = $("urlResolved");
+      if (raw && resolved !== raw) {
+        node.textContent = resolved;
+        node.classList.remove("hidden");
+      } else {
+        node.classList.add("hidden");
+      }
+    }
+
+    function renderDraft() {
+      const d = state.draft;
+      $("reqMethod").value = d.method || "GET";
+      syncSelectLabel($("reqMethod"));
+      $("reqUrl").value = d.url || "";
+      $("authType").value = d.auth.type || "none";
+      syncSelectLabel($("authType"));
+      $("rawType").value = d.body.rawType || "json";
+      syncSelectLabel($("rawType"));
+      $("bodyRaw").value = d.body.raw || "";
+      $("reqTimeout").value = d.timeoutMs || 30000;
+      $("reqFollow").checked = d.followRedirects !== false;
+      renderAuthFields();
+      renderBodyMode();
+      renderAllKV();
+      updateCounts();
+      updateUrlPreview();
+      setReqTab(state.reqTab);
+    }
+
+    function renderAuthFields() {
+      const box = $("authFields");
+      const auth = state.draft.auth;
+      const field = (id, labelKey, value, mono) => `
+        <label class="block">
+          <span class="mb-1 block text-[10.5px] font-medium text-slate-500">${esc(t(labelKey))}</span>
+          <input id="${id}" value="${esc(value || "")}" spellcheck="false" class="w-full rounded-lg border border-slate-200 px-3 py-2 ${mono ? "font-mono" : ""} text-[11px] outline-none focus:border-amber-400" />
+        </label>`;
+      if (auth.type === "bearer") {
+        box.innerHTML = `<div class="max-w-[420px]">${field("authToken", "api.req.token", auth.token, true)}</div>`;
+        $("authToken").addEventListener("input", (event) => { auth.token = event.target.value; markDirty(); });
+      } else if (auth.type === "basic") {
+        box.innerHTML = `<div class="grid max-w-[520px] grid-cols-2 gap-3">
+          ${field("authUser", "api.req.username", auth.username, true)}
+          ${field("authPass", "api.req.password", auth.password, true)}
+        </div>`;
+        $("authUser").addEventListener("input", (event) => { auth.username = event.target.value; markDirty(); });
+        $("authPass").addEventListener("input", (event) => { auth.password = event.target.value; markDirty(); });
+      } else if (auth.type === "apikey") {
+        box.innerHTML = `<div class="grid max-w-[640px] grid-cols-3 gap-3">
+          ${field("authKeyName", "api.req.apiKeyName", auth.key, true)}
+          ${field("authKeyValue", "api.req.apiKeyValue", auth.value, true)}
+          <div>
+            <span class="mb-1 block text-[10.5px] font-medium text-slate-500">${esc(t("api.req.apiKeyIn"))}</span>
+            <div class="flex" id="authInGroup">
+              <button data-auth-in="header" class="seg-btn ${auth.in !== "query" ? "is-active" : ""}">${esc(t("api.req.in.header"))}</button>
+              <button data-auth-in="query" class="seg-btn ${auth.in === "query" ? "is-active" : ""}">${esc(t("api.req.in.query"))}</button>
+            </div>
+          </div>
+        </div>`;
+        $("authKeyName").addEventListener("input", (event) => { auth.key = event.target.value; markDirty(); });
+        $("authKeyValue").addEventListener("input", (event) => { auth.value = event.target.value; markDirty(); });
+        $("authInGroup").addEventListener("click", (event) => {
+          const btn = event.target.closest("[data-auth-in]");
+          if (!btn) return;
+          auth.in = btn.dataset.authIn;
+          renderAuthFields();
+          markDirty();
         });
-        state.lastResponse = data.body || "";
-        state.lastError = "";
-        $("resHint").classList.add("hidden");
+      } else {
+        box.innerHTML = `<div class="rounded-lg border border-dashed border-slate-200 px-3 py-6 text-center text-[10.5px] text-slate-400">${esc(t("api.req.authHint"))}</div>`;
+      }
+    }
+
+    function renderBodyMode() {
+      const mode = state.draft.body.mode || "none";
+      document.querySelectorAll("[data-body-mode]").forEach((btn) => {
+        btn.classList.toggle("is-active", btn.dataset.bodyMode === mode);
+      });
+      $("bodyRawWrap").classList.toggle("hidden", mode !== "raw");
+      $("bodyFieldsWrap").classList.toggle("hidden", mode !== "urlencoded" && mode !== "formdata");
+      $("bodyFieldsHint").textContent = mode === "formdata" ? t("api.req.bodyFormdataHint") : t("api.req.bodyUrlencodedHint");
+    }
+
+    function setReqTab(tab) {
+      state.reqTab = tab;
+      const panes = { params: "paneParams", auth: "paneAuth", headers: "paneHeaders", body: "paneBody", settings: "paneSettings" };
+      document.querySelectorAll("#reqTabs [data-req-tab]").forEach((btn) => {
+        btn.classList.toggle("is-active", btn.dataset.reqTab === tab);
+      });
+      Object.entries(panes).forEach(([name, id]) => {
+        $(id).classList.toggle("hidden", name !== tab);
+      });
+      updateCounts();
+    }
+
+    // ---------- 渲染：响应 ----------
+    function fmtBytes(size) {
+      const n = Number(size) || 0;
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+      return `${(n / 1024 / 1024).toFixed(2)} MB`;
+    }
+
+    function bodyText(res) {
+      let text = res.body || "";
+      if (state.resPretty) {
+        try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (_) {}
+      }
+      return text;
+    }
+
+    function setResTab(tab) {
+      state.resTab = tab;
+      document.querySelectorAll("#resTabs [data-res-tab]").forEach((btn) => {
+        btn.classList.toggle("is-active", btn.dataset.resTab === tab);
+      });
+      const hasData = !!state.response;
+      $("resBody").classList.toggle("hidden", !hasData || tab !== "body");
+      $("resHeadersPane").classList.toggle("hidden", !hasData || tab !== "headers");
+      $("resCookiesPane").classList.toggle("hidden", !hasData || tab !== "cookies");
+      $("resHint").classList.toggle("hidden", hasData || !!state.resError);
+    }
+
+    function renderResponse() {
+      const res = state.response;
+      const err = state.resError;
+      const hasData = !!res;
+      $("resHint").classList.toggle("hidden", hasData || !!err);
+      ["resStatus", "resTime", "resSize"].forEach((id) => $(id).classList.toggle("hidden", !hasData));
+      $("resTruncated").classList.toggle("hidden", !(hasData && res.truncated));
+      $("resRedirect").classList.toggle("hidden", true);
+
+      if (err) {
         $("resBody").classList.remove("hidden");
-        $("resBody").textContent = pretty(data.body || "");
-        const ok = data.status >= 200 && data.status < 400;
-        $("resStatus").textContent = `${data.status} ${data.statusText || ""}`.trim();
-        $("resStatus").className = "rounded-full px-2 py-0.5 text-[10px] font-semibold " +
-          (ok ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600");
-        $("resStatus").classList.remove("hidden");
-        $("resTime").textContent = `${data.durationMs} ms`;
-        $("resSize").textContent = `${data.size} B`;
-        $("resTime").classList.remove("hidden");
-        $("resSize").classList.remove("hidden");
-        $("resHeaders").textContent = headersToText(data.headers);
-        $("resHeadersBox").classList.remove("hidden");
-      } catch (err) {
-        state.lastError = err.message;
-        $("resHint").classList.remove("hidden");
-        $("resHint").textContent = t("api.debug.error", { error: err.message });
-        $("resHint").className = "py-8 text-center text-[11px] text-rose-500";
+        $("resBody").textContent = t("api.res.error", { error: err });
+        $("resHeadersPane").classList.add("hidden");
+        $("resCookiesPane").classList.add("hidden");
+        $("resHeadersCount").textContent = "";
+        $("resCookiesCount").textContent = "";
+        return;
+      }
+      if (!res) {
         $("resBody").classList.add("hidden");
-        $("resStatus").classList.add("hidden");
-      } finally {
-        $("sendBtn").disabled = false;
-        $("sendBtn").textContent = t("api.debug.send");
+        $("resHeadersPane").classList.add("hidden");
+        $("resCookiesPane").classList.add("hidden");
+        $("resHeadersCount").textContent = "";
+        $("resCookiesCount").textContent = "";
+        return;
       }
-    });
 
-    $("copyResBtn").addEventListener("click", async () => {
-      if (!state.lastResponse) return toast(t("api.debug.noResponse"));
-      await navigator.clipboard.writeText(state.lastResponse);
-      toast(t("api.debug.copied"));
-    });
+      const chip = $("resStatus");
+      chip.className = `chip ${statusChipClass(res.status)}`;
+      chip.textContent = `${res.status} ${res.statusText || ""}`.trim();
+      $("resTime").textContent = `${res.durationMs || 0} ms`;
+      $("resSize").textContent = fmtBytes(res.size);
 
-    // ---------- Mock ----------
-    async function loadMocks() {
+      $("resBody").textContent = bodyText(res) || t("api.res.noBody");
+      $("resHeadersBody").innerHTML = (res.headerList || []).map((pair) => `
+        <tr class="border-b border-slate-100 last:border-0">
+          <td class="w-[32%] break-all px-2 py-1.5 align-top text-slate-500">${esc(pair.key)}</td>
+          <td class="break-all px-2 py-1.5 text-slate-700">${esc(pair.value)}</td>
+        </tr>`).join("");
+      const cookies = res.cookies || [];
+      $("resCookiesBody").innerHTML = cookies.length
+        ? cookies.map((cookie) => {
+          const flags = [cookie.httpOnly ? "HttpOnly" : "", cookie.secure ? "Secure" : ""].filter(Boolean).join(" · ");
+          return `<tr class="border-b border-slate-100 last:border-0">
+            <td class="break-all px-2 py-1.5 text-slate-700">${esc(cookie.name)}</td>
+            <td class="break-all px-2 py-1.5 text-slate-500">${esc(cookie.value)}</td>
+            <td class="break-all px-2 py-1.5 text-slate-500">${esc(cookie.domain || "")}</td>
+            <td class="px-2 py-1.5 text-slate-500">${esc(cookie.path || "")}</td>
+            <td class="px-2 py-1.5 text-slate-400">${esc(cookie.expires || "")}</td>
+            <td class="px-2 py-1.5 text-slate-400">${esc(flags)}</td>
+          </tr>`;
+        }).join("")
+        : `<tr><td colspan="6" class="px-2 py-6 text-center text-slate-400">${esc(t("api.res.noCookies"))}</td></tr>`;
+      $("resHeadersCount").textContent = String((res.headerList || []).length);
+      $("resCookiesCount").textContent = String(cookies.length);
+
+      if (res.finalURL && res.finalURL !== state.lastSentURL) {
+        $("resRedirect").textContent = t("api.res.redirected", { url: res.finalURL });
+        $("resRedirect").classList.remove("hidden");
+      }
+      setResTab(state.resTab);
+    }
+
+    // ---------- 打开请求 ----------
+    function openRequest(req, collectionId) {
+      state.draft = draftFromRequest(req, collectionId);
+      state.active = { collectionId, requestId: req.id };
+      clearDirty();
+      renderDraft();
+      renderSidebar();
+      state.response = null;
+      state.resError = "";
+      renderResponse();
+    }
+
+    function newRequest(collectionId) {
+      state.draft = emptyDraft(collectionId || "");
+      state.active = null;
+      clearDirty();
+      renderDraft();
+      renderSidebar();
+      $("reqUrl").focus();
+    }
+
+    // ---------- 发送请求 ----------
+    async function send() {
+      if (state.sending) return;
+      const d = state.draft;
+      d.url = $("reqUrl").value;
+      d.method = $("reqMethod").value;
+      const url = resolveVars(d.url).trim();
+      if (!url) {
+        toast(t("api.req.urlRequired"));
+        $("reqUrl").focus();
+        return;
+      }
+
+      const payload = {
+        method: d.method,
+        url,
+        params: cleanKV(d.params).map((item) => ({ ...item, value: resolveVars(item.value) })),
+        headers: cleanKV(d.headers).map((item) => ({ ...item, value: resolveVars(item.value) })),
+        auth: {
+          type: d.auth.type,
+          token: resolveVars(d.auth.token),
+          username: d.auth.username,
+          password: d.auth.password,
+          key: d.auth.key,
+          value: resolveVars(d.auth.value),
+          in: d.auth.in,
+        },
+        body: {
+          mode: d.body.mode,
+          raw: resolveVars(d.body.raw),
+          rawType: d.body.rawType,
+          fields: cleanKV(d.body.fields).map((item) => ({ ...item, value: resolveVars(item.value) })),
+        },
+        timeoutMs: Number(d.timeoutMs) || 30000,
+        followRedirects: d.followRedirects !== false,
+      };
+
+      state.sending = true;
+      const btn = $("sendBtn");
+      const label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = t("api.req.sending");
       try {
-        state.mocks = await api("/mocks");
-        renderMocks();
-      } catch (err) {
-        toast(t("api.mock.loadFailed", { error: err.message }));
+        const res = await api("/send", { method: "POST", body: JSON.stringify(payload) });
+        state.response = res;
+        state.resError = "";
+        state.lastSentURL = url;
+        state.resTab = "body";
+        state.ws.history.unshift({
+          id: rid(),
+          method: payload.method,
+          url: d.url,
+          status: res.status,
+          durationMs: res.durationMs,
+          size: res.size,
+          at: new Date().toISOString(),
+        });
+        state.ws.history = state.ws.history.slice(0, 100);
+        persistWorkspace();
+        renderHistory();
+      } catch (error) {
+        state.response = null;
+        state.resError = error.message || String(error);
+        state.resTab = "body";
+      } finally {
+        state.sending = false;
+        btn.disabled = false;
+        btn.textContent = label;
+        renderResponse();
+        if (state.tab === "mock") loadLogs();
       }
+    }
+
+    // ---------- 保存请求 ----------
+    function guessName(url) {
+      const raw = String(url || "").trim();
+      if (!raw) return "";
+      try {
+        const parsed = new URL(resolveVars(raw));
+        const seg = parsed.pathname.split("/").filter(Boolean).pop();
+        return seg || parsed.hostname;
+      } catch (_) {
+        return raw;
+      }
+    }
+
+    function openSaveModal() {
+      if (!state.draft) return;
+      $("saveName").value = state.draft.name || guessName(state.draft.url);
+      $("saveNewCollection").value = "";
+      const sel = $("saveCollection");
+      const collections = state.ws.collections;
+      sel.innerHTML = collections.length
+        ? collections.map((coll) => `<option value="${esc(coll.id)}">${esc(coll.name)}</option>`).join("")
+        : `<option value="">${esc(t("api.req.collectionPlaceholder"))}</option>`;
+      const wanted = collections.some((coll) => coll.id === state.draft.collectionId)
+        ? state.draft.collectionId
+        : (collections[0] ? collections[0].id : "");
+      sel.value = wanted;
+      syncSelectLabel(sel);
+      showModal("saveModal");
+      setTimeout(() => { $("saveName").focus(); $("saveName").select(); }, 20);
+    }
+
+    function applySave() {
+      const name = $("saveName").value.trim();
+      if (!name) {
+        toast(t("api.req.nameRequired"));
+        $("saveName").focus();
+        return;
+      }
+      let collectionId = $("saveCollection").value;
+      const newName = $("saveNewCollection").value.trim();
+      if (newName) {
+        const collection = { id: rid(), name: newName, requests: [] };
+        state.ws.collections.push(collection);
+        collectionId = collection.id;
+      } else if (!collectionId) {
+        if (!state.ws.collections.length) {
+          const collection = { id: rid(), name: t("api.req.defaultCollection"), requests: [] };
+          state.ws.collections.push(collection);
+          collectionId = collection.id;
+        } else {
+          collectionId = state.ws.collections[0].id;
+        }
+      }
+
+      const saved = serializeDraft();
+      saved.name = name;
+      state.ws.collections.forEach((coll) => {
+        if (coll.id !== collectionId) coll.requests = coll.requests.filter((req) => req.id !== saved.id);
+      });
+      const target = state.ws.collections.find((coll) => coll.id === collectionId);
+      if (!target) return;
+      target.requests = target.requests || [];
+      const index = target.requests.findIndex((req) => req.id === saved.id);
+      if (index >= 0) target.requests[index] = saved;
+      else target.requests.push(saved);
+
+      state.draft.id = saved.id;
+      state.draft.name = saved.name;
+      state.draft.collectionId = collectionId;
+      state.active = { collectionId, requestId: saved.id };
+      clearDirty();
+      persistWorkspace();
+      renderSidebar();
+      hideModal("saveModal");
+      toast(t("api.common.saved"));
+    }
+    // ---------- Mock 服务 ----------
+    function mockBaseURL() {
+      return String(state.baseURL || location.origin).replace(/\/+$/, "") + "/mock";
+    }
+
+    function findRule(id) {
+      return state.mocks.find((rule) => rule.id === id) || null;
+    }
+
+    function renderMockHeader() {
+      const on = !!state.ws.mock.enabled;
+      $("mockEnabled").checked = on;
+      const chip = $("mockState");
+      chip.textContent = t(on ? "api.mock.on" : "api.mock.off");
+      chip.className = `chip ${on ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`;
+      $("mockBase").textContent = mockBaseURL();
     }
 
     function renderMocks() {
       const box = $("mockList");
       if (!state.mocks.length) {
-        box.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-white/50 px-4 py-12 text-center text-[11px] text-slate-400">${esc(t("api.mock.empty"))}</div>`;
+        box.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 py-12 text-center text-[11px] text-slate-400">${esc(t("api.mock.empty"))}</div>`;
         return;
       }
-      box.innerHTML = state.mocks.map((rule) => `
-        <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm" data-id="${esc(rule.id)}">
-          <div class="flex items-center gap-2">
-            <span class="rounded-md bg-slate-900 px-1.5 py-0.5 font-mono text-[9.5px] font-semibold text-amber-300">${esc(rule.method)}</span>
-            <code class="font-mono text-[11.5px] text-slate-800">${esc(rule.path)}</code>
-            <span class="text-[10px] text-slate-400">${esc(rule.status)} · ${esc(rule.delayMs || 0)}ms</span>
-            <span class="text-[10px] ${rule.enabled ? "text-emerald-600" : "text-slate-400"}">${esc(rule.enabled ? t("api.common.enabled") : t("api.common.disabled"))}</span>
-            <div class="ml-auto flex items-center gap-1">
-              <label class="flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 px-1.5 py-1 text-[10px] text-slate-500">
-                <input type="checkbox" data-toggle ${rule.enabled ? "checked" : ""} class="rounded border-slate-300" />${esc(t("api.common.enable"))}
+      box.innerHTML = state.mocks.map((rule) => {
+        const query = Object.entries(rule.query || {});
+        const headerCount = Object.keys(rule.headers || {}).length;
+        const queryText = query.map(([key, value]) => value ? `${key}=${value}` : `${key}*`).join(", ");
+        return `<div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm ${rule.enabled === false ? "opacity-60" : ""}">
+          <div class="flex flex-wrap items-center gap-2">
+            ${methodBadge(rule.method)}
+            <code class="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-[10.5px] text-slate-700">${esc(rule.path)}</code>
+            <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-600">${esc(rule.name || t("api.mock.untitled"))}</span>
+            <div class="ml-auto flex flex-none items-center gap-1.5">
+              <label class="switch" title="${esc(t("api.mock.enableRule"))}">
+                <input type="checkbox" data-mock-toggle="${esc(rule.id)}" ${rule.enabled === false ? "" : "checked"} /><span></span>
               </label>
-              <button data-edit class="rounded-md border border-slate-200 px-1.5 py-1 text-[10px] text-slate-500 hover:bg-slate-50">${esc(t("api.common.edit"))}</button>
-              <button data-delete class="rounded-md border border-rose-200 px-1.5 py-1 text-[10px] text-rose-500 hover:bg-rose-50">${esc(t("api.common.delete"))}</button>
+              <button data-mock-try="${esc(rule.id)}" class="btn-ghost">${esc(t("api.mock.try"))}</button>
+              <button data-mock-edit="${esc(rule.id)}" class="btn-ghost">${esc(t("api.common.edit"))}</button>
+              <button data-mock-del="${esc(rule.id)}" class="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500" title="${esc(t("api.common.delete"))}">
+                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
+              </button>
             </div>
           </div>
-          <div class="mt-2 flex items-center gap-2">
-            <span class="text-[10px] text-slate-400">${esc(rule.name || t("api.mock.untitled"))}</span>
-            <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-slate-400">${esc(rule.body || "")}</span>
+          <div class="mt-1.5 flex flex-wrap items-center gap-3 text-[9.5px] text-slate-400">
+            <span>${rule.status || 200}</span>
+            <span>${rule.delayMs || 0} ms</span>
+            ${queryText ? `<span class="truncate">?${esc(queryText)}</span>` : ""}
+            ${headerCount ? `<span>Headers · ${headerCount}</span>` : ""}
+            ${rule.enabled === false ? `<span class="text-amber-600">${esc(t("api.common.disabled"))}</span>` : ""}
           </div>
-        </div>`).join("");
+          <pre class="scroll-thin mt-2 max-h-[92px] overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-[9.5px] leading-relaxed text-slate-500">${esc(String(rule.body || "").slice(0, 600) || t("api.res.noBody"))}</pre>
+        </div>`;
+      }).join("");
+    }
 
-      box.querySelectorAll("[data-id]").forEach((node) => {
-        const rule = state.mocks.find((x) => x.id === node.dataset.id);
-        node.querySelector("[data-toggle]").addEventListener("change", async (event) => {
-          rule.enabled = event.target.checked;
-          try {
-            await api("/mocks", { method: "POST", body: JSON.stringify(state.mocks) });
-            renderMocks();
-          } catch (err) {
-            toast(t("api.mock.updateFailed", { error: err.message }));
-          }
+    function renderLogs() {
+      $("logCount").textContent = String(state.logs.length);
+      const box = $("mockLogs");
+      if (!state.logs.length) {
+        box.innerHTML = `<div class="px-2 py-8 text-center text-[10.5px] text-slate-400">${esc(t("api.mock.logsEmpty"))}</div>`;
+        return;
+      }
+      box.innerHTML = state.logs.map((log) => {
+        let when = log.at || "";
+        const date = new Date(log.at);
+        if (!Number.isNaN(date.getTime())) when = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        return `<div class="rounded-lg border ${log.matched ? "border-slate-200" : "border-rose-200"} bg-white px-2 py-1.5">
+          <div class="flex items-center gap-1.5">
+            <span class="h-1.5 w-1.5 flex-none rounded-full ${log.matched ? "bg-emerald-500" : "bg-rose-400"}"></span>
+            <span class="flex-none font-mono text-[9px] font-semibold text-slate-500">${esc(String(log.method || "").toUpperCase())}</span>
+            <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-slate-700" title="${esc((log.path || "") + (log.query ? "?" + log.query : ""))}">${esc(log.path || "/")}</span>
+            <span class="chip ${statusChipClass(log.status)}">${log.status}</span>
+          </div>
+          <div class="mt-0.5 flex items-center gap-2 pl-3 text-[9px] text-slate-400">
+            <span class="truncate">${esc(log.ruleName || t("api.mock.miss"))}</span>
+            <span class="ml-auto flex-none">${esc(when)}</span>
+          </div>
+          ${log.query ? `<div class="truncate pl-3 font-mono text-[9px] text-slate-400">?${esc(log.query)}</div>` : ""}
+        </div>`;
+      }).join("");
+    }
+
+    async function loadMocks() {
+      try {
+        state.mocks = await api("/mocks");
+        renderMocks();
+      } catch (error) {
+        toast(t("api.mock.loadFailed", { error: error.message }));
+      }
+    }
+
+    async function loadLogs() {
+      try {
+        state.logs = await api("/mock/logs");
+        renderLogs();
+      } catch (_) {}
+    }
+
+    async function saveMocks() {
+      try {
+        const rules = await api("/mocks", { method: "POST", body: JSON.stringify(state.mocks) });
+        state.mocks = Array.isArray(rules) ? rules : [];
+        renderMocks();
+        return true;
+      } catch (error) {
+        toast(t("api.mock.updateFailed", { error: error.message }));
+        return false;
+      }
+    }
+
+    async function toggleMockService(enabled) {
+      state.ws.mock.enabled = enabled;
+      renderMockHeader();
+      try {
+        await api("/workspace", { method: "POST", body: JSON.stringify(state.ws) });
+        toast(t(enabled ? "api.mock.on" : "api.mock.off"));
+      } catch (error) {
+        state.ws.mock.enabled = !enabled;
+        renderMockHeader();
+        toast(t("api.common.saveFailed", { error: error.message }));
+      }
+    }
+
+    function openMockModal(rule, preset) {
+      const editing = !!rule;
+      const source = preset || {};
+      state.mockDraft = {
+        id: editing ? rule.id : "",
+        method: editing ? rule.method : (source.method || "GET"),
+        headers: ensureRows(editing ? entriesToKV(rule.headers) : [{ key: "Content-Type", value: "application/json; charset=utf-8", enabled: true }]),
+        query: editing ? entriesToKV(rule.query) : entriesToKV(source.query),
+      };
+      $("mockTitle").textContent = t(editing ? "api.mock.titleEdit" : "api.mock.titleNew");
+      $("mName").value = editing ? (rule.name || "") : (source.name || `${state.mockDraft.method} ${source.path || "/"}`);
+      $("mMethod").value = state.mockDraft.method;
+      syncSelectLabel($("mMethod"));
+      $("mPath").value = editing ? (rule.path || "/") : (source.path || "/");
+      $("mStatus").value = editing ? (rule.status || 200) : 200;
+      $("mDelay").value = editing ? (rule.delayMs || 0) : 0;
+      $("mEnabled").checked = editing ? rule.enabled !== false : true;
+      $("mBody").value = editing ? (rule.body || "") : (source.body || '{\n  "ok": true\n}');
+      renderKVView(kvViews.mockQueryKV);
+      renderKVView(kvViews.mockHeadersKV);
+      showModal("mockModal");
+      setTimeout(() => $("mName").focus(), 20);
+    }
+
+    function entriesToKV(map) {
+      return Object.entries(map || {}).map(([key, value]) => ({ key, value: String(value ?? ""), enabled: true }));
+    }
+
+    function ensureRows(list) {
+      const rows = Array.isArray(list) ? list : [];
+      if (!rows.length) rows.push({ key: "", value: "", enabled: true });
+      return rows;
+    }
+
+    function kvToMap(list, keepEmptyValue) {
+      const map = {};
+      (list || []).forEach((item) => {
+        const key = String(item.key || "").trim();
+        if (!key) return;
+        const value = String(item.value || "");
+        if (!keepEmptyValue && !value) map[key] = "";
+        else map[key] = value;
+      });
+      return map;
+    }
+
+    async function saveMockRule() {
+      const d = state.mockDraft;
+      if (!d) return;
+      let name = $("mName").value.trim();
+      let path = $("mPath").value.trim();
+      if (!path) path = "/";
+      if (!path.startsWith("/")) path = "/" + path;
+      if (!name) name = path;
+      let status = Number($("mStatus").value) || 200;
+      let delay = Number($("mDelay").value) || 0;
+      status = Math.max(100, Math.min(599, status));
+      delay = Math.max(0, Math.min(10000, delay));
+      const rule = {
+        id: d.id || rid(),
+        name,
+        method: $("mMethod").value || "GET",
+        path,
+        status,
+        delayMs: delay,
+        headers: kvToMap(d.headers, false),
+        query: kvToMap(d.query, true),
+        body: $("mBody").value,
+        enabled: $("mEnabled").checked,
+      };
+      const index = state.mocks.findIndex((item) => item.id === rule.id);
+      if (index >= 0) state.mocks[index] = rule;
+      else state.mocks.unshift(rule);
+      if (!(await saveMocks())) return;
+      hideModal("mockModal");
+      toast(t("api.mock.saved"));
+    }
+
+    function mockFromDraft() {
+      const raw = (($("reqUrl") && $("reqUrl").value) || (state.draft && state.draft.url) || "").trim();
+      if (!raw) {
+        toast(t("api.mock.urlRequired"));
+        return;
+      }
+      let path = "/";
+      let query = {};
+      let method = (state.draft && state.draft.method) || "GET";
+      try {
+        const parsed = new URL(resolveVars(raw));
+        path = parsed.pathname || "/";
+        parsed.searchParams.forEach((value, key) => { query[key] = value; });
+      } catch (_) {
+        const plain = raw.split("?")[0];
+        path = plain.startsWith("/") ? plain : "/" + plain.replace(/^https?:\/\/[^/]+/i, "");
+      }
+      let body = '{\n  "ok": true\n}';
+      if (state.response && state.response.body) {
+        try { body = JSON.stringify(JSON.parse(state.response.body), null, 2); } catch (_) {}
+        if (state.response.status) method = state.draft.method;
+      }
+      openMockModal(null, { path, query, method, body, name: `${method} ${path}` });
+    }
+
+    // ---------- 环境管理 ----------
+    function selectedEnv() {
+      const draft = state.envDraft;
+      if (!draft) return null;
+      return draft.list.find((env) => env.id === draft.selectedId) || null;
+    }
+
+    function renderEnvModal() {
+      const draft = state.envDraft;
+      if (!draft) return;
+      $("envList").innerHTML = draft.list.length
+        ? draft.list.map((env) => `<button data-env-id="${esc(env.id)}" class="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left ${env.id === draft.selectedId ? "bg-amber-50 text-amber-800" : "text-slate-600 hover:bg-slate-50"}">
+            <span class="h-1.5 w-1.5 flex-none rounded-full ${env.id === draft.activeId ? "bg-emerald-500" : "bg-slate-300"}"></span>
+            <span class="min-w-0 flex-1 truncate text-[11px] font-medium">${esc(env.name)}</span>
+            <span class="text-[9px] text-slate-400">${(env.variables || []).length}</span>
+          </button>`).join("")
+        : `<div class="px-1 py-5 text-center text-[10px] text-slate-400">${esc(t("api.env.empty"))}</div>`;
+
+      const env = selectedEnv();
+      $("envName").value = env ? env.name : "";
+      $("envName").disabled = !env;
+      $("envDeleteBtn").disabled = !env;
+      if (env) {
+        renderKVView(kvViews.envVars);
+      } else {
+        $("envVars").innerHTML = `<div class="kv-empty">${esc(t("api.env.empty"))}</div>`;
+      }
+    }
+
+    function openEnvModal() {
+      state.envDraft = {
+        list: (state.ws.environments || []).map((env) => ({
+          id: env.id,
+          name: env.name,
+          variables: (env.variables || []).map((item) => ({ key: item.key, value: item.value, enabled: item.enabled !== false })),
+        })),
+        activeId: state.ws.activeEnvironment || "",
+        selectedId: state.ws.activeEnvironment || (state.ws.environments[0] ? state.ws.environments[0].id : ""),
+      };
+      renderEnvModal();
+      showModal("envModal");
+    }
+
+    function addEnv() {
+      const draft = state.envDraft;
+      if (!draft) return;
+      const env = {
+        id: rid(),
+        name: `${t("api.env.new")} ${draft.list.length + 1}`,
+        variables: [{ key: "", value: "", enabled: true }],
+      };
+      draft.list.push(env);
+      draft.selectedId = env.id;
+      renderEnvModal();
+      $("envName").focus();
+      $("envName").select();
+    }
+
+    async function deleteEnv() {
+      const draft = state.envDraft;
+      const env = selectedEnv();
+      if (!draft || !env) return;
+      const ok = await askConfirm("api.env.delete", "api.env.confirmDelete", { name: env.name });
+      if (!ok) return;
+      draft.list = draft.list.filter((item) => item.id !== env.id);
+      if (draft.activeId === env.id) draft.activeId = "";
+      draft.selectedId = draft.list[0] ? draft.list[0].id : "";
+      renderEnvModal();
+    }
+
+    function applyEnvSave() {
+      const draft = state.envDraft;
+      if (!draft) return;
+      for (const env of draft.list) {
+        env.name = String(env.name || "").trim();
+        if (!env.name) {
+          toast(t("api.env.nameRequired"));
+          draft.selectedId = env.id;
+          renderEnvModal();
+          $("envName").focus();
+          return;
+        }
+      }
+      state.ws.environments = draft.list;
+      state.ws.activeEnvironment = draft.list.some((env) => env.id === draft.activeId) ? draft.activeId : "";
+      persistWorkspace();
+      renderEnvSelect();
+      hideModal("envModal");
+      toast(t("api.env.saved"));
+    }
+    // ---------- 交互 ----------
+    function setTab(tab) {
+      state.tab = tab;
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        const on = btn.dataset.tab === tab;
+        btn.className = on
+          ? "tab-btn rounded-lg bg-slate-900 px-3 py-1.5 text-[11.5px] font-medium text-white"
+          : "tab-btn rounded-lg px-3 py-1.5 text-[11.5px] font-medium text-slate-500 hover:bg-slate-100";
+      });
+      $("tabDebug").classList.toggle("hidden", tab !== "debug");
+      $("tabMock").classList.toggle("hidden", tab !== "mock");
+      closeSelectMenu();
+      if (tab === "mock") {
+        renderMockHeader();
+        loadMocks();
+        loadLogs();
+      }
+    }
+
+    async function copyText(text, successKey) {
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        toast(t(successKey));
+      } catch (_) {
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.style.position = "fixed";
+        area.style.opacity = "0";
+        document.body.appendChild(area);
+        area.select();
+        try { document.execCommand("copy"); toast(t(successKey)); } catch (_) {}
+        area.remove();
+      }
+    }
+
+    async function createCollection() {
+      const name = await askText("api.side.newCollection", "api.side.collectionName", "");
+      if (name === null) return;
+      const trimmed = String(name).trim();
+      if (!trimmed) return;
+      const collection = { id: rid(), name: trimmed, requests: [] };
+      state.ws.collections.push(collection);
+      state.collapsed[collection.id] = false;
+      persistWorkspace();
+      renderSidebar();
+    }
+
+    function syncParamsFromUrl() {
+      const raw = ($("reqUrl").value || "").trim();
+      try {
+        const parsed = new URL(resolveVars(raw));
+        const list = [];
+        parsed.searchParams.forEach((value, key) => list.push({ key, value, enabled: true }));
+        const count = list.length;
+        if (!list.length) list.push({ key: "", value: "", enabled: true });
+        state.draft.params = list;
+        renderKVView(kvViews.paramsKV);
+        updateCounts();
+        markDirty();
+        toast(t("api.req.synced", { count }));
+      } catch (_) {
+        toast(t("api.req.urlInvalid"));
+      }
+    }
+
+    async function removeRequest(collection, requestId) {
+      const request = collection.requests.find((item) => item.id === requestId);
+      const ok = await askConfirm("api.common.delete", "api.side.confirmDeleteRequest", { name: request ? (request.name || request.url) : "" });
+      if (!ok) return;
+      collection.requests = collection.requests.filter((item) => item.id !== requestId);
+      if (state.active && state.active.requestId === requestId) state.active = null;
+      persistWorkspace();
+      renderSidebar();
+    }
+
+    async function onCollectionClick(event) {
+      const row = event.target.closest("[data-coll]");
+      if (!row) return;
+      const collection = state.ws.collections.find((item) => item.id === row.dataset.coll);
+      if (!collection) return;
+
+      const delBtn = event.target.closest("[data-req-del]");
+      if (delBtn) {
+        event.stopPropagation();
+        const reqRow = delBtn.closest("[data-open-request]");
+        await removeRequest(collection, reqRow.dataset.reqId);
+        return;
+      }
+
+      const openRow = event.target.closest("[data-open-request]");
+      if (openRow) {
+        const request = collection.requests.find((item) => item.id === openRow.dataset.reqId);
+        if (request) openRequest(request, collection.id);
+        return;
+      }
+
+      if (event.target.closest("[data-coll-toggle]") || event.target.closest("[data-coll-select]")) {
+        state.collapsed[collection.id] = !state.collapsed[collection.id];
+        renderSidebar();
+        return;
+      }
+      if (event.target.closest("[data-coll-add]")) {
+        state.collapsed[collection.id] = false;
+        newRequest(collection.id);
+        renderSidebar();
+        return;
+      }
+      const renameBtn = event.target.closest("[data-coll-rename]");
+      if (renameBtn) {
+        const name = await askText("api.side.rename", "api.side.collectionName", collection.name);
+        if (name === null) return;
+        const trimmed = String(name).trim();
+        if (!trimmed) return;
+        collection.name = trimmed;
+        persistWorkspace();
+        renderSidebar();
+        return;
+      }
+      if (event.target.closest("[data-coll-del]")) {
+        const ok = await askConfirm("api.side.deleteCollection", "api.side.confirmDeleteCollection", { name: collection.name });
+        if (!ok) return;
+        state.ws.collections = state.ws.collections.filter((item) => item.id !== collection.id);
+        if (state.active && state.active.collectionId === collection.id) state.active = null;
+        persistWorkspace();
+        renderSidebar();
+      }
+    }
+
+    function onHistoryClick(event) {
+      const btn = event.target.closest("[data-history]");
+      if (!btn) return;
+      const item = state.ws.history.find((entry) => entry.id === btn.dataset.history);
+      if (!item) return;
+      state.draft = emptyDraft();
+      state.draft.method = item.method || "GET";
+      state.draft.url = item.url || "";
+      state.active = null;
+      clearDirty();
+      renderDraft();
+      renderSidebar();
+    }
+
+    function tryMock(rule) {
+      if (!rule) return;
+      state.draft = emptyDraft();
+      state.draft.method = rule.method === "ANY" ? "GET" : (rule.method || "GET");
+      const path = String(rule.path || "/").replace(/:\w+/g, "1").replace(/\*/g, "example");
+      const params = new URLSearchParams();
+      Object.entries(rule.query || {}).forEach(([key, value]) => params.append(key, value || "1"));
+      state.draft.url = mockBaseURL() + (path.startsWith("/") ? path : "/" + path) + (params.toString() ? "?" + params.toString() : "");
+      state.active = null;
+      clearDirty();
+      setTab("debug");
+      renderDraft();
+      send();
+    }
+
+    function bindEvents() {
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => setTab(btn.dataset.tab));
+      });
+
+      document.querySelectorAll(".side-tab").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.sideTab = btn.dataset.side;
+          document.querySelectorAll(".side-tab").forEach((item) => {
+            item.classList.toggle("is-active", item === btn);
+          });
+          renderSidebar();
         });
-        node.querySelector("[data-edit]").addEventListener("click", () => openMockModal(rule));
-        node.querySelector("[data-delete]").addEventListener("click", async () => {
-          if (!confirm(t("api.mock.confirmDelete", { name: rule.name }))) return;
-          try {
-            await api(`/mocks/${encodeURIComponent(rule.id)}`, { method: "DELETE" });
-            await loadMocks();
-            toast(t("api.mock.deleted"));
-          } catch (err) {
-            toast(t("api.mock.deleteFailed", { error: err.message }));
-          }
+      });
+
+      $("newCollectionBtn").addEventListener("click", createCollection);
+      $("sideCollectionsPane").addEventListener("click", onCollectionClick);
+      $("sideHistoryPane").addEventListener("click", onHistoryClick);
+
+      $("reqMethod").addEventListener("change", () => {
+        state.draft.method = $("reqMethod").value;
+        markDirty();
+      });
+      $("reqUrl").addEventListener("input", () => {
+        state.draft.url = $("reqUrl").value;
+        updateUrlPreview();
+        markDirty();
+      });
+      $("sendBtn").addEventListener("click", send);
+      $("saveReqBtn").addEventListener("click", openSaveModal);
+      $("mockFromReqBtn").addEventListener("click", mockFromDraft);
+      $("syncUrlBtn").addEventListener("click", syncParamsFromUrl);
+
+      document.querySelectorAll("#reqTabs [data-req-tab]").forEach((btn) => {
+        btn.addEventListener("click", () => setReqTab(btn.dataset.reqTab));
+      });
+      $("authType").addEventListener("change", () => {
+        state.draft.auth.type = $("authType").value;
+        renderAuthFields();
+        updateCounts();
+        markDirty();
+      });
+      $("rawType").addEventListener("change", () => {
+        state.draft.body.rawType = $("rawType").value;
+        markDirty();
+      });
+      $("bodyRaw").addEventListener("input", () => {
+        state.draft.body.raw = $("bodyRaw").value;
+        updateCounts();
+        markDirty();
+      });
+      document.querySelectorAll("[data-body-mode]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.draft.body.mode = btn.dataset.bodyMode;
+          renderBodyMode();
+          updateCounts();
+          markDirty();
+        });
+      });
+      $("reqTimeout").addEventListener("input", () => {
+        state.draft.timeoutMs = Number($("reqTimeout").value) || 30000;
+        markDirty();
+      });
+      $("reqFollow").addEventListener("change", () => {
+        state.draft.followRedirects = $("reqFollow").checked;
+        markDirty();
+      });
+
+      document.querySelectorAll("#resTabs [data-res-tab]").forEach((btn) => {
+        btn.addEventListener("click", () => setResTab(btn.dataset.resTab));
+      });
+      $("resPrettyBtn").addEventListener("click", () => {
+        state.resPretty = !state.resPretty;
+        $("resPrettyBtn").classList.toggle("is-active", state.resPretty);
+        if (state.response) $("resBody").textContent = bodyText(state.response) || t("api.res.noBody");
+      });
+      $("copyResBtn").addEventListener("click", () => {
+        if (state.response) copyText(state.response.body || "", "api.res.copied");
+      });
+
+      $("envSelect").addEventListener("change", () => {
+        state.ws.activeEnvironment = $("envSelect").value;
+        persistWorkspace();
+        updateUrlPreview();
+      });
+      $("envManageBtn").addEventListener("click", openEnvModal);
+
+      $("mockEnabled").addEventListener("change", () => toggleMockService($("mockEnabled").checked));
+      $("copyMockBtn").addEventListener("click", () => copyText(mockBaseURL(), "api.mock.copyBase"));
+      $("newMockBtn").addEventListener("click", () => openMockModal(null));
+      $("fromRequestBtn").addEventListener("click", mockFromDraft);
+      $("clearLogsBtn").addEventListener("click", async () => {
+        try {
+          await api("/mock/logs", { method: "DELETE" });
+          state.logs = [];
+          renderLogs();
+        } catch (error) {
+          toast(t("api.common.saveFailed", { error: error.message }));
+        }
+      });
+
+      $("mockList").addEventListener("click", async (event) => {
+        const tryBtn = event.target.closest("[data-mock-try]");
+        if (tryBtn) {
+          tryMock(findRule(tryBtn.dataset.mockTry));
+          return;
+        }
+        const editBtn = event.target.closest("[data-mock-edit]");
+        if (editBtn) {
+          openMockModal(findRule(editBtn.dataset.mockEdit));
+          return;
+        }
+        const delBtn = event.target.closest("[data-mock-del]");
+        if (delBtn) {
+          const rule = findRule(delBtn.dataset.mockDel);
+          if (!rule) return;
+          const ok = await askConfirm("api.common.delete", "api.mock.confirmDelete", { name: rule.name });
+          if (!ok) return;
+          state.mocks = state.mocks.filter((item) => item.id !== rule.id);
+          if (await saveMocks()) toast(t("api.mock.deleted"));
+        }
+      });
+      $("mockList").addEventListener("change", (event) => {
+        const toggle = event.target.closest("[data-mock-toggle]");
+        if (!toggle) return;
+        const rule = findRule(toggle.dataset.mockToggle);
+        if (!rule) return;
+        rule.enabled = toggle.checked;
+        saveMocks();
+      });
+
+      // 弹窗按钮
+      $("textCancel").addEventListener("click", () => closeText(null));
+      $("textOk").addEventListener("click", () => closeText($("textInput").value));
+      $("textInput").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          closeText($("textInput").value);
+        }
+      });
+      $("confirmCancel").addEventListener("click", () => closeConfirm(false));
+      $("confirmOk").addEventListener("click", () => closeConfirm(true));
+
+      $("saveClose").addEventListener("click", () => hideModal("saveModal"));
+      $("saveCancel").addEventListener("click", () => hideModal("saveModal"));
+      $("saveOk").addEventListener("click", applySave);
+      $("saveName").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          applySave();
+        }
+      });
+
+      $("mockClose").addEventListener("click", () => hideModal("mockModal"));
+      $("mockCancel").addEventListener("click", () => hideModal("mockModal"));
+      $("mockSave").addEventListener("click", saveMockRule);
+
+      $("envClose").addEventListener("click", () => hideModal("envModal"));
+      $("envCancel").addEventListener("click", () => hideModal("envModal"));
+      $("envSave").addEventListener("click", applyEnvSave);
+      $("envNewBtn").addEventListener("click", addEnv);
+      $("envDeleteBtn").addEventListener("click", deleteEnv);
+      $("envList").addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-env-id]");
+        if (!btn || !state.envDraft) return;
+        state.envDraft.selectedId = btn.dataset.envId;
+        renderEnvModal();
+      });
+      $("envName").addEventListener("input", () => {
+        const env = selectedEnv();
+        if (!env) return;
+        env.name = $("envName").value;
+        const label = $("envList").querySelector(`[data-env-id="${env.id}"] .truncate`);
+        if (label) label.textContent = env.name;
+      });
+
+      // 点击遮罩关闭
+      const backdrop = (id, close) => {
+        $(id).addEventListener("click", (event) => {
+          if (event.target === $(id)) close();
+        });
+      };
+      backdrop("textModal", () => closeText(null));
+      backdrop("confirmModal", () => closeConfirm(false));
+      backdrop("saveModal", () => hideModal("saveModal"));
+      backdrop("mockModal", () => hideModal("mockModal"));
+      backdrop("envModal", () => hideModal("envModal"));
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (!$("textModal").classList.contains("hidden")) { closeText(null); return; }
+        if (!$("confirmModal").classList.contains("hidden")) { closeConfirm(false); return; }
+        if (!$("mockModal").classList.contains("hidden")) { hideModal("mockModal"); return; }
+        if (!$("saveModal").classList.contains("hidden")) { hideModal("saveModal"); return; }
+        if (!$("envModal").classList.contains("hidden")) { hideModal("envModal"); }
+      });
+
+      document.addEventListener("devos:locale-changed", () => {
+        renderEnvSelect();
+        renderSidebar();
+        renderMockHeader();
+        renderMocks();
+        renderLogs();
+        if (state.draft) renderDraft();
+        renderResponse();
+        if (state.envDraft) renderEnvModal();
+        if (state.mockDraft) {
+          $("mockTitle").textContent = t(state.mockDraft.id ? "api.mock.titleEdit" : "api.mock.titleNew");
+        }
+        $("resPrettyBtn").classList.toggle("is-active", state.resPretty);
+        ["envSelect", "reqMethod", "authType", "rawType", "saveCollection", "mMethod"].forEach((id) => {
+          const el = $(id);
+          if (el) syncSelectLabel(el);
         });
       });
     }
 
-    function openMockModal(rule) {
-      $("mockModal").classList.remove("hidden");
-      $("mockModal").classList.add("flex");
-      $("mockError").classList.add("hidden");
-      $("mockTitle").textContent = t(rule ? "api.mock.titleEdit" : "api.mock.titleNew");
-      $("mId").value = rule ? rule.id : "";
-      $("mName").value = rule ? rule.name : "";
-      $("mMethod").value = rule ? rule.method : "GET";
-      $("mPath").value = rule ? rule.path : "/";
-      $("mStatus").value = rule ? rule.status : 200;
-      $("mDelay").value = rule ? rule.delayMs || 0 : 0;
-      $("mEnabled").checked = rule ? rule.enabled : true;
-      $("mHeaders").value = headersToText(rule ? rule.headers : { "Content-Type": "application/json; charset=utf-8" });
-      $("mBody").value = rule ? rule.body : '{"ok":true}';
-    }
-
-    function closeMockModal() {
-      $("mockModal").classList.add("hidden");
-      $("mockModal").classList.remove("flex");
-    }
-
-    $("newMockBtn").addEventListener("click", () => openMockModal(null));
-    $("closeMockModal").addEventListener("click", closeMockModal);
-    $("cancelMock").addEventListener("click", closeMockModal);
-
-    $("mockForm").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const rule = {
-        id: $("mId").value,
-        name: $("mName").value.trim(),
-        method: $("mMethod").value,
-        path: $("mPath").value.trim(),
-        status: parseInt($("mStatus").value, 10) || 200,
-        delayMs: parseInt($("mDelay").value, 10) || 0,
-        headers: parseHeaders($("mHeaders").value),
-        body: $("mBody").value,
-        enabled: $("mEnabled").checked,
-      };
-      const next = [...state.mocks];
-      const idx = next.findIndex((x) => x.id === rule.id);
-      if (idx >= 0) next[idx] = rule;
-      else next.push(rule);
-      try {
-        await api("/mocks", { method: "POST", body: JSON.stringify(next) });
-        closeMockModal();
-        await loadMocks();
-        toast(t("api.mock.saved"));
-      } catch (err) {
-        $("mockError").textContent = err.message;
-        $("mockError").classList.remove("hidden");
-      }
-    });
-
-    $("copyMockBtn").addEventListener("click", async () => {
-      await navigator.clipboard.writeText(state.baseURL + "/mock");
-      toast(t("api.mock.copyBase"));
-    });
-
+    // ---------- 初始化 ----------
     async function init() {
-      loadSaved();
-      $("method").value = "GET";
-      $("url").value = "https://httpbin.org/get";
+      state.draft = emptyDraft();
+      setupKV("paramsKV", () => state.draft.params);
+      setupKV("headersKV", () => state.draft.headers);
+      setupKV("bodyFieldsKV", () => state.draft.body.fields);
+      setupKV("mockQueryKV", () => (state.mockDraft ? state.mockDraft.query : []));
+      setupKV("mockHeadersKV", () => (state.mockDraft ? state.mockDraft.headers : []));
+      setupKV("envVars", () => {
+        const env = selectedEnv();
+        return env ? env.variables : [];
+      });
+
+      initSelects();
+      bindEvents();
+      I18N.apply(document);
+
       try {
-        const sys = await fetch("/api/system").then((r) => r.json());
-        state.baseURL = sys.baseURL;
-        $("mockBase").textContent = sys.baseURL + "/mock";
-        $("mockHint").textContent = `${sys.baseURL}/mock`;
-        $("mockHint").classList.remove("hidden");
+        const resp = await fetch("/api/system");
+        if (resp.ok) {
+          const sys = await resp.json();
+          if (sys && sys.baseURL) state.baseURL = sys.baseURL;
+        }
       } catch (_) {}
+      if (!state.baseURL) state.baseURL = location.origin;
+
+      try {
+        state.ws = normalizeWorkspace(await api("/workspace"));
+      } catch (error) {
+        toast(error.message);
+      }
+
+      renderEnvSelect();
+      renderSidebar();
+      const firstCollection = state.ws.collections.find((coll) => (coll.requests || []).length);
+      if (firstCollection) openRequest(firstCollection.requests[0], firstCollection.id);
+      else newRequest();
+
+      renderMockHeader();
+      $("resPrettyBtn").classList.add("is-active");
+      setTab("debug");
       loadMocks();
+      loadLogs();
+      setInterval(() => {
+        if (state.tab === "mock") loadLogs();
+      }, 6000);
     }
 
     init();
   </script>
 </body>
 </html>
+
