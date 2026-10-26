@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +38,8 @@ func (k *Kernel) registerSecurityRoutes(app *fiber.App) {
 	api.Post("/password", k.handleSecurityPassword)
 	api.Post("/settings", k.handleSecuritySettings)
 	api.Post("/wallpaper", k.handleWallpaperUpload)
+	api.Get("/wallpapers", k.handleWallpaperList)
+	api.Post("/wallpaper/delete", k.handleWallpaperDelete)
 	api.Get("/wallpaper/file/:name", k.handleWallpaperFile)
 }
 
@@ -156,7 +159,13 @@ func (k *Kernel) handleSecuritySettings(c *fiber.Ctx) error {
 	if in.Wallpaper != nil {
 		wallpaper := *in.Wallpaper
 		if wallpaper.Kind == security.WallpaperCustom {
-			return fiber.NewError(fiber.StatusBadRequest, "自定义壁纸请通过上传接口设置")
+			// 只允许切换到已存在的自定义壁纸文件。
+			if !wallpaperFileRe.MatchString(wallpaper.File) {
+				return fiber.NewError(fiber.StatusBadRequest, "自定义壁纸不存在")
+			}
+			if _, err := os.Stat(filepath.Join(k.wallpaperDir, wallpaper.File)); err != nil {
+				return fiber.NewError(fiber.StatusBadRequest, "自定义壁纸不存在")
+			}
 		}
 		if err := k.sec.SetWallpaper(wallpaper); err != nil {
 			return fiber.NewError(fiber.StatusBadRequest, err.Error())
@@ -214,19 +223,100 @@ func (k *Kernel) handleWallpaperUpload(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, "保存壁纸失败")
 	}
 
-	previous := k.sec.Wallpaper()
-	if previous.Kind == security.WallpaperCustom && previous.File != "" && previous.File != name {
-		_ = os.Remove(filepath.Join(k.wallpaperDir, filepath.Base(previous.File)))
-	}
+	// 上传的自定义壁纸全部保留在壁纸库中，可随时切换或删除。
 	wallpaper := security.Wallpaper{Kind: security.WallpaperCustom, File: name}
 	if err := k.sec.SetWallpaper(wallpaper); err != nil {
 		_ = os.Remove(filepath.Join(k.wallpaperDir, name))
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(fiber.Map{
-		"ok":        true,
-		"wallpaper": wallpaper,
-		"url":       "/api/security/wallpaper/file/" + name,
+		"ok":         true,
+		"wallpaper":  wallpaper,
+		"url":        "/api/security/wallpaper/file/" + name,
+		"wallpapers": k.customWallpapers(),
+	})
+}
+
+// wallpaperItem 是壁纸库中的一张自定义壁纸。
+type wallpaperItem struct {
+	File    string `json:"file"`
+	URL     string `json:"url"`
+	Size    int64  `json:"size"`
+	ModTime string `json:"modTime"`
+}
+
+// customWallpapers 列出壁纸目录下的自定义壁纸，按上传时间倒序。
+func (k *Kernel) customWallpapers() []wallpaperItem {
+	items := []wallpaperItem{}
+	entries, err := os.ReadDir(k.wallpaperDir)
+	if err != nil {
+		return items
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !wallpaperFileRe.MatchString(name) {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		items = append(items, wallpaperItem{
+			File:    name,
+			URL:     "/api/security/wallpaper/file/" + name,
+			Size:    info.Size(),
+			ModTime: info.ModTime().Format(time.RFC3339),
+		})
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].ModTime > items[j].ModTime })
+	return items
+}
+
+func (k *Kernel) handleWallpaperList(c *fiber.Ctx) error {
+	if err := k.verifyRequestOrigin(c); err != nil {
+		return err
+	}
+	c.Set("Cache-Control", "no-store")
+	return c.JSON(fiber.Map{
+		"wallpapers": k.customWallpapers(),
+		"wallpaper":  k.sec.Wallpaper(),
+	})
+}
+
+// handleWallpaperDelete 删除壁纸库中的一张自定义壁纸。
+// 若删除的正是当前壁纸，则回退到默认预设。
+func (k *Kernel) handleWallpaperDelete(c *fiber.Ctx) error {
+	if err := k.verifyRequestOrigin(c); err != nil {
+		return err
+	}
+	var in struct {
+		File string `json:"file"`
+	}
+	if err := c.BodyParser(&in); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "参数解析失败")
+	}
+	name := filepath.Base(strings.TrimSpace(in.File))
+	if !wallpaperFileRe.MatchString(name) {
+		return fiber.NewError(fiber.StatusNotFound, "壁纸不存在")
+	}
+	target := filepath.Join(k.wallpaperDir, name)
+	if _, err := os.Stat(target); err != nil {
+		return fiber.NewError(fiber.StatusNotFound, "壁纸不存在")
+	}
+	if err := os.Remove(target); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "删除壁纸失败")
+	}
+	current := k.sec.Wallpaper()
+	if current.Kind == security.WallpaperCustom && current.File == name {
+		fallback := security.Wallpaper{Kind: security.WallpaperPreset, Preset: security.DefaultPreset}
+		if err := k.sec.SetWallpaper(fallback); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		}
+	}
+	return c.JSON(fiber.Map{
+		"ok":         true,
+		"wallpapers": k.customWallpapers(),
+		"wallpaper":  k.sec.Wallpaper(),
 	})
 }
 

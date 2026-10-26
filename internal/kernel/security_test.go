@@ -343,7 +343,7 @@ func TestWallpaperUploadAndServing(t *testing.T) {
 		t.Fatalf("上传结果不完整: %s", res.Body)
 	}
 
-	// 第二次上传应清理旧的壁纸文件。
+	// 第二次上传应保留旧壁纸并生成新文件名，两张都可切换。
 	second := uploadWallpaper(t, k, cookies, "bg2.png", pngFixture(t))
 	if second.Code != fiber.StatusOK {
 		t.Fatalf("第二次上传失败: %d", second.Code)
@@ -359,8 +359,8 @@ func TestWallpaperUploadAndServing(t *testing.T) {
 		t.Fatal("第二次上传应生成新文件名")
 	}
 	old := request(t, k, "GET", out.URL, "", nil, nil)
-	if old.Code != fiber.StatusNotFound {
-		t.Fatalf("旧壁纸文件应被删除，实际 %d", old.Code)
+	if old.Code != fiber.StatusOK {
+		t.Fatalf("旧壁纸应保留在壁纸库中，实际 %d", old.Code)
 	}
 
 	served := request(t, k, "GET", out2.URL, "", nil, nil)
@@ -372,5 +372,65 @@ func TestWallpaperUploadAndServing(t *testing.T) {
 		if res := request(t, k, "GET", bad, "", nil, nil); res.Code != fiber.StatusNotFound {
 			t.Fatalf("非法壁纸路径 %s 应返回 404，实际 %d", bad, res.Code)
 		}
+	}
+
+	// 壁纸库应同时列出两张自定义壁纸。
+	list := request(t, k, "GET", "/api/security/wallpapers", "", cookies, devosHeaders(nil))
+	if list.Code != fiber.StatusOK {
+		t.Fatalf("壁纸列表失败: %d", list.Code)
+	}
+	var lib struct {
+		Wallpapers []struct {
+			File string `json:"file"`
+		} `json:"wallpapers"`
+	}
+	if err := json.Unmarshal(list.Body, &lib); err != nil {
+		t.Fatalf("解析壁纸列表: %v", err)
+	}
+	if len(lib.Wallpapers) != 2 {
+		t.Fatalf("壁纸库应有 2 张，实际 %d", len(lib.Wallpapers))
+	}
+
+	// 切换到较早上传的那张。
+	switchBody := `{"wallpaper":{"kind":"custom","file":"` + out.Wallpaper.File + `"}}`
+	sw := request(t, k, "POST", "/api/security/settings", switchBody, cookies, devosHeaders(nil))
+	if sw.Code != fiber.StatusOK {
+		t.Fatalf("切换自定义壁纸失败: %d %s", sw.Code, sw.Body)
+	}
+	var swOut struct {
+		Wallpaper struct {
+			Kind string `json:"kind"`
+			File string `json:"file"`
+		} `json:"wallpaper"`
+	}
+	_ = json.Unmarshal(sw.Body, &swOut)
+	if swOut.Wallpaper.Kind != "custom" || swOut.Wallpaper.File != out.Wallpaper.File {
+		t.Fatalf("切换后当前壁纸不正确: %s", sw.Body)
+	}
+
+	// 删除当前自定义壁纸后应回退到默认预设。
+	del := request(t, k, "POST", "/api/security/wallpaper/delete",
+		`{"file":"`+out.Wallpaper.File+`"}`, cookies, devosHeaders(nil))
+	if del.Code != fiber.StatusOK {
+		t.Fatalf("删除壁纸失败: %d %s", del.Code, del.Body)
+	}
+	var delOut struct {
+		Wallpapers []struct {
+			File string `json:"file"`
+		} `json:"wallpapers"`
+		Wallpaper struct {
+			Kind   string `json:"kind"`
+			Preset string `json:"preset"`
+		} `json:"wallpaper"`
+	}
+	_ = json.Unmarshal(del.Body, &delOut)
+	if len(delOut.Wallpapers) != 1 {
+		t.Fatalf("删除后应剩 1 张，实际 %d", len(delOut.Wallpapers))
+	}
+	if delOut.Wallpaper.Kind != "preset" || delOut.Wallpaper.Preset == "" {
+		t.Fatalf("删除当前壁纸后应回退到预设: %s", del.Body)
+	}
+	if res := request(t, k, "GET", out.URL, "", nil, nil); res.Code != fiber.StatusNotFound {
+		t.Fatalf("已删除的壁纸应返回 404，实际 %d", res.Code)
 	}
 }

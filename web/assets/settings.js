@@ -13,6 +13,7 @@
 
   var overlay = null;
   var status = null;
+  var customs = [];
   var tab = "appearance";
   var busy = false;
 
@@ -52,9 +53,12 @@
     }
   }
 
-  function wallpaperURL(wallpaper) {
-    if (!wallpaper || wallpaper.kind !== "custom" || !wallpaper.file) return "";
-    return "/api/security/wallpaper/file/" + encodeURIComponent(wallpaper.file);
+  // 自定义壁纸以“月-日 时:分”作为角标，便于区分多张上传图片。
+  function wallpaperStamp(iso) {
+    var date = new Date(iso);
+    if (isNaN(date.getTime())) return "";
+    var pad = function (value) { return (value < 10 ? "0" : "") + value; };
+    return pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + " " + pad(date.getHours()) + ":" + pad(date.getMinutes());
   }
 
   function ensureOverlay() {
@@ -76,19 +80,26 @@
       return '<button type="button" class="wallpaper-item ' + preset.swatch + active + '" data-preset="' + preset.id + '">' +
         '<span class="wallpaper-name">' + esc(t("settings.wallpaper.preset." + preset.id)) + "</span></button>";
     }).join("");
-    var preview = customActive
-      ? '<img src="' + esc(wallpaperURL(current)) + '" alt="" />'
-      : '<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 17 4.5-4.5 3 3L16 12l3.5 5"/></svg>';
+    // 自定义壁纸与内置壁纸同网格展示：点击切换，右上角按钮删除。
+    var customTiles = customs.map(function (item) {
+      var active = customActive && current.file === item.file ? " is-active" : "";
+      return '<div class="wallpaper-item is-custom' + active + '" data-file="' + esc(item.file) + '"' +
+        ' style="background-image:url(' + esc(item.url) + ')">' +
+        '<button type="button" class="wallpaper-pick" data-custom-file="' + esc(item.file) + '" data-i18n-title="settings.wallpaper.switch">' +
+        '<span class="wallpaper-name">' + esc(wallpaperStamp(item.modTime)) + "</span></button>" +
+        '<button type="button" class="wallpaper-delete" data-custom-delete="' + esc(item.file) + '" data-i18n-title="settings.wallpaper.delete">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+        "</button></div>";
+    }).join("");
+    // 网格末尾追加与壁纸卡片同尺寸的上传区域，点击选择本地图片。
+    var addTile = '<label class="wallpaper-item is-add" data-i18n-title="settings.wallpaper.upload">' +
+      '<input id="wallpaperFile" type="file" accept="image/png,image/jpeg" class="hidden" />' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>' +
+      '<span data-i18n="settings.wallpaper.upload"></span></label>';
     return '<div class="settings-label" data-i18n="settings.wallpaper.title"></div>' +
       '<p class="settings-desc" data-i18n="settings.wallpaper.desc"></p>' +
-      '<div class="wallpaper-grid">' + tiles + "</div>" +
-      '<div class="settings-upload">' +
-      '<div class="settings-upload-preview" id="wallpaperPreview">' + preview + "</div>" +
-      '<div class="min-w-0"><label class="btn-ghost inline-flex cursor-pointer items-center gap-2">' +
-      '<input id="wallpaperFile" type="file" accept="image/png,image/jpeg" class="hidden" />' +
-      '<span data-i18n="settings.wallpaper.upload"></span></label>' +
-      '<p class="settings-desc" data-i18n="settings.wallpaper.hint"></p></div>' +
-      "</div>";
+      '<div class="wallpaper-grid">' + tiles + customTiles + addTile + "</div>" +
+      '<p class="settings-desc" data-i18n="settings.wallpaper.hint"></p>';
   }
 
   function languageSection() {
@@ -135,7 +146,7 @@
     overlay.innerHTML =
       '<div class="settings-panel" role="dialog" aria-modal="true">' +
       '<div class="settings-head">' +
-      '<span class="settings-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"/></svg></span>' +
+      '<span class="settings-head-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>' +
       '<div><div class="settings-title" data-i18n="settings.title"></div>' +
       '<div class="settings-subtitle">DevOS</div></div>' +
       '<button type="button" class="settings-close" id="settingsClose" data-i18n-title="settings.close">' +
@@ -168,6 +179,19 @@
     });
   }
 
+  // 按当前壁纸同步内置与自定义壁纸的选中态。
+  function syncActive() {
+    var current = (status && status.wallpaper) || {};
+    overlay.querySelectorAll(".wallpaper-item").forEach(function (item) {
+      var preset = item.getAttribute("data-preset");
+      var file = item.getAttribute("data-file");
+      var active = current.kind === "custom"
+        ? !!file && file === current.file
+        : !!preset && preset === current.preset;
+      item.classList.toggle("is-active", active);
+    });
+  }
+
   function bind() {
     overlay.querySelector("#settingsClose").addEventListener("click", close);
     overlay.querySelectorAll(".settings-tab").forEach(function (btn) {
@@ -183,11 +207,44 @@
           .then(function (data) {
             status = data;
             applyWallpaper(data.wallpaper);
-            overlay.querySelectorAll("[data-preset]").forEach(function (item) {
-              item.classList.toggle("is-active", item.getAttribute("data-preset") === preset);
-            });
+            syncActive();
           })
           .catch(function (err) { notify(t("settings.wallpaper.failed", { error: err.message })); })
+          .then(function () { busy = false; });
+      });
+    });
+
+    overlay.querySelectorAll("[data-custom-file]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (busy) return;
+        var file = btn.getAttribute("data-custom-file");
+        busy = true;
+        request("/api/security/settings", { body: { wallpaper: { kind: "custom", file: file } } })
+          .then(function (data) {
+            status = data;
+            applyWallpaper(data.wallpaper);
+            syncActive();
+          })
+          .catch(function (err) { notify(t("settings.wallpaper.failed", { error: err.message })); })
+          .then(function () { busy = false; });
+      });
+    });
+
+    overlay.querySelectorAll("[data-custom-delete]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (busy) return;
+        var file = btn.getAttribute("data-custom-delete");
+        if (!window.confirm(t("settings.wallpaper.deleteConfirm"))) return;
+        busy = true;
+        request("/api/security/wallpaper/delete", { body: { file: file } })
+          .then(function (data) {
+            customs = data.wallpapers || [];
+            status = Object.assign({}, status, { wallpaper: data.wallpaper });
+            applyWallpaper(data.wallpaper);
+            render();
+            notify(t("settings.wallpaper.deleted"));
+          })
+          .catch(function (err) { notify(t("settings.wallpaper.deleteFailed", { error: err.message })); })
           .then(function () { busy = false; });
       });
     });
@@ -204,6 +261,7 @@
         request("/api/security/wallpaper", { body: form })
           .then(function (data) {
             status = Object.assign({}, status, { wallpaper: data.wallpaper });
+            customs = data.wallpapers || customs;
             applyWallpaper(data.wallpaper);
             render();
             notify(t("settings.wallpaper.uploaded"));
@@ -301,9 +359,18 @@
   function open() {
     ensureOverlay();
     overlay.classList.remove("hidden");
-    request("/api/security/status", { method: "GET" })
-      .then(function (data) { status = data; })
-      .catch(function () { /* 保留上次状态 */ })
+    // 状态与自定义壁纸库并行加载，保证壁纸网格与当前选中态一致。
+    Promise.all([
+      request("/api/security/status", { method: "GET" }).catch(function () { return null; }),
+      request("/api/security/wallpapers", { method: "GET" }).catch(function () { return null; }),
+    ])
+      .then(function (results) {
+        if (results[0]) status = results[0];
+        if (results[1] && results[1].wallpapers) customs = results[1].wallpapers;
+        if (results[1] && results[1].wallpaper) {
+          status = Object.assign({}, status, { wallpaper: results[1].wallpaper });
+        }
+      })
       .then(function () { render(); });
   }
 

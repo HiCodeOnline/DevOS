@@ -150,6 +150,44 @@
   border-color: #0f172a;
   box-shadow: 0 0 0 1px #0f172a inset;
 }
+.wallpaper-item.is-custom {
+  background-color: #e2e8f0;
+  background-position: center;
+  background-size: cover;
+}
+.wallpaper-item .wallpaper-pick {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border-radius: inherit;
+}
+.wallpaper-item .wallpaper-delete {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  height: 20px;
+  width: 20px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.55);
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+.wallpaper-item:hover .wallpaper-delete,
+.wallpaper-item:focus-within .wallpaper-delete {
+  opacity: 1;
+  transform: scale(1);
+}
+.wallpaper-item .wallpaper-delete:hover {
+  background: #e11d48;
+}
+.wallpaper-item .wallpaper-delete svg {
+  height: 10px;
+  width: 10px;
+}
 .wallpaper-item .wallpaper-name {
   position: absolute;
   left: 8px;
@@ -196,29 +234,30 @@
   color: #e2e8f0;
 }
 
-.settings-upload {
+.wallpaper-item.is-add {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  margin-top: 14px;
-}
-.settings-upload-preview {
-  display: grid;
-  place-items: center;
-  height: 56px;
-  width: 84px;
-  flex: none;
-  overflow: hidden;
-  border-radius: 10px;
-  border: 1px dashed rgba(203, 213, 225, 0.95);
+  justify-content: center;
+  gap: 4px;
+  border-style: dashed;
+  border-color: rgba(203, 213, 225, 0.95);
   background: #f8fafc;
   color: #94a3b8;
   font-size: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.settings-upload-preview img {
-  height: 100%;
-  width: 100%;
-  object-fit: cover;
+.wallpaper-item.is-add:hover {
+  border-color: #0f172a;
+  background: #f1f5f9;
+  color: #0f172a;
+  transform: none;
+  box-shadow: none;
+}
+.wallpaper-item.is-add svg {
+  height: 18px;
+  width: 18px;
 }
 
 .lang-list {
