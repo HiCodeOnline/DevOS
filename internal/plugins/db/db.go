@@ -90,6 +90,9 @@ type DB struct {
 	pools        map[string]*sqlPool
 	redisClients map[string]*redisPool
 	mongoClients map[string]*mongoConn
+
+	nativeMu sync.Mutex
+	native   map[string]any
 }
 
 // New 创建数据库插件。
@@ -98,6 +101,7 @@ func New() *DB {
 		pools:        map[string]*sqlPool{},
 		redisClients: map[string]*redisPool{},
 		mongoClients: map[string]*mongoConn{},
+		native:       map[string]any{},
 	}
 }
 

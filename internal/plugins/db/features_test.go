@@ -52,7 +52,7 @@ func TestTypeAliasKeepsOldConfigs(t *testing.T) {
 		t.Fatalf("驱动映射不正确: dameng=%s clickhouse=%s mariadb=%s",
 			driverImpl("dameng"), driverImpl("clickhouse"), driverImpl("mariadb"))
 	}
-	if supportsConnect("oracle") != true || supportsConnect("neo4j") != false {
+	if supportsConnect("oracle") != true || supportsConnect("duckdb") != false {
 		t.Fatalf("连接能力标记不正确")
 	}
 }
@@ -76,9 +76,53 @@ func TestClickHouseDSN(t *testing.T) {
 
 func TestPlannedTypeRejected(t *testing.T) {
 	p := New()
-	_, err := p.pool(Connection{ID: "x", Driver: "neo4j", Host: "127.0.0.1", Port: 7687}, "")
+	_, err := p.pool(Connection{ID: "x", Driver: "duckdb", Host: "127.0.0.1", Port: 5432}, "")
 	if err == nil || !strings.Contains(err.Error(), "未内置驱动") {
 		t.Fatalf("未内置驱动的类型应拒绝连接，err=%v", err)
+	}
+}
+
+func TestExtraFamilyDSN(t *testing.T) {
+	cases := []struct {
+		driver   string
+		database string
+		params   string
+		want     []string
+		notWant  []string
+	}{
+		{"firebird", "emp.fdb", "", []string{"u:p@127.0.0.1:3050/emp.fdb", "charset=UTF8"}, nil},
+		{"saphana", "TENANT", "", []string{"hdb://u:p@127.0.0.1:30015", "databaseName=TENANT"}, nil},
+		{"exasol", "", "", []string{"exasol://u:p@127.0.0.1:8563", "validateservercertificate=0"}, nil},
+		{"vertica", "vdb", "", []string{"vertica://u:p@127.0.0.1:5433/vdb"}, nil},
+		{"trino", "hive", "", []string{"http://u:p@127.0.0.1:8080", "catalog=hive"}, nil},
+		{"snowflake", "ANALYTICS", "account=myorg-xy", []string{"u:p@127.0.0.1:443/ANALYTICS", "account=myorg-xy"}, []string{"snowflake://"}},
+		{"hive", "default", "", []string{"hive://u:p@127.0.0.1:10000/default"}, nil},
+	}
+	for _, tc := range cases {
+		c := Connection{Driver: tc.driver, Host: "127.0.0.1", User: "u", Password: "p", Params: tc.params}
+		if tc.driver == "vertica" {
+			c.Port = 5433
+		}
+		dsn, err := buildDSN(c, tc.database)
+		if err != nil {
+			t.Fatalf("%s buildDSN: %v", tc.driver, err)
+		}
+		for _, want := range tc.want {
+			if !strings.Contains(dsn, want) {
+				t.Fatalf("%s DSN 缺少 %q: %s", tc.driver, want, dsn)
+			}
+		}
+		for _, notWant := range tc.notWant {
+			if strings.Contains(dsn, notWant) {
+				t.Fatalf("%s DSN 不应包含 %q: %s", tc.driver, notWant, dsn)
+			}
+		}
+	}
+}
+
+func TestExtraFamilyRejectsMissingFile(t *testing.T) {
+	if _, err := buildDSN(Connection{Driver: "firebird", Host: "127.0.0.1"}, ""); err == nil {
+		t.Fatalf("Firebird 缺少数据库文件时应报错")
 	}
 }
 

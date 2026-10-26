@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/assets/ui.css?v=2" />
   <script src="/assets/app-i18n.js?v=2"></script>
-  <script src="/assets/locales/apps/db.js?v=3"></script>
+  <script src="/assets/locales/apps/db.js?v=4"></script>
   <script src="/assets/secure-ui.js?v=2"></script>
   <style>
     .pane { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
@@ -395,6 +395,8 @@ function iconSvg(name, cls = 'h-3.5 w-3.5') {
     play: '<path d="m6 4 14 8-14 8V4Z"/>',
     key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m11 12 8-8M17 6l2 2M19 4l2 2"/>',
     collection: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 15h18"/>',
+    message: '<path d="M4 5h16v11H8l-4 3V5Z"/><path d="M8 9h8M8 12h5"/>',
+    directory: '<path d="M3 6h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"/><path d="M3 10h18"/>',
     terminal: '<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     minus: '<path d="M5 12h14"/>',
@@ -488,6 +490,48 @@ function objectSchema(conn, database) {
 const isRedis = (conn) => typeOf(conn).family === 'redis';
 const isMongo = (conn) => typeOf(conn).family === 'mongo';
 const isNoSQL = (conn) => isRedis(conn) || isMongo(conn);
+// 这些协议族没有传统表结构，树上的对象直接以查询面板打开。
+const NO_TABLE_FAMILIES = ['http', 'cassandra', 'zookeeper', 'mqtt', 'nebula'];
+const isObjectOnly = (conn) => NO_TABLE_FAMILIES.includes(typeOf(conn).family);
+
+// 查询面板：非 SQL 协议族使用各自的示例与提示。
+const QUERY_PLACEHOLDER_KEYS = {
+  http: 'db.query.placeholder.http',
+  cassandra: 'db.query.placeholder.cassandra',
+  zookeeper: 'db.query.placeholder.zookeeper',
+  mqtt: 'db.query.placeholder.mqtt',
+  nebula: 'db.query.placeholder.nebula',
+};
+const QUERY_HINT_KEYS = {
+  http: 'db.query.hint.http',
+  cassandra: 'db.query.hint.cassandra',
+  zookeeper: 'db.query.hint.zookeeper',
+  mqtt: 'db.query.hint.mqtt',
+  nebula: 'db.query.hint.nebula',
+};
+function queryPlaceholder(tab) {
+  const key = QUERY_PLACEHOLDER_KEYS[tab.fam];
+  return key ? tr(key) : tr('db.query.sqlPlaceholder');
+}
+function queryHint(tab) {
+  const key = QUERY_HINT_KEYS[tab.fam];
+  return key ? tr(key) : '';
+}
+
+// 对象节点对应的初始语句，方便在查询面板中直接执行。
+function objectQueryText(conn, node) {
+  const fam = typeOf(conn).family;
+  const db = node.database || '';
+  const name = node.table || '';
+  if (fam === 'cassandra') return `SELECT * FROM ${db}.${name} LIMIT 100`;
+  if (fam === 'nebula') {
+    return node.kind === 'edge'
+      ? `MATCH ()-[e:${name}]->() RETURN e LIMIT 100`
+      : `MATCH (n:${name}) RETURN n LIMIT 100`;
+  }
+  if (fam === 'zookeeper') return `ls /${[db, name].filter(Boolean).join('/')}`;
+  return '';
+}
 async function loadTypes() {
   try {
     const list = await api('/types');
@@ -548,8 +592,9 @@ function renderConn(conn) {
   S.nodeMap.set(p, { kind: 'conn', path: p, connId: conn.id });
   const t = typeOf(conn);
   const planned = isPlanned(t);
-  const consoleTitle = planned ? unsupportedMsg(t) : (isNoSQL(conn) ? tr('db.tree.console') : tr('db.tree.newQuery'));
-  const consoleIcon = isNoSQL(conn) ? 'terminal' : 'sql';
+  const sqlMode = !!t.sql;
+  const consoleTitle = planned ? unsupportedMsg(t) : (sqlMode ? tr('db.tree.newQuery') : tr('db.tree.console'));
+  const consoleIcon = sqlMode ? 'sql' : 'terminal';
   const open = S.expanded.has(p);
   const loading = S.loading.has(p);
   const dbs = S.cache.get(p);
@@ -592,6 +637,10 @@ function renderDb(conn, db) {
   else if (t.family === 'oracle') suffix = ' ' + tr('db.tree.suffix.schema');
   else if (t.family === 'redis') { suffix = ' ' + tr('db.tree.suffix.redisDb'); icon = 'key'; }
   else if (t.family === 'mongo') icon = 'collection';
+  else if (t.family === 'cassandra') suffix = ' ' + tr('db.tree.suffix.keyspace');
+  else if (t.family === 'nebula') suffix = ' ' + tr('db.tree.suffix.space');
+  else if (t.family === 'mqtt') { suffix = ' ' + tr('db.tree.suffix.topic'); icon = 'message'; }
+  else if (t.family === 'zookeeper') { suffix = ' ' + tr('db.tree.suffix.path'); icon = 'directory'; }
   const consoleTitle = isNoSQL(conn) ? tr('db.tree.consoleHere') : tr('db.tree.queryHere');
   return `
     <div class="tree-row mx-1 flex items-center gap-1 rounded-md py-0.5 pl-3 pr-1" data-node="${esc(p)}">
@@ -601,7 +650,7 @@ function renderDb(conn, db) {
       ${iconSvg(icon, 'h-3.5 w-3.5 flex-none text-slate-400')}
       <span class="min-w-0 flex-1 truncate text-[11px] text-slate-600" data-act="toggle" title="${esc(db)}">${esc(db + suffix)}</span>
       <span class="tree-actions flex-none items-center">
-        <button data-act="query" title="${consoleTitle}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg(isNoSQL(conn) ? 'terminal' : 'sql', 'h-3 w-3')}</button>
+        <button data-act="query" title="${consoleTitle}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg(typeOf(conn).sql ? 'sql' : 'terminal', 'h-3 w-3')}</button>
       </span>
     </div>
     ${open ? renderDbChildren(conn, db, children, loading) : ''}`;
@@ -687,15 +736,16 @@ function renderObject(conn, db, schema, obj, indent) {
   const open = S.expanded.has(p);
   const loading = S.loading.has(p);
   const cols = S.cache.get(p);
+  const sqlMode = !!typeOf(conn).sql;
   return `
     <div class="tree-row mx-1 flex items-center gap-1 rounded-md py-0.5 pr-1" style="padding-left:${indent * 12 + 12}px" data-node="${esc(p)}">
       <button data-act="toggle" class="grid h-4 w-4 flex-none place-items-center rounded text-slate-400 hover:bg-slate-200">
         ${loading ? iconSvg('refresh', 'h-3 w-3 spin') : iconSvg(open ? 'chevronDown' : 'chevron', 'h-3 w-3')}
       </button>
-      ${iconSvg(obj.type === 'view' ? 'view' : 'table', 'h-3.5 w-3.5 flex-none ' + (obj.type === 'view' ? 'text-violet-400' : 'text-emerald-500/80'))}
+      ${iconSvg(obj.type === 'view' ? 'view' : (obj.type === 'tag' || obj.type === 'edge' ? 'collection' : (obj.type === 'node' ? 'directory' : 'table')), 'h-3.5 w-3.5 flex-none ' + (obj.type === 'view' ? 'text-violet-400' : 'text-emerald-500/80'))}
       <span class="min-w-0 flex-1 truncate text-[11px] text-slate-600" data-act="open" title="${esc(obj.name)}">${esc(obj.name)}</span>
       <span class="tree-actions flex-none items-center">
-        <button data-act="query" title="${esc(tr('db.tree.newQuery'))}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg('sql', 'h-3 w-3')}</button>
+        <button data-act="query" title="${esc(tr(sqlMode ? 'db.tree.newQuery' : 'db.tree.console'))}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-white hover:text-emerald-600">${iconSvg(sqlMode ? 'sql' : 'terminal', 'h-3 w-3')}</button>
       </span>
     </div>
     ${open ? renderColumns(cols, indent + 1) : ''}`;
@@ -745,6 +795,9 @@ async function toggleNode(node) {
       data = await api(`/objects?id=${encodeURIComponent(node.connId)}&database=${encodeURIComponent(node.database)}&schema=${encodeURIComponent(node.schema)}`);
     } else if (node.kind === 'table' || node.kind === 'view') {
       data = await api(`/columns?id=${encodeURIComponent(node.connId)}&database=${encodeURIComponent(node.database || '')}&schema=${encodeURIComponent(node.schema || '')}&table=${encodeURIComponent(node.table)}`);
+    } else if (node.kind === 'tag' || node.kind === 'edge' || node.kind === 'node') {
+      // 图标签、边与目录节点没有列信息，按空列处理避免一直在加载。
+      data = [];
     }
     S.cache.set(p, data);
   } catch (err) {
@@ -800,6 +853,7 @@ $('#tree').addEventListener('click', async (ev) => {
   if (act === 'open') {
     if (node.kind === 'rkey') openRedisKeyTab(node);
     else if (node.kind === 'coll') openMongoTab(node);
+    else if (isObjectOnly(conn)) openQueryTab(node.connId, node.database || '', objectQueryText(conn, node));
     else openDataTab(node);
     return;
   }
@@ -809,7 +863,8 @@ $('#tree').addEventListener('click', async (ev) => {
   }
   if (act === 'query') {
     if (isPlanned(typeOf(conn))) { toast(unsupportedMsg(typeOf(conn)), 'err'); return; }
-    openQueryTab(node.connId, node.database || conn.database || '', '');
+    const seed = node.table ? objectQueryText(conn, node) : '';
+    openQueryTab(node.connId, node.database || conn.database || '', seed);
     return;
   }
   if (act === 'ping') {
@@ -859,7 +914,9 @@ function tabTitle(tab) {
   if (tab.type === 'query') {
     if (tab.fam === 'redis') return `Redis · ${tab.database || '0'}`;
     if (tab.fam === 'mongo') return `Mongo · ${tab.database || ''}`;
-    return tr('db.tab.query', { db: tab.database || (findConn(tab.connId)?.name ?? '') });
+    const conn = findConn(tab.connId);
+    if (conn && !typeOf(conn).sql) return `${typeOf(conn).name} · ${tab.database || ''}`;
+    return tr('db.tab.query', { db: tab.database || (conn?.name ?? '') });
   }
   if (tab.type === 'rkey') return tab.key;
   if (tab.type === 'mongo') return `${tab.database}.${tab.table}`;
@@ -870,7 +927,8 @@ function tabIcon(tab) {
   if (tab.type === 'rkey') return iconSvg('key', 'h-3 w-3');
   if (tab.type === 'mongo') return iconSvg('collection', 'h-3 w-3');
   if (tab.type === 'data') return iconSvg(S.nodeMap.get(tab.path)?.kind === 'view' ? 'view' : 'table', 'h-3 w-3');
-  return iconSvg(tab.fam && tab.fam !== 'sql' ? 'terminal' : 'sql', 'h-3 w-3');
+  const conn = findConn(tab.connId);
+  return iconSvg(conn && typeOf(conn).sql ? 'sql' : 'terminal', 'h-3 w-3');
 }
 
 function renderTabs() {
@@ -917,7 +975,7 @@ function openQueryTab(connId, database, sql) {
   const tab = {
     id: ++S.seq,
     type: 'query',
-    fam: ['redis', 'mongo'].includes(fam) ? fam : 'sql',
+    fam,
     connId,
     database: database || '',
     sql: sql || '',
@@ -928,8 +986,8 @@ function openQueryTab(connId, database, sql) {
     output: '',
   };
   S.tabs.push(tab);
-  if (tab.fam === 'sql') createQueryPane(tab);
-  else createCommandPane(tab);
+  if (fam === 'redis' || fam === 'mongo') createCommandPane(tab);
+  else createQueryPane(tab);
   S.active = tab.id;
   renderTabs();
   renderTree();
@@ -992,7 +1050,7 @@ function createQueryPane(tab) {
       <button class="explain-btn flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${iconSvg('plan', 'h-3 w-3')} ${esc(tr('db.query.explain'))}</button>
       <span class="query-hint ml-auto text-[10px] text-slate-400"></span>
     </div>
-    <textarea class="sql-input min-h-0 flex-none resize-none border-b border-slate-200 bg-white p-3 font-mono text-[11.5px] leading-relaxed text-slate-700 outline-none" style="height:38%;flex:0 0 38%" spellcheck="false" placeholder="${esc(tr('db.query.sqlPlaceholder'))}"></textarea>
+    <textarea class="sql-input min-h-0 flex-none resize-none border-b border-slate-200 bg-white p-3 font-mono text-[11.5px] leading-relaxed text-slate-700 outline-none" style="height:38%;flex:0 0 38%" spellcheck="false" placeholder="${esc(queryPlaceholder(tab))}"></textarea>
     <div class="query-status flex-none border-b border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">${esc(tr('db.common.ready'))}</div>
     <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>`;
   $('#panes').appendChild(el);
@@ -1002,6 +1060,14 @@ function createQueryPane(tab) {
   const select = $('.db-select', el);
   const input = $('.sql-input', el);
   input.value = tab.sql || '';
+  const hintKey = QUERY_HINT_KEYS[tab.fam];
+  if (hintKey) $('.query-hint', el).textContent = tr(hintKey);
+  // 非 SQL 协议族不支持脚本执行、执行计划与 .sql 文件载入。
+  if (!typeOf(conn).sql) {
+    for (const selector of ['.open-sql-btn', '.run-file-btn', '.explain-btn']) {
+      $(selector, el)?.classList.add('hidden');
+    }
+  }
 
   (async () => {
     try {
@@ -2600,8 +2666,8 @@ function refreshPaneTexts(tab) {
   refreshStatus(tab);
   if (tab.type === 'query') {
     $('.exec-btn', el).innerHTML = `${iconSvg('play', 'h-3 w-3')} ${esc(tr('db.query.exec'))} <span class="kbd !text-white/80 !border-white/30 !bg-white/10">Ctrl+Enter</span>`;
-    if (tab.fam === 'sql') {
-      $('.sql-input', el).placeholder = tr('db.query.sqlPlaceholder');
+    if (tab.fam !== 'redis' && tab.fam !== 'mongo') {
+      $('.sql-input', el).placeholder = queryPlaceholder(tab);
       $('.rows-label', el).textContent = tr('db.query.maxRows');
       $('.export-btn', el).innerHTML = `${iconSvg('download', 'h-3 w-3')} ${esc(tr('db.common.exportCsv'))}`;
       $('.copy-btn', el).textContent = tr('db.common.copyResult');
@@ -2611,6 +2677,7 @@ function refreshPaneTexts(tab) {
       const opt = $('.db-select option[value=""]', el);
       if (opt) opt.textContent = tr('db.query.defaultDb');
       if (tab.dbListError) $('.query-hint', el).textContent = tr('db.query.dbListFailed', { error: tab.dbListError });
+      else $('.query-hint', el).textContent = queryHint(tab);
       if (tab.script) renderScriptOutput(tab);
       else if (tab.result || tab.error) renderQueryOutput(tab);
     } else {

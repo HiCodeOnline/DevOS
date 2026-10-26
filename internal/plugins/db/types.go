@@ -10,7 +10,18 @@ const (
 	familyRedis      = "redis"
 	familyMongo      = "mongo"
 	familyClickHouse = "clickhouse"
-	familyHTTP       = "http" // 预留：需要专用驱动/HTTP 客户端的类型
+	familyHTTP       = "http" // 通过 REST/HTTP 协议接入的类型
+	familyHive       = "hive" // HiveServer2 / Spark Thrift / Kyuubi
+	familyFirebird   = "firebird"
+	familyHana       = "hana"
+	familyExasol     = "exasol"
+	familyVertica    = "vertica"
+	familyTrino      = "trino"
+	familySnowflake  = "snowflake"
+	familyCassandra  = "cassandra"
+	familyZooKeeper  = "zookeeper"
+	familyMQTT       = "mqtt"
+	familyNebula     = "nebula"
 )
 
 // 类型支持级别。
@@ -39,20 +50,20 @@ const (
 
 // DBType 描述一种可连接的数据库类型。
 type DBType struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	Family       string   `json:"family"`
-	Group        string   `json:"group"`
-	DefaultPort  int      `json:"defaultPort,omitempty"`
-	SchemaLevel  bool     `json:"schemaLevel,omitempty"` // 库下是否还有模式层级
-	File         bool     `json:"file,omitempty"`        // 是否使用本地数据库文件
-	SQL          bool     `json:"sql"`                   // 是否使用 SQL 工作区
-	Color        string   `json:"color"`
-	Icon         string   `json:"icon"`    // 前端内置图标键
-	Support      string   `json:"support"` // native | protocol | planned
-	Capabilities []string `json:"capabilities"`
-	DatabaseLabel string  `json:"databaseLabel,omitempty"`
-	Hint          string  `json:"hint,omitempty"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Family        string   `json:"family"`
+	Group         string   `json:"group"`
+	DefaultPort   int      `json:"defaultPort,omitempty"`
+	SchemaLevel   bool     `json:"schemaLevel,omitempty"` // 库下是否还有模式层级
+	File          bool     `json:"file,omitempty"`        // 是否使用本地数据库文件
+	SQL           bool     `json:"sql"`                   // 是否使用 SQL 工作区
+	Color         string   `json:"color"`
+	Icon          string   `json:"icon"`    // 前端内置图标键
+	Support       string   `json:"support"` // native | protocol | planned
+	Capabilities  []string `json:"capabilities"`
+	DatabaseLabel string   `json:"databaseLabel,omitempty"`
+	Hint          string   `json:"hint,omitempty"`
 }
 
 func nt(id, name, family, group string, port int, color, icon, support string) DBType {
@@ -75,17 +86,17 @@ var dbTypes = func() []DBType {
 
 		// 关系型
 		nt("duckdb", "DuckDB", familyHTTP, groupRelational, 0, "#f59e0b", "analytics", SupportPlanned),
-		nt("rqlite", "RQLite", familyHTTP, groupRelational, 4001, "#0ea5e9", "database", SupportPlanned),
-		nt("turso", "Turso", familyHTTP, groupRelational, 443, "#16a34a", "cloud", SupportPlanned),
-		nt("cloudflare-d1", "Cloudflare D1", familyHTTP, groupRelational, 443, "#f38020", "cloud", SupportPlanned),
-		nt("firebird", "Firebird", familyHTTP, groupRelational, 3050, "#f43f5e", "database", SupportPlanned),
-		nt("exasol", "Exasol", familyHTTP, groupRelational, 8563, "#1e40af", "analytics", SupportPlanned),
-		nt("vertica", "Vertica", familyPostgres, groupRelational, 5433, "#2563eb", "analytics", SupportProtocol),
+		nt("rqlite", "RQLite", familyHTTP, groupRelational, 4001, "#0ea5e9", "database", SupportNative),
+		nt("turso", "Turso", familyHTTP, groupRelational, 443, "#16a34a", "cloud", SupportNative),
+		nt("cloudflare-d1", "Cloudflare D1", familyHTTP, groupRelational, 443, "#f38020", "cloud", SupportNative),
+		nt("firebird", "Firebird", familyFirebird, groupRelational, 3050, "#f43f5e", "database", SupportNative),
+		nt("exasol", "Exasol", familyExasol, groupRelational, 8563, "#1e40af", "analytics", SupportNative),
+		nt("vertica", "Vertica", familyVertica, groupRelational, 5433, "#2563eb", "analytics", SupportNative),
 		nt("h2", "H2", familyHTTP, groupRelational, 9092, "#2563eb", "database", SupportPlanned),
 		nt("db2", "IBM DB2", familyHTTP, groupRelational, 50000, "#1d4ed8", "database", SupportPlanned),
 		nt("informix", "IBM Informix", familyHTTP, groupRelational, 9088, "#0f766e", "database", SupportPlanned),
 		nt("access", "Microsoft Access", familyHTTP, groupRelational, 0, "#a21caf", "file", SupportPlanned),
-		nt("saphana", "SAP HANA", familyHTTP, groupRelational, 30015, "#0ea5e9", "analytics", SupportPlanned),
+		nt("saphana", "SAP HANA", familyHana, groupRelational, 30015, "#0ea5e9", "analytics", SupportNative),
 		nt("teradata", "Teradata", familyHTTP, groupRelational, 1025, "#e11d48", "analytics", SupportPlanned),
 
 		// 国产化
@@ -110,15 +121,15 @@ var dbTypes = func() []DBType {
 		// 云与分布式
 		nt("redshift", "Amazon Redshift", familyPostgres, groupCloud, 5439, "#8b5cf6", "analytics", SupportProtocol),
 		nt("databend", "Databend", familyMySQL, groupCloud, 8000, "#7c3aed", "analytics", SupportProtocol),
-		nt("databricks", "Databricks SQL", familyHTTP, groupCloud, 443, "#ff3621", "cloud", SupportPlanned),
-		nt("snowflake", "Snowflake", familyHTTP, groupCloud, 443, "#29b5e8", "cloud", SupportPlanned),
-		nt("bigquery", "Google BigQuery", familyHTTP, groupCloud, 0, "#4285f4", "cloud", SupportPlanned),
-		nt("spanner", "Google Cloud Spanner", familyHTTP, groupCloud, 443, "#4285f4", "cloud", SupportPlanned),
-		nt("dynamodb", "Amazon DynamoDB", familyHTTP, groupCloud, 8000, "#4053d6", "cloud", SupportPlanned),
-		nt("salesforce", "Salesforce", familyHTTP, groupCloud, 443, "#00a1e0", "cloud", SupportPlanned),
-		nt("trino", "Trino", familyHTTP, groupCloud, 8080, "#dd00a1", "analytics", SupportPlanned),
-		nt("prestosql", "PrestoSQL", familyHTTP, groupCloud, 8080, "#dd00a1", "analytics", SupportPlanned),
-		nt("kylin", "Apache Kylin", familyHTTP, groupCloud, 7070, "#6366f1", "analytics", SupportPlanned),
+		nt("databricks", "Databricks SQL", familyHTTP, groupCloud, 443, "#ff3621", "cloud", SupportNative),
+		nt("snowflake", "Snowflake", familySnowflake, groupCloud, 443, "#29b5e8", "cloud", SupportNative),
+		nt("bigquery", "Google BigQuery", familyHTTP, groupCloud, 0, "#4285f4", "cloud", SupportNative),
+		nt("spanner", "Google Cloud Spanner", familyHTTP, groupCloud, 443, "#4285f4", "cloud", SupportNative),
+		nt("dynamodb", "Amazon DynamoDB", familyHTTP, groupCloud, 8000, "#4053d6", "cloud", SupportNative),
+		nt("salesforce", "Salesforce", familyHTTP, groupCloud, 443, "#00a1e0", "cloud", SupportNative),
+		nt("trino", "Trino", familyTrino, groupCloud, 8080, "#dd00a1", "analytics", SupportNative),
+		nt("prestosql", "PrestoSQL", familyTrino, groupCloud, 8080, "#dd00a1", "analytics", SupportNative),
+		nt("kylin", "Apache Kylin", familyHTTP, groupCloud, 7070, "#6366f1", "analytics", SupportNative),
 		nt("tidb", "TiDB", familyMySQL, groupCloud, 4000, "#dc2626", "mysql", SupportProtocol),
 		nt("oceanbase", "OceanBase MySQL 模式", familyMySQL, groupCloud, 2881, "#1e40af", "mysql", SupportProtocol),
 		nt("polardb_mysql", "PolarDB MySQL", familyMySQL, groupCloud, 3306, "#f97316", "mysql", SupportProtocol),
@@ -126,53 +137,53 @@ var dbTypes = func() []DBType {
 		nt("tdsql_mysql", "TDSQL MySQL", familyMySQL, groupCloud, 3306, "#2563eb", "mysql", SupportProtocol),
 
 		// NoSQL
-		nt("couchdb", "Apache CouchDB", familyHTTP, groupNoSQL, 5984, "#e42528", "document", SupportPlanned),
-		nt("cassandra", "Apache Cassandra", familyHTTP, groupNoSQL, 9042, "#1287b1", "widecolumn", SupportPlanned),
-		nt("hbase", "Apache HBase", familyHTTP, groupNoSQL, 8080, "#f97316", "widecolumn", SupportPlanned),
-		nt("ignite", "Apache Ignite", familyHTTP, groupNoSQL, 10800, "#ec4899", "widecolumn", SupportPlanned),
+		nt("couchdb", "Apache CouchDB", familyHTTP, groupNoSQL, 5984, "#e42528", "document", SupportNative),
+		nt("cassandra", "Apache Cassandra", familyCassandra, groupNoSQL, 9042, "#1287b1", "widecolumn", SupportNative),
+		nt("hbase", "Apache HBase", familyHTTP, groupNoSQL, 8080, "#f97316", "widecolumn", SupportNative),
+		nt("ignite", "Apache Ignite", familyHTTP, groupNoSQL, 10800, "#ec4899", "widecolumn", SupportNative),
 		nt("ignite3", "Apache Ignite 3", familyHTTP, groupNoSQL, 10800, "#db2777", "widecolumn", SupportPlanned),
-		nt("neo4j", "Neo4j", familyHTTP, groupNoSQL, 7687, "#018bff", "graph", SupportPlanned),
-		nt("nebula", "NebulaGraph", familyHTTP, groupNoSQL, 9669, "#7c3aed", "graph", SupportPlanned),
+		nt("neo4j", "Neo4j", familyHTTP, groupNoSQL, 7687, "#018bff", "graph", SupportNative),
+		nt("nebula", "NebulaGraph", familyNebula, groupNoSQL, 9669, "#7c3aed", "graph", SupportNative),
 
 		// 搜索与向量
-		nt("elasticsearch", "Elasticsearch", familyHTTP, groupSearch, 9200, "#f59e0b", "search", SupportPlanned),
-		nt("easysearch", "Easysearch", familyHTTP, groupSearch, 9200, "#10b981", "search", SupportPlanned),
-		nt("meilisearch", "Meilisearch", familyHTTP, groupSearch, 7700, "#f472b6", "search", SupportPlanned),
-		nt("solr", "Apache Solr", familyHTTP, groupSearch, 8983, "#d9411e", "search", SupportPlanned),
+		nt("elasticsearch", "Elasticsearch", familyHTTP, groupSearch, 9200, "#f59e0b", "search", SupportNative),
+		nt("easysearch", "Easysearch", familyHTTP, groupSearch, 9200, "#10b981", "search", SupportNative),
+		nt("meilisearch", "Meilisearch", familyHTTP, groupSearch, 7700, "#f472b6", "search", SupportNative),
+		nt("solr", "Apache Solr", familyHTTP, groupSearch, 8983, "#d9411e", "search", SupportNative),
 		nt("manticoresearch", "Manticore Search", familyMySQL, groupSearch, 9306, "#e11d48", "search", SupportProtocol),
-		nt("qdrant", "Qdrant", familyHTTP, groupSearch, 6333, "#dc244c", "vector", SupportPlanned),
-		nt("chromadb", "ChromaDB", familyHTTP, groupSearch, 8000, "#f97316", "vector", SupportPlanned),
-		nt("milvus", "Milvus", familyHTTP, groupSearch, 19530, "#00a1ea", "vector", SupportPlanned),
-		nt("weaviate", "Weaviate", familyHTTP, groupSearch, 8080, "#06b6d4", "vector", SupportPlanned),
+		nt("qdrant", "Qdrant", familyHTTP, groupSearch, 6333, "#dc244c", "vector", SupportNative),
+		nt("chromadb", "ChromaDB", familyHTTP, groupSearch, 8000, "#f97316", "vector", SupportNative),
+		nt("milvus", "Milvus", familyHTTP, groupSearch, 19530, "#00a1ea", "vector", SupportNative),
+		nt("weaviate", "Weaviate", familyHTTP, groupSearch, 8080, "#06b6d4", "vector", SupportNative),
 
 		// 大数据
 		nt("doris", "Apache Doris", familyMySQL, groupBigData, 9030, "#1d4ed8", "analytics", SupportProtocol),
 		nt("starrocks", "StarRocks", familyMySQL, groupBigData, 9030, "#2563eb", "analytics", SupportProtocol),
-		nt("hive", "Apache Hive", familyHTTP, groupBigData, 10000, "#eab308", "analytics", SupportPlanned),
-		nt("impala", "Apache Impala", familyHTTP, groupBigData, 21050, "#f97316", "analytics", SupportPlanned),
-		nt("spark", "Apache Spark", familyHTTP, groupBigData, 10015, "#e25a1c", "analytics", SupportPlanned),
-		nt("kyuubi", "Apache Kyuubi", familyHTTP, groupBigData, 10009, "#f97316", "analytics", SupportPlanned),
-		nt("argo", "星环 Argo", familyHTTP, groupBigData, 10000, "#0ea5e9", "analytics", SupportPlanned),
-		nt("transwarp", "星环 Inceptor", familyHTTP, groupBigData, 10000, "#dc2626", "analytics", SupportPlanned),
+		nt("hive", "Apache Hive", familyHive, groupBigData, 10000, "#eab308", "analytics", SupportNative),
+		nt("impala", "Apache Impala", familyHive, groupBigData, 21050, "#f97316", "analytics", SupportNative),
+		nt("spark", "Apache Spark", familyHive, groupBigData, 10015, "#e25a1c", "analytics", SupportNative),
+		nt("kyuubi", "Apache Kyuubi", familyHive, groupBigData, 10009, "#f97316", "analytics", SupportNative),
+		nt("argo", "星环 Argo", familyHive, groupBigData, 10000, "#0ea5e9", "analytics", SupportNative),
+		nt("transwarp", "星环 Inceptor", familyHive, groupBigData, 10000, "#dc2626", "analytics", SupportNative),
 
 		// 时序与流
 		nt("questdb", "QuestDB", familyPostgres, groupTimeSeries, 8812, "#d97706", "timeseries", SupportProtocol),
-		nt("tdengine", "TDengine", familyHTTP, groupTimeSeries, 6041, "#0ea5e9", "timeseries", SupportPlanned),
-		nt("iotdb", "Apache IoTDB", familyHTTP, groupTimeSeries, 6667, "#0ea5e9", "timeseries", SupportPlanned),
-		nt("influxdb", "InfluxDB", familyHTTP, groupTimeSeries, 8086, "#22adf6", "timeseries", SupportPlanned),
-		nt("influxdb3", "InfluxDB 3.x", familyHTTP, groupTimeSeries, 8181, "#0ea5e9", "timeseries", SupportPlanned),
-		nt("victoriametrics", "VictoriaMetrics", familyHTTP, groupTimeSeries, 8428, "#e11d48", "timeseries", SupportPlanned),
-		nt("mq", "Message Queue", familyHTTP, groupTimeSeries, 8080, "#f59e0b", "message", SupportPlanned),
-		nt("mqtt", "MQTT", familyHTTP, groupTimeSeries, 1883, "#9333ea", "message", SupportPlanned),
+		nt("tdengine", "TDengine", familyHTTP, groupTimeSeries, 6041, "#0ea5e9", "timeseries", SupportNative),
+		nt("iotdb", "Apache IoTDB", familyHTTP, groupTimeSeries, 6667, "#0ea5e9", "timeseries", SupportNative),
+		nt("influxdb", "InfluxDB", familyHTTP, groupTimeSeries, 8086, "#22adf6", "timeseries", SupportNative),
+		nt("influxdb3", "InfluxDB 3.x", familyHTTP, groupTimeSeries, 8181, "#0ea5e9", "timeseries", SupportNative),
+		nt("victoriametrics", "VictoriaMetrics", familyHTTP, groupTimeSeries, 8428, "#e11d48", "timeseries", SupportNative),
+		nt("mq", "Message Queue", familyHTTP, groupTimeSeries, 8080, "#f59e0b", "message", SupportNative),
+		nt("mqtt", "MQTT", familyMQTT, groupTimeSeries, 1883, "#9333ea", "message", SupportNative),
 
 		// 目录与服务
-		nt("etcd", "etcd", familyHTTP, groupInfra, 2379, "#419eda", "keyvalue", SupportPlanned),
-		nt("zookeeper", "Apache ZooKeeper", familyHTTP, groupInfra, 2181, "#f59e0b", "directory", SupportPlanned),
-		nt("nacos", "Nacos", familyHTTP, groupInfra, 8848, "#22d3ee", "directory", SupportPlanned),
-		nt("consul", "Consul", familyHTTP, groupInfra, 8500, "#e03875", "directory", SupportPlanned),
+		nt("etcd", "etcd", familyHTTP, groupInfra, 2379, "#419eda", "keyvalue", SupportNative),
+		nt("zookeeper", "Apache ZooKeeper", familyZooKeeper, groupInfra, 2181, "#f59e0b", "directory", SupportNative),
+		nt("nacos", "Nacos", familyHTTP, groupInfra, 8848, "#22d3ee", "directory", SupportNative),
+		nt("consul", "Consul", familyHTTP, groupInfra, 8500, "#e03875", "directory", SupportNative),
 
 		// 其他
-		nt("iris", "InterSystems IRIS", familyHTTP, groupOther, 1972, "#6366f1", "database", SupportPlanned),
+		nt("iris", "InterSystems IRIS", familyHTTP, groupOther, 1972, "#6366f1", "database", SupportNative),
 		nt("jdbc", "JDBC 通用", familyHTTP, groupOther, 0, "#64748b", "file", SupportPlanned),
 		nt("plugin", "插件驱动", familyHTTP, groupOther, 0, "#64748b", "generic", SupportPlanned),
 	}
@@ -185,9 +196,27 @@ var dbTypes = func() []DBType {
 		if t.DatabaseLabel == "" {
 			t.DatabaseLabel = databaseLabelFor(*t)
 		}
+		if hint, ok := typeHints[t.ID]; ok {
+			t.Hint = hint
+		}
 	}
 	return list
 }()
+
+// typeHints 说明尚未内置驱动的类型所需的外部依赖。
+var typeHints = map[string]string{
+	"duckdb":   "DuckDB 嵌入式引擎仅提供 CGO 绑定，暂未内置；可将数据导出为 SQLite 使用。",
+	"h2":       "H2 仅提供 JDBC 驱动，请使用 JDBC 通用类型或通过 H2 的 PostgreSQL 兼容模式连接。",
+	"access":   "Microsoft Access 依赖 ODBC 驱动，暂未内置。",
+	"db2":      "IBM DB2 官方驱动依赖 CGO/CLI，暂未内置。",
+	"informix": "IBM Informix 官方驱动依赖 CGO/CLI，暂未内置。",
+	"teradata": "Teradata 官方驱动依赖 CLI，暂未内置。",
+	"gbase8s":  "GBase 8s 基于 Informix 协议，缺少纯 Go 驱动，暂未内置。",
+	"sundb":    "SUNDB 需厂商专用客户端，暂未内置。",
+	"ignite3":  "Ignite 3 使用瘦客户端二进制协议，暂未内置；可选用 Ignite 2.x 的 REST 接入。",
+	"jdbc":     "JDBC 通用类型需 JVM 环境，暂未内置。",
+	"plugin":   "插件驱动需要额外安装驱动文件后启用。",
+}
 
 // dbTypeAlias 兼容早期版本保存的连接类型 ID。
 var dbTypeAlias = map[string]string{
@@ -222,7 +251,8 @@ func supportsConnect(id string) bool { return typeOf(id).Support != SupportPlann
 
 func sqlFamily(family string) bool {
 	switch family {
-	case familyMySQL, familyPostgres, familySQLite, familyOracle, familySQLServer, familyClickHouse:
+	case familyMySQL, familyPostgres, familySQLite, familyOracle, familySQLServer, familyClickHouse,
+		familyHive, familyFirebird, familyHana, familyExasol, familyVertica, familyTrino, familySnowflake:
 		return true
 	}
 	return false
@@ -230,7 +260,7 @@ func sqlFamily(family string) bool {
 
 func schemaLevelFor(family string) bool {
 	switch family {
-	case familyPostgres, familySQLServer, familyOracle:
+	case familyPostgres, familySQLServer, familyOracle, familyTrino, familySnowflake:
 		return true
 	}
 	return false
@@ -259,6 +289,32 @@ func databaseLabelFor(t DBType) string {
 		return "服务名 / SID"
 	case familySQLServer, familyClickHouse:
 		return "数据库（可选）"
+	case familyFirebird:
+		return "数据库文件 / 别名"
+	case familyTrino:
+		return "目录 Catalog（可选）"
+	case familyCassandra:
+		return "Keyspace（可选）"
+	case familyZooKeeper:
+		return "根路径（可选）"
+	case familyMQTT:
+		return "主题前缀（可选）"
+	case familyNebula:
+		return "图空间（可选）"
+	case familyHTTP:
+		switch t.ID {
+		case "bigquery":
+			return "数据集（可选）"
+		case "databricks":
+			return "目录 Catalog（可选）"
+		case "spanner":
+			return "数据库名"
+		case "cloudflare-d1":
+			return "D1 数据库名"
+		case "salesforce":
+			return ""
+		}
+		return "命名空间（可选）"
 	default:
 		return "默认数据库（可选）"
 	}
@@ -273,6 +329,14 @@ func capsFor(t DBType) []string {
 		return []string{"browse", "keys", "command", "export"}
 	case familyMongo:
 		return []string{"browse", "query", "command", "export"}
+	case familyHTTP:
+		return []string{"query", "browse", "export"}
+	case familyCassandra:
+		return []string{"query", "browse", "command", "edit", "export"}
+	case familyNebula:
+		return []string{"query", "browse", "export"}
+	case familyZooKeeper, familyMQTT:
+		return []string{"browse", "command"}
 	}
 	return []string{"query", "browse", "edit", "ddl", "import", "export", "explain", "sqlfile"}
 }
@@ -294,6 +358,20 @@ func driverImpl(id string) string {
 		return "sqlserver"
 	case familyClickHouse:
 		return "clickhouse"
+	case familyFirebird:
+		return "firebirdsql"
+	case familyHana:
+		return "hdb"
+	case familyExasol:
+		return "exasol"
+	case familyVertica:
+		return "vertica"
+	case familyTrino:
+		return "trino"
+	case familySnowflake:
+		return "snowflake"
+	case familyHive:
+		return "hive"
 	default:
 		return "mysql"
 	}

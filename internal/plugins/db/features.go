@@ -109,6 +109,9 @@ func (p *DB) handleTableRows(c *fiber.Ctx) error {
 	if strings.TrimSpace(in.Table) == "" {
 		return jsonErr(c, fiber.StatusBadRequest, "缺少表名")
 	}
+	if isNoTableFamily(conn.Driver) {
+		return jsonErr(c, fiber.StatusBadRequest, "该连接类型不支持表格行编辑，请在「查询」面板执行语句")
+	}
 	db, err := p.pool(conn, in.Database)
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
@@ -303,6 +306,9 @@ func (p *DB) handleTableStructure(c *fiber.Ctx) error {
 	if table == "" {
 		return jsonErr(c, fiber.StatusBadRequest, "缺少表名")
 	}
+	if isNoTableFamily(conn.Driver) {
+		return jsonErr(c, fiber.StatusBadRequest, "该连接类型不支持表结构查看")
+	}
 	db, err := p.pool(conn, c.Query("database"))
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
@@ -350,6 +356,9 @@ func (p *DB) handleTableAlter(c *fiber.Ctx) error {
 	}
 	if len(in.Ops) == 0 {
 		return jsonErr(c, fiber.StatusBadRequest, "没有待执行的结构变更")
+	}
+	if isNoTableFamily(conn.Driver) {
+		return jsonErr(c, fiber.StatusBadRequest, "该连接类型不支持表结构变更")
 	}
 	statements, err := buildAlterStatements(conn.Driver, in.Table, in.Ops)
 	if err != nil {
@@ -623,6 +632,9 @@ func (p *DB) markPrimaryKeys(ctx context.Context, conn Connection, db *sql.DB, d
 }
 
 func (p *DB) loadTableColumnsRaw(ctx context.Context, conn Connection, db *sql.DB, database, schema, table string) ([]Column, error) {
+	if isExtraFamily(conn.Driver) {
+		return extraColumns(ctx, db, conn, database, schema, table)
+	}
 	switch familyOf(conn.Driver) {
 	case familySQLite:
 		rows, err := db.QueryContext(ctx, "PRAGMA table_info("+quoteIdent(conn.Driver, table)+")")
@@ -764,6 +776,9 @@ func (p *DB) loadIndexes(ctx context.Context, conn Connection, db *sql.DB, datab
 	var indexes []Index
 	var fks []ForeignKey
 	fam := familyOf(conn.Driver)
+	if isExtraFamily(conn.Driver) || fam == familyHTTP {
+		return nil, nil
+	}
 
 	appendIndex := func(name string, unique, primary bool, columns []string, def string) {
 		indexes = append(indexes, Index{Name: name, Unique: unique, Primary: primary, Columns: columns, Definition: def})

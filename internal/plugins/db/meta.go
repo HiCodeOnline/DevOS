@@ -12,12 +12,18 @@ import (
 
 	_ "gitee.com/chunanyong/dm"                // 达梦 DM 驱动
 	_ "github.com/ClickHouse/clickhouse-go/v2" // ClickHouse 驱动
+	_ "github.com/SAP/go-hdb/driver"           // SAP HANA
+	_ "github.com/exasol/exasol-driver-go"     // Exasol
 	"github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v2"
-	_ "github.com/jackc/pgx/v5/stdlib"  // PostgreSQL 及兼容数据库
-	_ "github.com/microsoft/go-mssqldb" // SQL Server / Azure SQL
-	_ "github.com/sijms/go-ora/v2"      // Oracle
-	_ "modernc.org/sqlite"              // 纯 Go SQLite 驱动
+	_ "github.com/jackc/pgx/v5/stdlib"           // PostgreSQL 及兼容数据库
+	_ "github.com/microsoft/go-mssqldb"          // SQL Server / Azure SQL
+	_ "github.com/nakagami/firebirdsql"          // Firebird（纯 Go）
+	_ "github.com/sijms/go-ora/v2"               // Oracle
+	_ "github.com/snowflakedb/gosnowflake"       // Snowflake
+	_ "github.com/trinodb/trino-go-client/trino" // Trino / Presto
+	_ "github.com/vertica/vertica-sql-go"        // Vertica
+	_ "modernc.org/sqlite"                       // 纯 Go SQLite 驱动
 )
 
 // sqlPool 保存一个连接池及其最近使用时间。
@@ -88,6 +94,10 @@ func buildDSN(c Connection, database string) (string, error) {
 		host = "127.0.0.1"
 	}
 	addr := net.JoinHostPort(host, strconv.Itoa(defPort(c)))
+
+	if dsn, ok, err := extraDSN(c, addr, db); ok {
+		return dsn, err
+	}
 
 	switch familyOf(c.Driver) {
 	case familySQLite:
@@ -308,10 +318,14 @@ func (p *DB) closePools(connID string) {
 			delete(p.mongoClients, key)
 		}
 	}
+	p.closeNative(connID)
 }
 
 // versionSQL 返回各协议族的版本查询语句。
 func versionSQL(driver string) string {
+	if q, ok := extraVersionSQL(driver); ok {
+		return q
+	}
 	switch familyOf(driver) {
 	case familyPostgres:
 		return "SELECT version()"
@@ -335,6 +349,10 @@ func (p *DB) ping(c Connection, database string) (int64, string, error) {
 		return p.pingRedis(c, database)
 	case familyMongo:
 		return p.pingMongo(c)
+	case familyHTTP:
+		return p.httpPing(c)
+	case familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
+		return p.nativePing(c, database)
 	}
 
 	db, err := p.pool(c, database)
@@ -451,6 +469,18 @@ func (p *DB) handleDatabases(c *fiber.Ctx) error {
 		return p.handleMongoDatabases(c)
 	case familySQLite:
 		return c.JSON([]string{"main"})
+	case familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
+		ns, err := p.nativeDatabases(conn)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		return c.JSON(ns)
+	case familyHTTP:
+		ns, err := p.httpDatabases(conn)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		return c.JSON(ns)
 	case familyOracle:
 		// Oracle/达梦没有“数据库”概念，以模式（用户）作为顶层对象。
 		db, err := p.pool(conn, "")
@@ -468,6 +498,16 @@ func (p *DB) handleDatabases(c *fiber.Ctx) error {
 	db, err := p.pool(conn, "")
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
+	}
+	if isExtraFamily(conn.Driver) {
+		ns, err := extraDatabases(c.Context(), db, conn, "")
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		if ns == nil {
+			ns = []string{}
+		}
+		return c.JSON(ns)
 	}
 
 	var q string
@@ -516,11 +556,23 @@ func (p *DB) handleSchemas(c *fiber.Ctx) error {
 		return c.JSON([]string{database})
 	case familyOracle:
 		return c.JSON([]string{oracleOwner(conn, database, "")})
+	case familyHTTP, familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
+		return c.JSON([]string{})
 	}
 
 	db, err := p.pool(conn, database)
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
+	}
+	if isExtraFamily(conn.Driver) {
+		schemas, err := extraSchemas(c.Context(), db, conn, database)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		if schemas == nil {
+			schemas = []string{}
+		}
+		return c.JSON(schemas)
 	}
 	var q string
 	if familyOf(conn.Driver) == familySQLServer {
@@ -543,9 +595,30 @@ func (p *DB) handleObjects(c *fiber.Ctx) error {
 	}
 	database := c.Query("database")
 	schema := c.Query("schema")
+	switch familyOf(conn.Driver) {
+	case familyHTTP:
+		objs, err := p.httpObjects(conn, database)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		return c.JSON(objs)
+	case familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
+		objs, err := p.nativeObjects(conn, database)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		return c.JSON(objs)
+	}
 	db, err := p.pool(conn, database)
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
+	}
+	if isExtraFamily(conn.Driver) {
+		objs, err := extraObjects(c.Context(), db, conn, database, schema)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		return c.JSON(objs)
 	}
 
 	var query string
@@ -622,9 +695,21 @@ func (p *DB) handleColumns(c *fiber.Ctx) error {
 	if table == "" {
 		return jsonErr(c, fiber.StatusBadRequest, "缺少表名")
 	}
+	switch familyOf(conn.Driver) {
+	case familyHTTP, familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
+		// 这些类型没有关系型表结构，字段列表由查询面板返回。
+		return c.JSON([]Column{})
+	}
 	db, err := p.pool(conn, database)
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
+	}
+	if isExtraFamily(conn.Driver) {
+		cols, err := extraColumns(c.Context(), db, conn, database, schema, table)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		return c.JSON(cols)
 	}
 
 	switch familyOf(conn.Driver) {
@@ -814,10 +899,30 @@ func (p *DB) handleColumns(c *fiber.Ctx) error {
 	}
 }
 
+// isExtraFamily 判断是否属于新增的 database/sql 协议族。
+func isExtraFamily(driver string) bool {
+	switch familyOf(driver) {
+	case familyFirebird, familyHana, familyExasol, familyVertica, familyTrino, familySnowflake, familyHive:
+		return true
+	}
+	return false
+}
+
+// isNoTableFamily 判断该类型是否没有关系型表（REST/键值/图/消息等）。
+func isNoTableFamily(driver string) bool {
+	switch familyOf(driver) {
+	case familyHTTP, familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
+		return true
+	}
+	return false
+}
+
 // quoteIdent 按数据库方言转义标识符。
 func quoteIdent(driver, name string) string {
 	switch familyOf(driver) {
 	case familyMySQL:
+		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
+	case familyHive:
 		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 	case familySQLServer:
 		return "[" + strings.ReplaceAll(name, "]", "]]") + "]"
@@ -854,6 +959,42 @@ func qualify(driver, database, schema, table string) string {
 		}
 		return quoteIdent(driver, schema) + "." + quoteIdent(driver, table)
 	case familyClickHouse:
+		if database != "" {
+			return quoteIdent(driver, database) + "." + quoteIdent(driver, table)
+		}
+		return quoteIdent(driver, table)
+	case familyFirebird:
+		return quoteIdent(driver, table)
+	case familyHana, familyExasol, familyVertica:
+		owner := schema
+		if owner == "" {
+			owner = database
+		}
+		if owner != "" {
+			return quoteIdent(driver, owner) + "." + quoteIdent(driver, table)
+		}
+		return quoteIdent(driver, table)
+	case familyTrino:
+		parts := make([]string, 0, 3)
+		if database != "" {
+			parts = append(parts, quoteIdent(driver, database))
+		}
+		if schema != "" {
+			parts = append(parts, quoteIdent(driver, schema))
+		}
+		parts = append(parts, quoteIdent(driver, table))
+		return strings.Join(parts, ".")
+	case familySnowflake:
+		parts := make([]string, 0, 3)
+		if database != "" {
+			parts = append(parts, quoteIdent(driver, database))
+		}
+		if schema != "" {
+			parts = append(parts, quoteIdent(driver, schema))
+		}
+		parts = append(parts, quoteIdent(driver, table))
+		return strings.Join(parts, ".")
+	case familyHive:
 		if database != "" {
 			return quoteIdent(driver, database) + "." + quoteIdent(driver, table)
 		}

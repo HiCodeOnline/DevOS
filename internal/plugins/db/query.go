@@ -100,6 +100,50 @@ func (p *DB) handleQuery(c *fiber.Ctx) error {
 		return jsonErr(c, fiber.StatusBadRequest, "Redis 连接请在「命令」控制台执行命令")
 	case familyMongo:
 		return jsonErr(c, fiber.StatusBadRequest, "MongoDB 连接请在「命令」控制台执行 JSON 命令")
+	case familyHTTP:
+		if conn.ReadOnly && httpRequestIsWrite(in.SQL) {
+			return jsonErr(c, fiber.StatusForbidden, "该连接为只读模式，已拒绝执行写操作")
+		}
+		start := time.Now()
+		res, err := p.httpQuery(conn, in.Database, in.SQL, in.MaxRows)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		payload := fiber.Map{
+			"kind":       res.Kind,
+			"durationMs": time.Since(start).Milliseconds(),
+		}
+		if res.Kind == "rows" {
+			payload["columns"] = res.Columns
+			payload["rows"] = res.Rows
+			payload["rowCount"] = len(res.Rows)
+			payload["truncated"] = res.Truncated
+		} else {
+			payload["affected"] = res.Affected
+		}
+		return c.JSON(payload)
+	case familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
+		if conn.ReadOnly {
+			return jsonErr(c, fiber.StatusForbidden, "该连接为只读模式，已拒绝执行写操作")
+		}
+		start := time.Now()
+		res, err := p.nativeExec(conn, in.Database, in.SQL, in.MaxRows)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		payload := fiber.Map{
+			"kind":       res.Kind,
+			"durationMs": time.Since(start).Milliseconds(),
+		}
+		if res.Kind == "rows" {
+			payload["columns"] = res.Columns
+			payload["rows"] = res.Rows
+			payload["rowCount"] = len(res.Rows)
+			payload["truncated"] = res.Truncated
+		} else {
+			payload["affected"] = res.Affected
+		}
+		return c.JSON(payload)
 	}
 	if conn.ReadOnly && isWriteSQL(in.SQL) {
 		return jsonErr(c, fiber.StatusForbidden, "该连接为只读模式，已拒绝执行写操作")
@@ -189,6 +233,8 @@ func tableQuery(driver, database, schema, table, sort, dir string, page, pageSiz
 			return q + order + " LIMIT " + n + " OFFSET " + m
 		}
 		return q + order + " OFFSET " + m + " ROWS FETCH NEXT " + n + " ROWS ONLY"
+	case familyFirebird:
+		return q + order + firebirdPage(page, pageSize, offset)
 	default:
 		return q + order + " LIMIT " + n + " OFFSET " + m
 	}
@@ -215,6 +261,10 @@ func (p *DB) handleTableData(c *fiber.Ctx) error {
 	}
 	sortCol := c.Query("sort")
 	dir := c.Query("dir")
+	switch familyOf(conn.Driver) {
+	case familyHTTP, familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
+		return jsonErr(c, fiber.StatusBadRequest, "该连接类型请在「查询」面板执行语句")
+	}
 	db, err := p.pool(conn, database)
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
@@ -288,6 +338,14 @@ func (p *DB) handleExport(c *fiber.Ctx) error {
 		q = tableQuery(conn.Driver, in.Database, in.Schema, in.Table, in.Sort, in.Dir, 1, 0)
 	}
 
+	if familyOf(conn.Driver) == familyHTTP {
+		res, err := p.httpQuery(conn, in.Database, q, 20000)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		return writeCSV(c, res.Columns, res.Rows)
+	}
+
 	db, err := p.pool(conn, in.Database)
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
@@ -341,5 +399,27 @@ func (p *DB) handleExport(c *fiber.Ctx) error {
 	if writeErr != nil {
 		p.log.Warn("导出 CSV 中断", "err", writeErr)
 	}
+	return nil
+}
+
+// writeCSV 将结果集以 UTF-8 BOM 的 CSV 形式直接写回响应。
+func writeCSV(c *fiber.Ctx, cols []string, rows [][]any) error {
+	c.Set("Content-Type", "text/csv; charset=utf-8")
+	c.Set("Content-Disposition", `attachment; filename="devos-export.csv"`)
+	w := csv.NewWriter(c.Response().BodyWriter())
+	_, _ = c.Response().BodyWriter().Write([]byte{0xEF, 0xBB, 0xBF})
+	_ = w.Write(cols)
+	for _, row := range rows {
+		record := make([]string, len(cols))
+		for i := range cols {
+			if i < len(row) && row[i] != nil {
+				record[i] = fmt.Sprint(row[i])
+			}
+		}
+		if err := w.Write(record); err != nil {
+			break
+		}
+	}
+	w.Flush()
 	return nil
 }
