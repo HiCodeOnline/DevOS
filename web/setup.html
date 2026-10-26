@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DevOS</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px;
+        color: #0f172a;
+        font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+        background:
+          radial-gradient(880px 520px at 10% -12%, rgba(167, 243, 208, 0.5) 0%, rgba(167, 243, 208, 0) 62%),
+          radial-gradient(760px 460px at 94% 2%, rgba(191, 219, 254, 0.5) 0%, rgba(191, 219, 254, 0) 60%),
+          linear-gradient(180deg, #f8fafc, #eef2f7);
+      }
+      .card {
+        width: min(564px, 100%);
+        padding: 32px 34px 28px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        background: #fff;
+        box-shadow: 0 40px 90px -44px rgba(15, 23, 42, 0.5);
+        animation: setupIn 0.22s ease;
+      }
+      @keyframes setupIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px) scale(0.99);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .logo {
+        display: grid;
+        place-items: center;
+        height: 38px;
+        width: 38px;
+        flex: none;
+        border-radius: 12px;
+        color: #fff;
+        background: linear-gradient(145deg, #34d399, #10b981);
+        box-shadow: 0 12px 26px -14px rgba(16, 185, 129, 0.8);
+      }
+      .logo svg {
+        height: 20px;
+        width: 20px;
+      }
+      .brand-name {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .brand-sub {
+        margin-top: 2px;
+        font-size: 10.5px;
+        color: #94a3b8;
+      }
+      h1 {
+        margin: 26px 0 0;
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+      .desc {
+        margin: 8px 0 0;
+        font-size: 12px;
+        line-height: 1.7;
+        color: #64748b;
+      }
+      .field {
+        margin-top: 22px;
+      }
+      .field-label {
+        display: block;
+        margin-bottom: 7px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #334155;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      .dir-input {
+        flex: 1;
+        min-width: 0;
+        height: 42px;
+        padding: 0 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 11px;
+        background: #fbfcfe;
+        color: #0f172a;
+        font-family: "JetBrains Mono", Consolas, ui-monospace, monospace;
+        font-size: 12px;
+        outline: none;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      }
+      .dir-input:focus {
+        border-color: #10b981;
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.14);
+      }
+      .browse-btn {
+        height: 42px;
+        padding: 0 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 11px;
+        background: #fff;
+        color: #475569;
+        font-size: 11.5px;
+        white-space: nowrap;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+      .browse-btn:hover {
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      .browse-btn:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+      .hint {
+        margin: 8px 0 0;
+        font-size: 10.5px;
+        line-height: 1.6;
+        color: #94a3b8;
+      }
+      .note {
+        margin-top: 20px;
+        padding: 11px 13px;
+        border: 1px solid #eef2f7;
+        border-radius: 11px;
+        background: #f8fafc;
+        font-size: 10.5px;
+        line-height: 1.7;
+        color: #94a3b8;
+      }
+      .error {
+        display: none;
+        margin: 14px 0 0;
+        font-size: 11px;
+        color: #e11d48;
+      }
+      .error.show {
+        display: block;
+      }
+      .status {
+        display: none;
+        margin: 14px 0 0;
+        font-size: 11px;
+        color: #047857;
+      }
+      .status.show {
+        display: block;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 24px;
+      }
+      .primary {
+        height: 42px;
+        padding: 0 22px;
+        border: none;
+        border-radius: 11px;
+        background: #0f172a;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s ease, opacity 0.15s ease;
+      }
+      .primary:hover {
+        background: #1e293b;
+      }
+      .primary:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="brand">
+        <span class="logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </span>
+        <div>
+          <div class="brand-name">DevOS</div>
+          <div class="brand-sub">Developer Workspace</div>
+        </div>
+      </div>
+
+      <h1 data-i18n="title"></h1>
+      <p class="desc" data-i18n="desc"></p>
+
+      <div class="field">
+        <label class="field-label" for="dir" data-i18n="label"></label>
+        <div class="row">
+          <input id="dir" class="dir-input" type="text" spellcheck="false" autocomplete="off" />
+          <button id="browse" class="browse-btn" type="button" data-i18n="browse"></button>
+        </div>
+        <p class="hint" data-i18n="hint"></p>
+      </div>
+
+      <p class="note" data-i18n="note"></p>
+      <p id="error" class="error"></p>
+      <p id="status" class="status"></p>
+
+      <div class="actions">
+        <button id="confirm" class="primary" type="button" data-i18n="confirm"></button>
+      </div>
+    </main>
+
+    <script>
+      (function () {
+        var DICT = {
+          "zh-CN": {
+            title: "选择应用数据存储目录",
+            desc: "DevOS 将配置、加密凭据、壁纸与插件数据保存在此目录中。可以使用默认位置，也可以选择其他目录。",
+            label: "数据目录",
+            browse: "浏览…",
+            hint: "请填写本机可写的绝对路径，目录不存在时会自动创建。",
+            note: "目录中的配置文件、加密密钥与连接信息均受保护。更换目录不会自动迁移原目录中的数据。",
+            confirm: "确定并初始化",
+            initializing: "正在初始化…",
+            done: "初始化完成，正在启动 DevOS…",
+            errors: {
+              empty: "请输入数据目录",
+              not_abs: "请填写绝对路径，例如 D:\\DevOSData",
+              volume_root: "不能直接使用磁盘根目录，请选择具体文件夹",
+              mkdir_failed: "无法创建该目录，请检查路径是否合法",
+              not_writable: "该目录不可写，请更换其他位置",
+              save_failed: "保存目录设置失败，请重试",
+              parse_failed: "参数解析失败",
+              browse_unsupported: "无法打开目录选择窗口，请手动填写路径",
+              network: "无法连接 DevOS 服务，请确认应用仍在运行",
+              unknown: "初始化失败，请重试"
+            }
+          },
+          "zh-TW": {
+            title: "選擇應用資料儲存目錄",
+            desc: "DevOS 會將設定、加密憑證、桌布與外掛資料保存在此目錄中。可以使用預設位置，也可以選擇其他目錄。",
+            label: "資料目錄",
+            browse: "瀏覽…",
+            hint: "請填寫本機可寫入的絕對路徑，目錄不存在時會自動建立。",
+            note: "目錄中的設定檔、加密金鑰與連線資訊均受保護。更換目錄不會自動移轉原目錄中的資料。",
+            confirm: "確定並初始化",
+            initializing: "正在初始化…",
+            done: "初始化完成，正在啟動 DevOS…",
+            errors: {
+              empty: "請輸入資料目錄",
+              not_abs: "請填寫絕對路徑，例如 D:\\DevOSData",
+              volume_root: "不能直接使用磁碟根目錄，請選擇具體資料夾",
+              mkdir_failed: "無法建立該目錄，請檢查路徑是否合法",
+              not_writable: "該目錄無法寫入，請更換其他位置",
+              save_failed: "儲存目錄設定失敗，請重試",
+              parse_failed: "參數解析失敗",
+              browse_unsupported: "無法開啟目錄選擇視窗，請手動填寫路徑",
+              network: "無法連線 DevOS 服務，請確認應用仍在執行",
+              unknown: "初始化失敗，請重試"
+            }
+          },
+          en: {
+            title: "Choose a data folder",
+            desc: "DevOS stores its configuration, encrypted credentials, wallpapers and plugin data in this folder. Keep the default location or pick another folder.",
+            label: "Data folder",
+            browse: "Browse…",
+            hint: "Enter an absolute path that is writable on this machine. The folder is created automatically if it does not exist.",
+            note: "Configuration files, encryption keys and connection details in this folder are protected. Changing the folder does not migrate existing data automatically.",
+            confirm: "Confirm and initialize",
+            initializing: "Initializing…",
+            done: "Initialization complete. Starting DevOS…",
+            errors: {
+              empty: "Please enter a data folder",
+              not_abs: "Please enter an absolute path, for example D:\\DevOSData",
+              volume_root: "A drive root cannot be used directly. Please choose a folder inside it",
+              mkdir_failed: "Unable to create this folder. Please check the path",
+              not_writable: "This folder is not writable. Please choose another location",
+              save_failed: "Failed to save the folder setting. Please try again",
+              parse_failed: "Invalid request",
+              browse_unsupported: "Unable to open the folder picker. Please type the path instead",
+              network: "Cannot reach the DevOS service. Make sure the app is still running",
+              unknown: "Initialization failed. Please try again"
+            }
+          }
+        };
+
+        function detectLocale() {
+          var lang = (navigator.language || "en").toLowerCase();
+          if (lang.indexOf("zh-tw") === 0 || lang.indexOf("zh-hant") === 0 || lang.indexOf("zh-hk") === 0) {
+            return "zh-TW";
+          }
+          if (lang.indexOf("zh") === 0) {
+            return "zh-CN";
+          }
+          return "en";
+        }
+
+        var locale = detectLocale();
+        var dict = DICT[locale] || DICT.en;
+        document.documentElement.lang = locale;
+
+        function applyText() {
+          var nodes = document.querySelectorAll("[data-i18n]");
+          for (var i = 0; i < nodes.length; i++) {
+            var key = nodes[i].getAttribute("data-i18n");
+            if (dict[key]) {
+              nodes[i].textContent = dict[key];
+            }
+          }
+        }
+        applyText();
+
+        var dirInput = document.getElementById("dir");
+        var browseBtn = document.getElementById("browse");
+        var confirmBtn = document.getElementById("confirm");
+        var errorBox = document.getElementById("error");
+        var statusBox = document.getElementById("status");
+        var baseURL = location.origin;
+        var busy = false;
+
+        function showError(code, fallback) {
+          var message = (dict.errors && dict.errors[code]) || fallback || dict.errors.unknown;
+          errorBox.textContent = message;
+          errorBox.classList.add("show");
+          statusBox.classList.remove("show");
+        }
+
+        function clearError() {
+          errorBox.classList.remove("show");
+        }
+
+        function setBusy(next) {
+          busy = next;
+          confirmBtn.disabled = next;
+          browseBtn.disabled = next;
+          dirInput.disabled = next;
+          confirmBtn.textContent = next ? dict.initializing : dict.confirm;
+        }
+
+        var headers = { "X-DevOS-Request": "1" };
+
+        fetch("/api/setup/status", { headers: headers, cache: "no-store" })
+          .then(function (res) {
+            return res.ok ? res.json() : null;
+          })
+          .then(function (data) {
+            if (data && data.dataDir && !dirInput.value) {
+              dirInput.value = data.dataDir;
+            }
+          })
+          .catch(function () {});
+
+        browseBtn.addEventListener("click", function () {
+          if (busy) return;
+          clearError();
+          browseBtn.disabled = true;
+          var startDir = (dirInput.value || "").trim();
+          fetch("/api/setup/browse", {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, headers),
+            body: JSON.stringify({ dir: startDir })
+          })
+            .then(function (res) {
+              return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+              });
+            })
+            .then(function (result) {
+              if (result.ok && result.data.dir) {
+                dirInput.value = result.data.dir;
+              } else {
+                showError(result.data.code, result.data.error);
+              }
+            })
+            .catch(function () {
+              showError("browse_unsupported");
+            })
+            .finally(function () {
+              browseBtn.disabled = false;
+            });
+        });
+
+        function waitForBoot(url, attempt) {
+          var tries = attempt || 0;
+          fetch("/api/health", { cache: "no-store" })
+            .then(function (res) {
+              if (res.ok) {
+                location.replace(url);
+                return;
+              }
+              throw new Error("not ready");
+            })
+            .catch(function () {
+              if (tries > 50) {
+                location.replace(url);
+                return;
+              }
+              setTimeout(function () {
+                waitForBoot(url, tries + 1);
+              }, 400);
+            });
+        }
+
+        confirmBtn.addEventListener("click", function () {
+          if (busy) return;
+          clearError();
+          setBusy(true);
+          fetch("/api/setup/choose", {
+            method: "POST",
+            headers: Object.assign({ "Content-Type": "application/json" }, headers),
+            body: JSON.stringify({ dir: dirInput.value.trim() })
+          })
+            .then(function (res) {
+              return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+              });
+            })
+            .then(function (result) {
+              if (!result.ok) {
+                setBusy(false);
+                showError(result.data.code, result.data.error);
+                return;
+              }
+              statusBox.textContent = dict.done;
+              statusBox.classList.add("show");
+              setTimeout(function () {
+                waitForBoot(result.data.url || baseURL, 0);
+              }, 300);
+            })
+            .catch(function () {
+              setBusy(false);
+              showError("network");
+            });
+        });
+
+        dirInput.addEventListener("keydown", function (event) {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            confirmBtn.click();
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

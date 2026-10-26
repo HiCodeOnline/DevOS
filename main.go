@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"time"
 
 	"devos/internal/config"
@@ -22,15 +21,35 @@ func main() {
 	portFlag := flag.Int("port", 0, "指定监听端口（默认读取 config.json，7788）")
 	noTray := flag.Bool("no-tray", false, "不创建任务栏托盘图标")
 	noBrowser := flag.Bool("no-browser", false, "启动后不自动打开浏览器")
+	setupFlag := flag.Bool("setup", false, "强制显示数据目录初始化向导")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	dataDir, err := defaultDataDir()
+	dataDir, needSetup, err := resolveDataDir(*setupFlag)
 	if err != nil {
 		logger.Error("无法确定数据目录", "err", err)
 		os.Exit(1)
 	}
+
+	setupPort := 0
+	browserOpened := false
+	if needSetup {
+		cfg := config.Default()
+		if *portFlag > 0 {
+			cfg.Port = *portFlag
+		}
+		if *noBrowser {
+			cfg.OpenBrowser = false
+		}
+		// 初始化向导确认目录后会在同一进程内继续启动正式服务。
+		dir, port, opened, ok := runSetupMode(cfg, logger, dataDir)
+		if !ok {
+			return
+		}
+		dataDir, setupPort, browserOpened = dir, port, opened
+	}
+
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		logger.Error("无法创建数据目录", "dir", dataDir, "err", err)
 		os.Exit(1)
@@ -43,15 +62,19 @@ func main() {
 	}
 	if *portFlag > 0 {
 		cfg.Port = *portFlag
+	} else if setupPort > 0 {
+		// 复用初始化向导的端口，让向导页面能自动跳转到桌面。
+		cfg.Port = setupPort
 	}
 	if *noBrowser {
 		cfg.OpenBrowser = false
 	}
+	openBrowser := cfg.OpenBrowser && !browserOpened
 
 	// 单实例：已有 DevOS 在运行则直接唤起桌面。
 	if url, ok := kernel.FindDevOS(cfg.Port, cfg.MaxPortTries); ok {
 		logger.Info("DevOS 已在运行，打开已有实例", "url", url)
-		if cfg.OpenBrowser {
+		if openBrowser {
 			_ = kernel.OpenBrowser(url)
 		}
 		return
@@ -86,7 +109,7 @@ func main() {
 	logger.Info("DevOS 已就绪", "url", baseURL, "data", dataDir, "port", port)
 
 	if *noTray {
-		if cfg.OpenBrowser && kernel.WaitReady(baseURL, 3*time.Second) {
+		if openBrowser && kernel.WaitReady(baseURL, 3*time.Second) {
 			_ = kernel.OpenBrowser(baseURL)
 		}
 		kernel.WaitSignal(func() { _ = k.Shutdown() })
@@ -98,13 +121,5 @@ func main() {
 		trayApps = append(trayApps, kernel.TrayApp{ID: app.ID, Name: app.Name})
 	}
 
-	kernel.RunTray(baseURL, dataDir, cfg.OpenBrowser, trayApps, func() { _ = k.Shutdown() })
-}
-
-func defaultDataDir() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "DevOS"), nil
+	kernel.RunTray(baseURL, dataDir, openBrowser, trayApps, func() { _ = k.Shutdown() })
 }
