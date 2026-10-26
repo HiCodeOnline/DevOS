@@ -74,6 +74,21 @@ func (p *SFTP) Register(api fiber.Router) {
 		return c.JSON(p.store.List())
 	})
 
+	api.Post("/profiles", func(c *fiber.Ctx) error {
+		var in profile.Profile
+		if err := c.BodyParser(&in); err != nil {
+			return fiber.NewError(fiber.StatusBadRequest, "参数解析失败")
+		}
+		if in.Host == "" || in.User == "" {
+			return fiber.NewError(fiber.StatusBadRequest, "主机与用户名不能为空")
+		}
+		saved, err := p.store.Save(in)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+		}
+		return c.JSON(saved)
+	})
+
 	api.Get("/list", func(c *fiber.Ctx) error {
 		dir := cleanRemote(c.Query("path", "/"))
 		var entries []entry
