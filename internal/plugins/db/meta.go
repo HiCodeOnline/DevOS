@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	_ "gitee.com/chunanyong/dm" // 达梦 DM 驱动
+	_ "gitee.com/chunanyong/dm"                // 达梦 DM 驱动
+	_ "github.com/ClickHouse/clickhouse-go/v2" // ClickHouse 驱动
 	"github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v2"
 	_ "github.com/jackc/pgx/v5/stdlib"  // PostgreSQL 及兼容数据库
@@ -31,8 +32,16 @@ func resolveDatabase(c Connection, database string) string {
 	switch familyOf(c.Driver) {
 	case familySQLite:
 		return "main"
+	case familyClickHouse:
+		if database != "" {
+			return database
+		}
+		if c.Database != "" {
+			return c.Database
+		}
+		return "default"
 	case familyOracle:
-		if c.Driver == "dm" {
+		if typeOf(c.Driver).ID == "dameng" {
 			return ""
 		}
 		if c.Database != "" {
@@ -107,8 +116,32 @@ func buildDSN(c Connection, database string) (string, error) {
 		u.RawQuery = q.Encode()
 		return u.String(), nil
 
+	case familyClickHouse:
+		scheme := "clickhouse"
+		if p := defPort(c); p == 8123 {
+			scheme = "http"
+		} else if p == 8443 {
+			scheme = "https"
+		}
+		u := url.URL{
+			Scheme: scheme,
+			User:   url.UserPassword(c.User, c.Password),
+			Host:   addr,
+			Path:   "/" + db,
+		}
+		q := u.Query()
+		q.Set("dial_timeout", "8s")
+		if scheme == "https" {
+			q.Set("secure", "true")
+		}
+		for k, v := range parseParams(c.Params) {
+			q.Set(k, v)
+		}
+		u.RawQuery = q.Encode()
+		return u.String(), nil
+
 	case familyOracle:
-		if c.Driver == "dm" {
+		if typeOf(c.Driver).ID == "dameng" {
 			return dmDSN(c, addr), nil
 		}
 		service := db
@@ -214,6 +247,9 @@ func parseParams(raw string) map[string]string {
 
 // pool 返回（或创建）指定连接的连接池。
 func (p *DB) pool(c Connection, database string) (*sql.DB, error) {
+	if t := typeOf(c.Driver); t.Support == SupportPlanned {
+		return nil, fmt.Errorf("%s 暂未内置驱动，当前版本无法直接连接", t.Name)
+	}
 	key := c.ID + "|" + resolveDatabase(c, database)
 
 	p.poolsMu.Lock()
@@ -281,6 +317,8 @@ func versionSQL(driver string) string {
 		return "SELECT version()"
 	case familySQLite:
 		return "SELECT sqlite_version()"
+	case familyClickHouse:
+		return "SELECT version()"
 	case familyOracle:
 		return "SELECT banner FROM v$version WHERE ROWNUM = 1"
 	case familySQLServer:
@@ -438,6 +476,8 @@ func (p *DB) handleDatabases(c *fiber.Ctx) error {
 		q = "SELECT name FROM sys.databases WHERE state = 0 ORDER BY name"
 	case familyPostgres:
 		q = "SELECT datname FROM pg_database WHERE datistemplate = false AND datallowconn ORDER BY 1"
+	case familyClickHouse:
+		q = "SELECT name FROM system.databases ORDER BY name"
 	default:
 		q = "SELECT schema_name FROM information_schema.schemata ORDER BY 1"
 	}
@@ -471,6 +511,8 @@ func (p *DB) handleSchemas(c *fiber.Ctx) error {
 	case familySQLite:
 		return c.JSON([]string{"main"})
 	case familyMySQL:
+		return c.JSON([]string{database})
+	case familyClickHouse:
 		return c.JSON([]string{database})
 	case familyOracle:
 		return c.JSON([]string{oracleOwner(conn, database, "")})
@@ -531,6 +573,13 @@ func (p *DB) handleObjects(c *fiber.Ctx) error {
 		}
 		query = "SELECT TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = @p1 ORDER BY TABLE_NAME"
 		args = []any{schema}
+
+	case familyClickHouse:
+		if database == "" {
+			database = resolveDatabase(conn, database)
+		}
+		query = "SELECT name, if(engine LIKE '%View%', 'VIEW', 'TABLE') FROM system.tables WHERE database = ? ORDER BY name"
+		args = []any{database}
 
 	default:
 		if database == "" {
@@ -718,6 +767,28 @@ func (p *DB) handleColumns(c *fiber.Ctx) error {
 		}
 		return c.JSON(out)
 
+	case familyClickHouse:
+		if database == "" {
+			database = resolveDatabase(conn, database)
+		}
+		rows, err := db.QueryContext(c.Context(),
+			`SELECT name, type, if(default_kind = '', 'NO', 'YES'),
+			        if(is_in_primary_key, 'PRI', ''), default_expression, '', comment
+			 FROM system.columns WHERE database = ? AND table = ? ORDER BY position`, database, table)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		defer rows.Close()
+		out := make([]Column, 0, 16)
+		for rows.Next() {
+			var col Column
+			if err := rows.Scan(&col.Name, &col.Type, &col.Nullable, &col.Key, &col.Default, &col.Extra, &col.Comment); err != nil {
+				continue
+			}
+			out = append(out, col)
+		}
+		return c.JSON(out)
+
 	default:
 		if database == "" {
 			database = conn.Database
@@ -782,6 +853,11 @@ func qualify(driver, database, schema, table string) string {
 			schema = "dbo"
 		}
 		return quoteIdent(driver, schema) + "." + quoteIdent(driver, table)
+	case familyClickHouse:
+		if database != "" {
+			return quoteIdent(driver, database) + "." + quoteIdent(driver, table)
+		}
+		return quoteIdent(driver, table)
 	default:
 		return quoteIdent(driver, table)
 	}

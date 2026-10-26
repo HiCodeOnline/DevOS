@@ -185,7 +185,7 @@ func tableQuery(driver, database, schema, table, sort, dir string, page, pageSiz
 		}
 		return q + order + " OFFSET " + m + " ROWS FETCH NEXT " + n + " ROWS ONLY"
 	case familyOracle:
-		if driver == "dm" {
+		if typeOf(driver).ID == "dameng" {
 			return q + order + " LIMIT " + n + " OFFSET " + m
 		}
 		return q + order + " OFFSET " + m + " ROWS FETCH NEXT " + n + " ROWS ONLY"
@@ -261,6 +261,7 @@ func (p *DB) handleExport(c *fiber.Ctx) error {
 		SQL      string `json:"sql"`
 		Sort     string `json:"sort"`
 		Dir      string `json:"dir"`
+		Format   string `json:"format"`
 	}
 	if err := c.BodyParser(&in); err != nil {
 		return jsonErr(c, fiber.StatusBadRequest, "参数解析失败")
@@ -268,6 +269,16 @@ func (p *DB) handleExport(c *fiber.Ctx) error {
 	conn, err := p.conn(in.ID)
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadRequest, err.Error())
+	}
+	if strings.EqualFold(in.Format, "sql") {
+		table := strings.TrimSpace(in.Table)
+		if table == "" {
+			return jsonErr(c, fiber.StatusBadRequest, "SQL 导出仅支持整表导出，请提供表名")
+		}
+		if !typeOf(conn.Driver).SQL {
+			return jsonErr(c, fiber.StatusBadRequest, "该连接类型不支持 SQL 导出")
+		}
+		return p.exportSQL(c, conn, in.Database, in.Schema, table)
 	}
 	q := strings.TrimSpace(in.SQL)
 	if q == "" {

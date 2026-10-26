@@ -154,7 +154,12 @@ func (p *DB) Register(api fiber.Router) {
 	api.Get("/objects", p.handleObjects)
 	api.Get("/columns", p.handleColumns)
 	api.Get("/table-data", p.handleTableData)
+	api.Get("/table-structure", p.handleTableStructure)
+	api.Post("/table-rows", p.handleTableRows)
+	api.Post("/table-alter", p.handleTableAlter)
 	api.Post("/query", p.handleQuery)
+	api.Post("/explain", p.handleExplain)
+	api.Post("/sqlfile", p.handleSQLFile)
 	api.Post("/export", p.handleExport)
 
 	// NoSQL：Redis 键空间与 MongoDB 文档浏览。
