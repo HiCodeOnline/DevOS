@@ -362,6 +362,84 @@ func TestWorkspacePersistAndReload(t *testing.T) {
 	}
 }
 
+func TestMockGroupsToggle(t *testing.T) {
+	api, app := newTestAPI(t)
+
+	rules := []MockRule{
+		{ID: "o1", Name: "订单列表", Group: "订单", Method: "GET", Path: "/orders", Status: 200, Body: `{"scope":"order"}`, Enabled: true},
+		{ID: "u1", Name: "用户列表", Group: "用户", Method: "GET", Path: "/users", Status: 200, Body: `{"scope":"user"}`, Enabled: true},
+		{ID: "r1", Name: "根规则", Method: "GET", Path: "/root", Status: 200, Body: `{"scope":"root"}`, Enabled: true},
+	}
+	if status, data := doJSON(t, app, http.MethodPost, "/api/mocks", rules); status != http.StatusOK {
+		t.Fatalf("保存规则失败: %d %s", status, data)
+	}
+
+	ws := apiWorkspace(t, app)
+	if len(ws.Mock.Groups) != 2 {
+		t.Fatalf("规则引用的分组应自动登记: %+v", ws.Mock.Groups)
+	}
+	for _, group := range ws.Mock.Groups {
+		if !group.Enabled {
+			t.Fatalf("新登记分组应默认启用: %+v", group)
+		}
+	}
+
+	mustStatus := func(path string, want int) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		resp, err := app.Test(req, 5000)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != want {
+			body, _ := io.ReadAll(resp.Body)
+			t.Fatalf("%s 期望 %d，实际 %d %s", path, want, resp.StatusCode, body)
+		}
+	}
+	mustStatus("/mock/orders", http.StatusOK)
+	mustStatus("/mock/users", http.StatusOK)
+	mustStatus("/mock/root", http.StatusOK)
+
+	// 停用「订单」分组后，组内规则全部不参与匹配，其它分组与未分组规则不受影响。
+	for i := range ws.Mock.Groups {
+		if ws.Mock.Groups[i].Name == "订单" {
+			ws.Mock.Groups[i].Enabled = false
+		}
+	}
+	if status, data := doJSON(t, app, http.MethodPost, "/api/workspace", ws); status != http.StatusOK {
+		t.Fatalf("保存工作区失败: %d %s", status, data)
+	}
+	mustStatus("/mock/orders", http.StatusNotFound)
+	mustStatus("/mock/users", http.StatusOK)
+	mustStatus("/mock/root", http.StatusOK)
+
+	// 重新启用后恢复命中，并能在重载后保持分组状态。
+	ws = apiWorkspace(t, app)
+	for i := range ws.Mock.Groups {
+		ws.Mock.Groups[i].Enabled = ws.Mock.Groups[i].Name == "订单"
+	}
+	if status, data := doJSON(t, app, http.MethodPost, "/api/workspace", ws); status != http.StatusOK {
+		t.Fatalf("保存工作区失败: %d %s", status, data)
+	}
+	mustStatus("/mock/orders", http.StatusOK)
+	mustStatus("/mock/users", http.StatusNotFound)
+
+	reloaded := New()
+	dir := filepath.Dir(api.file)
+	ctx := &plugin.Context{DataDir: dir, BaseURL: "http://127.0.0.1:7788", Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	if err := reloaded.Init(ctx); err != nil {
+		t.Fatalf("重新加载失败: %v", err)
+	}
+	states := map[string]bool{}
+	for _, group := range reloaded.ws.Mock.Groups {
+		states[group.Name] = group.Enabled
+	}
+	if !states["订单"] || states["用户"] {
+		t.Fatalf("分组状态未持久化: %+v", reloaded.ws.Mock.Groups)
+	}
+}
+
 func TestMockLogs(t *testing.T) {
 	_, app := newTestAPI(t)
 	req := httptest.NewRequest(http.MethodGet, "/mock/hello", nil)

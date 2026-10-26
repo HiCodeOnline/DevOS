@@ -395,6 +395,16 @@
         <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.name">规则名称</span>
         <input id="mName" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-amber-400" />
       </label>
+      <div class="mt-3">
+        <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.group">分组</span>
+        <div class="ui-select" data-ui-select="mGroup">
+          <button type="button" class="ui-select-trigger" aria-haspopup="listbox" aria-expanded="false">
+            <span class="ui-select-value"></span>
+            <svg class="ui-select-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+          <select id="mGroup" class="hidden"></select>
+        </div>
+      </div>
       <div class="mt-3 grid grid-cols-12 gap-2">
         <div class="col-span-3">
           <span class="mb-1 block text-[10.5px] font-medium text-slate-500" data-i18n="api.mock.method">方法</span>
@@ -509,6 +519,7 @@
       reqTab: "params",
       envDraft: null,
       mockDraft: null,
+      mockCollapsed: {},
       sending: false,
     };
 
@@ -559,6 +570,9 @@
       out.environments = Array.isArray(out.environments) ? out.environments : [];
       out.history = Array.isArray(out.history) ? out.history : [];
       out.mock = out.mock || { enabled: true };
+      out.mock.groups = Array.isArray(out.mock.groups)
+        ? out.mock.groups.filter((group) => group && typeof group.name === "string" && group.name)
+        : [];
       out.collections.forEach((c) => {
         c.requests = Array.isArray(c.requests) ? c.requests : [];
         c.name = c.name || t("api.common.untitled");
@@ -1460,42 +1474,86 @@
       $("mockBase").textContent = mockBaseURL();
     }
 
+    function ruleGroup(rule) {
+      return String(rule.group || "").trim();
+    }
+
+    function mockGroupEnabled(name) {
+      const group = (state.ws.mock.groups || []).find((item) => item.name === name);
+      return !group || group.enabled !== false;
+    }
+
+    function mockRuleCard(rule) {
+      const query = Object.entries(rule.query || {});
+      const headerCount = Object.keys(rule.headers || {}).length;
+      const queryText = query.map(([key, value]) => value ? `${key}=${value}` : `${key}*`).join(", ");
+      return `<div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm ${rule.enabled === false ? "opacity-60" : ""}">
+        <div class="flex flex-wrap items-center gap-2">
+          ${methodBadge(rule.method)}
+          <code class="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-[10.5px] text-slate-700">${esc(rule.path)}</code>
+          <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-600">${esc(rule.name || t("api.mock.untitled"))}</span>
+          <div class="ml-auto flex flex-none items-center gap-1.5">
+            <label class="switch" title="${esc(t("api.mock.enableRule"))}">
+              <input type="checkbox" data-mock-toggle="${esc(rule.id)}" ${rule.enabled === false ? "" : "checked"} /><span></span>
+            </label>
+            <button data-mock-try="${esc(rule.id)}" class="btn-ghost">${esc(t("api.mock.try"))}</button>
+            <button data-mock-edit="${esc(rule.id)}" class="btn-ghost">${esc(t("api.common.edit"))}</button>
+            <button data-mock-del="${esc(rule.id)}" class="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500" title="${esc(t("api.common.delete"))}">
+              <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="mt-1.5 flex flex-wrap items-center gap-3 text-[9.5px] text-slate-400">
+          <span>${rule.status || 200}</span>
+          <span>${rule.delayMs || 0} ms</span>
+          ${queryText ? `<span class="truncate">?${esc(queryText)}</span>` : ""}
+          ${headerCount ? `<span>Headers · ${headerCount}</span>` : ""}
+          ${rule.enabled === false ? `<span class="text-amber-600">${esc(t("api.common.disabled"))}</span>` : ""}
+        </div>
+        <pre class="scroll-thin mt-2 max-h-[92px] overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-[9.5px] leading-relaxed text-slate-500">${esc(String(rule.body || "").slice(0, 600) || t("api.res.noBody"))}</pre>
+      </div>`;
+    }
+
+    function mockGroupSection(name, rules) {
+      if (!rules.length) return "";
+      const key = name || "__ungrouped";
+      const collapsed = !!state.mockCollapsed[key];
+      const on = !name || mockGroupEnabled(name);
+      return `<section class="rounded-xl border border-slate-200 bg-white/70 p-1 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2 px-2 py-1.5">
+          <button data-mock-group-collapse="${esc(name)}" class="grid h-5 w-5 place-items-center rounded text-slate-400 hover:bg-slate-100">
+            <svg class="h-3 w-3 transition-transform ${collapsed ? "" : "rotate-90"}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
+          </button>
+          <span class="text-[11.5px] font-semibold ${on ? "text-slate-700" : "text-slate-400"}">${esc(name || t("api.mock.ungrouped"))}</span>
+          <span class="chip bg-slate-100 text-slate-500">${rules.length}</span>
+          ${name ? `<label class="switch ml-auto" title="${esc(t("api.mock.groupHint"))}">
+              <input type="checkbox" data-mock-group-toggle="${esc(name)}" ${on ? "checked" : ""} /><span></span>
+            </label>
+            <span class="w-[42px] text-[10px] ${on ? "text-emerald-600" : "text-slate-400"}">${esc(t(on ? "api.mock.groupOn" : "api.mock.groupOff"))}</span>`
+            : `<span class="ml-auto text-[9.5px] text-slate-400">${esc(t("api.mock.groupUngroupedHint"))}</span>`}
+        </div>
+        <div class="${collapsed ? "hidden" : ""} space-y-2 px-1 pb-1 ${on ? "" : "opacity-60"}">${rules.map(mockRuleCard).join("")}</div>
+      </section>`;
+    }
+
     function renderMocks() {
       const box = $("mockList");
       if (!state.mocks.length) {
         box.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 py-12 text-center text-[11px] text-slate-400">${esc(t("api.mock.empty"))}</div>`;
         return;
       }
-      box.innerHTML = state.mocks.map((rule) => {
-        const query = Object.entries(rule.query || {});
-        const headerCount = Object.keys(rule.headers || {}).length;
-        const queryText = query.map(([key, value]) => value ? `${key}=${value}` : `${key}*`).join(", ");
-        return `<div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm ${rule.enabled === false ? "opacity-60" : ""}">
-          <div class="flex flex-wrap items-center gap-2">
-            ${methodBadge(rule.method)}
-            <code class="rounded bg-slate-50 px-1.5 py-0.5 font-mono text-[10.5px] text-slate-700">${esc(rule.path)}</code>
-            <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-slate-600">${esc(rule.name || t("api.mock.untitled"))}</span>
-            <div class="ml-auto flex flex-none items-center gap-1.5">
-              <label class="switch" title="${esc(t("api.mock.enableRule"))}">
-                <input type="checkbox" data-mock-toggle="${esc(rule.id)}" ${rule.enabled === false ? "" : "checked"} /><span></span>
-              </label>
-              <button data-mock-try="${esc(rule.id)}" class="btn-ghost">${esc(t("api.mock.try"))}</button>
-              <button data-mock-edit="${esc(rule.id)}" class="btn-ghost">${esc(t("api.common.edit"))}</button>
-              <button data-mock-del="${esc(rule.id)}" class="grid h-7 w-7 place-items-center rounded-lg border border-slate-200 text-slate-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500" title="${esc(t("api.common.delete"))}">
-                <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
-              </button>
-            </div>
-          </div>
-          <div class="mt-1.5 flex flex-wrap items-center gap-3 text-[9.5px] text-slate-400">
-            <span>${rule.status || 200}</span>
-            <span>${rule.delayMs || 0} ms</span>
-            ${queryText ? `<span class="truncate">?${esc(queryText)}</span>` : ""}
-            ${headerCount ? `<span>Headers · ${headerCount}</span>` : ""}
-            ${rule.enabled === false ? `<span class="text-amber-600">${esc(t("api.common.disabled"))}</span>` : ""}
-          </div>
-          <pre class="scroll-thin mt-2 max-h-[92px] overflow-auto rounded-lg bg-slate-50 p-2 font-mono text-[9.5px] leading-relaxed text-slate-500">${esc(String(rule.body || "").slice(0, 600) || t("api.res.noBody"))}</pre>
-        </div>`;
-      }).join("");
+      const ordered = (state.ws.mock.groups || []).map((group) => group.name);
+      const seen = new Set(ordered);
+      state.mocks.forEach((rule) => {
+        const name = ruleGroup(rule);
+        if (name && !seen.has(name)) {
+          seen.add(name);
+          ordered.push(name);
+        }
+      });
+      const sections = ordered.map((name) => mockGroupSection(name, state.mocks.filter((rule) => ruleGroup(rule) === name)));
+      sections.push(mockGroupSection("", state.mocks.filter((rule) => !ruleGroup(rule))));
+      box.innerHTML = sections.join("");
     }
 
     function renderLogs() {
@@ -1566,17 +1624,38 @@
       }
     }
 
+    async function setGroupEnabled(name, enabled) {
+      if (!name) return;
+      const groups = state.ws.mock.groups || (state.ws.mock.groups = []);
+      let group = groups.find((item) => item.name === name);
+      if (!group) {
+        group = { name, enabled };
+        groups.push(group);
+      }
+      group.enabled = enabled;
+      renderMocks();
+      try {
+        await api("/workspace", { method: "POST", body: JSON.stringify(state.ws) });
+      } catch (error) {
+        group.enabled = !enabled;
+        renderMocks();
+        toast(t("api.common.saveFailed", { error: error.message }));
+      }
+    }
+
     function openMockModal(rule, preset) {
       const editing = !!rule;
       const source = preset || {};
       state.mockDraft = {
         id: editing ? rule.id : "",
+        group: editing ? (rule.group || "") : (source.group || ""),
         method: editing ? rule.method : (source.method || "GET"),
         headers: ensureRows(editing ? entriesToKV(rule.headers) : [{ key: "Content-Type", value: "application/json; charset=utf-8", enabled: true }]),
         query: editing ? entriesToKV(rule.query) : entriesToKV(source.query),
       };
       $("mockTitle").textContent = t(editing ? "api.mock.titleEdit" : "api.mock.titleNew");
       $("mName").value = editing ? (rule.name || "") : (source.name || `${state.mockDraft.method} ${source.path || "/"}`);
+      buildGroupOptions(state.mockDraft.group);
       $("mMethod").value = state.mockDraft.method;
       syncSelectLabel($("mMethod"));
       $("mPath").value = editing ? (rule.path || "/") : (source.path || "/");
@@ -1612,6 +1691,39 @@
       return map;
     }
 
+    function buildGroupOptions(selected) {
+      const sel = $("mGroup");
+      if (!sel) return;
+      const groups = state.ws.mock.groups || [];
+      sel.innerHTML = `<option value="">${esc(t("api.mock.ungrouped"))}</option>` +
+        groups.map((group) => `<option value="${esc(group.name)}">${esc(group.name)}</option>`).join("") +
+        `<option value="__new">${esc(t("api.mock.groupNew"))}</option>`;
+      sel.value = groups.some((group) => group.name === selected) ? selected : "";
+      syncSelectLabel(sel);
+    }
+
+    async function onGroupSelectChange() {
+      const sel = $("mGroup");
+      if (!state.mockDraft) return;
+      if (sel.value !== "__new") {
+        state.mockDraft.group = sel.value;
+        return;
+      }
+      const name = await askText("api.mock.groupNew", "api.mock.groupName", "");
+      const trimmed = name === null ? "" : String(name).trim();
+      if (trimmed) {
+        const groups = state.ws.mock.groups || (state.ws.mock.groups = []);
+        if (!groups.some((group) => group.name === trimmed)) {
+          groups.push({ name: trimmed, enabled: true });
+        }
+        state.mockDraft.group = trimmed;
+        persistWorkspace();
+      } else {
+        state.mockDraft.group = state.mockDraft.group || "";
+      }
+      buildGroupOptions(state.mockDraft.group);
+    }
+
     async function saveMockRule() {
       const d = state.mockDraft;
       if (!d) return;
@@ -1627,6 +1739,7 @@
       const rule = {
         id: d.id || rid(),
         name,
+        group: d.group || "",
         method: $("mMethod").value || "GET",
         path,
         status,
@@ -1640,6 +1753,13 @@
       if (index >= 0) state.mocks[index] = rule;
       else state.mocks.unshift(rule);
       if (!(await saveMocks())) return;
+      if (rule.group) {
+        const groups = state.ws.mock.groups || (state.ws.mock.groups = []);
+        if (!groups.some((group) => group.name === rule.group)) {
+          groups.push({ name: rule.group, enabled: true });
+          persistWorkspace();
+        }
+      }
       hideModal("mockModal");
       toast(t("api.mock.saved"));
     }
@@ -2019,6 +2139,13 @@
       });
 
       $("mockList").addEventListener("click", async (event) => {
+        const collapseBtn = event.target.closest("[data-mock-group-collapse]");
+        if (collapseBtn) {
+          const key = collapseBtn.dataset.mockGroupCollapse || "__ungrouped";
+          state.mockCollapsed[key] = !state.mockCollapsed[key];
+          renderMocks();
+          return;
+        }
         const tryBtn = event.target.closest("[data-mock-try]");
         if (tryBtn) {
           tryMock(findRule(tryBtn.dataset.mockTry));
@@ -2040,6 +2167,11 @@
         }
       });
       $("mockList").addEventListener("change", (event) => {
+        const groupToggle = event.target.closest("[data-mock-group-toggle]");
+        if (groupToggle) {
+          setGroupEnabled(groupToggle.dataset.mockGroupToggle, groupToggle.checked);
+          return;
+        }
         const toggle = event.target.closest("[data-mock-toggle]");
         if (!toggle) return;
         const rule = findRule(toggle.dataset.mockToggle);
@@ -2073,6 +2205,7 @@
       $("mockClose").addEventListener("click", () => hideModal("mockModal"));
       $("mockCancel").addEventListener("click", () => hideModal("mockModal"));
       $("mockSave").addEventListener("click", saveMockRule);
+      $("mGroup").addEventListener("change", onGroupSelectChange);
 
       $("envClose").addEventListener("click", () => hideModal("envModal"));
       $("envCancel").addEventListener("click", () => hideModal("envModal"));
@@ -2125,6 +2258,7 @@
         if (state.envDraft) renderEnvModal();
         if (state.mockDraft) {
           $("mockTitle").textContent = t(state.mockDraft.id ? "api.mock.titleEdit" : "api.mock.titleNew");
+          buildGroupOptions(state.mockDraft.group);
         }
         $("resPrettyBtn").classList.toggle("is-active", state.resPretty);
         ["envSelect", "reqMethod", "authType", "rawType", "saveCollection", "mMethod"].forEach((id) => {

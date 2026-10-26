@@ -209,6 +209,7 @@ func (p *API) Init(ctx *plugin.Context) error {
 		p.ws.Mock.Enabled = true
 		p.seedWorkspace(ctx.BaseURL)
 	}
+	p.ensureRuleGroups()
 	if len(p.rules) == 0 {
 		p.rules = []MockRule{{
 			ID:      newID(),
@@ -284,8 +285,12 @@ func (p *API) handleMocksSave(c *fiber.Ctx) error {
 	}
 	p.mu.Lock()
 	p.rules = rules
+	p.ensureRuleGroups()
 	p.mu.Unlock()
 	if err := p.persistMocks(); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+	if err := p.persistWorkspace(); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(rules)
@@ -355,6 +360,34 @@ func fileExists(path string) bool {
 
 func boolPtr(v bool) *bool { return &v }
 
+// truncateRunes 按字符截断，避免多字节字符被截半。
+func truncateRunes(text string, limit int) string {
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit])
+}
+
+// ensureRuleGroups 保证规则引用的分组都存在于工作区，未知分组默认启用。
+func (p *API) ensureRuleGroups() {
+	known := map[string]bool{}
+	for _, group := range p.ws.Mock.Groups {
+		known[group.Name] = true
+	}
+	for i := range p.rules {
+		name := strings.TrimSpace(p.rules[i].Group)
+		if name == "" || known[name] {
+			continue
+		}
+		if len(p.ws.Mock.Groups) >= 50 {
+			return
+		}
+		known[name] = true
+		p.ws.Mock.Groups = append(p.ws.Mock.Groups, MockGroup{Name: name, Enabled: true})
+	}
+}
+
 func (p *API) normalizeWorkspace() {
 	if p.ws.Collections == nil {
 		p.ws.Collections = []Collection{}
@@ -397,6 +430,23 @@ func (p *API) normalizeWorkspace() {
 			env.Name = "未命名环境"
 		}
 	}
+	if p.ws.Mock.Groups == nil {
+		p.ws.Mock.Groups = []MockGroup{}
+	}
+	groups := make([]MockGroup, 0, len(p.ws.Mock.Groups))
+	seen := map[string]bool{}
+	for _, group := range p.ws.Mock.Groups {
+		name := truncateRunes(strings.TrimSpace(group.Name), 40)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		groups = append(groups, MockGroup{Name: name, Enabled: group.Enabled})
+		if len(groups) >= 50 {
+			break
+		}
+	}
+	p.ws.Mock.Groups = groups
 	if len(p.ws.History) > maxHistoryItems {
 		p.ws.History = p.ws.History[:maxHistoryItems]
 	}
@@ -454,6 +504,7 @@ func normalizeRule(rule *MockRule) {
 	if rule.ID == "" {
 		rule.ID = newID()
 	}
+	rule.Group = truncateRunes(strings.TrimSpace(rule.Group), 40)
 	if rule.Method == "" {
 		rule.Method = http.MethodGet
 	}
@@ -497,6 +548,10 @@ func (p *API) serveMock(c *fiber.Ctx) error {
 
 	p.mu.RLock()
 	enabled := p.ws.Mock.Enabled
+	groupState := make(map[string]bool, len(p.ws.Mock.Groups))
+	for _, group := range p.ws.Mock.Groups {
+		groupState[group.Name] = group.Enabled
+	}
 	rules := make([]MockRule, len(p.rules))
 	copy(rules, p.rules)
 	p.mu.RUnlock()
@@ -531,6 +586,11 @@ func (p *API) serveMock(c *fiber.Ctx) error {
 		rule := &rules[i]
 		if !rule.Enabled {
 			continue
+		}
+		if rule.Group != "" {
+			if on, exists := groupState[rule.Group]; exists && !on {
+				continue
+			}
 		}
 		if rule.Method != "ANY" && !strings.EqualFold(rule.Method, c.Method()) {
 			continue
@@ -950,4 +1010,6 @@ func (p *API) persistWorkspace() error {
 
 func newID() string {
 	buf := make([]byte, 5)
-	_, _ = rand.Re
+	_, _ = rand.Read(buf)
+	return hex.EncodeToString(buf)
+}
