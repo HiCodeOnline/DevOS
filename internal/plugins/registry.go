@@ -5,6 +5,7 @@ import (
 	"devos/internal/plugin"
 	"devos/internal/plugins/apitool"
 	"devos/internal/plugins/db"
+	notesapp "devos/internal/plugins/notes"
 	"devos/internal/plugins/pluginmgr"
 	"devos/internal/plugins/sftp"
 	"devos/internal/plugins/ssh"
@@ -18,6 +19,7 @@ func All() []plugin.Plugin {
 		sftpapp.New(),
 		dbapp.New(),
 		apitool.New(),
+		notesapp.New(),
 		toolbox.New(),
 		pluginmgr.New(),
 	}
