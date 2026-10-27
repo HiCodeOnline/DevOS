@@ -9,7 +9,10 @@
     { id: "sand", swatch: "wallpaper-swatch-sand" },
     { id: "midnight", swatch: "wallpaper-swatch-midnight" },
   ];
-  var LOCALE_NAMES = { "zh-CN": "简体中文", "en": "English", "zh-TW": "繁體中文" };
+  var LOCALE_NAMES = {
+    "zh-CN": "简体中文", "zh-TW": "繁體中文", "en": "English",
+    "ja": "日本語", "ko": "한국어", "fr": "Français", "de": "Deutsch", "ru": "Русский", "hi": "हिन्दी",
+  };
 
   var overlay = null;
   var status = null;
@@ -104,7 +107,7 @@
 
   function languageSection() {
     var current = (window.DevOSI18n && window.DevOSI18n.getLocale()) || "zh-CN";
-    var items = (window.DevOSI18n ? window.DevOSI18n.supported : ["zh-CN", "en", "zh-TW"]).map(function (code) {
+    var items = (window.DevOSI18n ? window.DevOSI18n.supported : Object.keys(LOCALE_NAMES)).map(function (code) {
       var active = code === current ? " is-active" : "";
       return '<button type="button" class="lang-item' + active + '" data-locale="' + code + '">' +
         '<span class="lang-item-name">' + esc(LOCALE_NAMES[code] || code) + "</span>" +

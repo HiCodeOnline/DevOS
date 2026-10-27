@@ -128,7 +128,7 @@ func TestStorePersistsLocaleAndWallpaper(t *testing.T) {
 	if store.Locale() != "en" {
 		t.Fatalf("语言应归一为 en，实际 %q", store.Locale())
 	}
-	if err := store.SetLocale("fr"); err == nil {
+	if err := store.SetLocale("pt"); err == nil {
 		t.Fatal("不支持的语言应报错")
 	}
 	if err := store.SetWallpaper(Wallpaper{Kind: WallpaperCustom, File: "wallpaper-1-a1b2c3d4.png"}); err != nil {

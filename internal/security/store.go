@@ -21,7 +21,7 @@ const (
 )
 
 // 支持的语言标识；新增语言时在此登记并在前端补充词典。
-var SupportedLocales = []string{"zh-CN", "en", "zh-TW"}
+var SupportedLocales = []string{"zh-CN", "zh-TW", "en", "ja", "ko", "fr", "de", "ru", "hi"}
 
 // settingsVersion 为当前设置文件版本；版本 2 起语言为空表示跟随系统。
 const settingsVersion = 2
@@ -105,6 +105,18 @@ func NormalizeLocale(locale string) string {
 		return "zh-TW"
 	case strings.EqualFold(value, "en"), strings.HasPrefix(strings.ToLower(value), "en-"):
 		return "en"
+	case strings.EqualFold(value, "ja"), strings.HasPrefix(strings.ToLower(value), "ja-"):
+		return "ja"
+	case strings.EqualFold(value, "ko"), strings.HasPrefix(strings.ToLower(value), "ko-"):
+		return "ko"
+	case strings.EqualFold(value, "fr"), strings.HasPrefix(strings.ToLower(value), "fr-"):
+		return "fr"
+	case strings.EqualFold(value, "de"), strings.HasPrefix(strings.ToLower(value), "de-"):
+		return "de"
+	case strings.EqualFold(value, "ru"), strings.HasPrefix(strings.ToLower(value), "ru-"):
+		return "ru"
+	case strings.EqualFold(value, "hi"), strings.HasPrefix(strings.ToLower(value), "hi-"):
+		return "hi"
 	default:
 		return ""
 	}

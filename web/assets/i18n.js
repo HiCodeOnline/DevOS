@@ -3,8 +3,11 @@
   if (window.DevOSI18n) return;
 
   var FALLBACK = "en";
-  var SUPPORTED = ["zh-CN", "en", "zh-TW"];
-  var BCP47 = { "zh-CN": "zh-CN", "en": "en-US", "zh-TW": "zh-TW" };
+  var SUPPORTED = ["zh-CN", "zh-TW", "en", "ja", "ko", "fr", "de", "ru", "hi"];
+  var BCP47 = {
+    "zh-CN": "zh-CN", "zh-TW": "zh-TW", "en": "en-US",
+    "ja": "ja-JP", "ko": "ko-KR", "fr": "fr-FR", "de": "de-DE", "ru": "ru-RU", "hi": "hi-IN",
+  };
   var dicts = Object.create(null);
   var listeners = [];
 
@@ -15,6 +18,12 @@
       var tag = String(tags[i] || "").toLowerCase();
       if (tag.indexOf("zh") === 0) return /(tw|hk|mo|hant)/.test(tag) ? "zh-TW" : "zh-CN";
       if (tag.indexOf("en") === 0) return "en";
+      if (tag.indexOf("ja") === 0) return "ja";
+      if (tag.indexOf("ko") === 0) return "ko";
+      if (tag.indexOf("fr") === 0) return "fr";
+      if (tag.indexOf("de") === 0) return "de";
+      if (tag.indexOf("ru") === 0) return "ru";
+      if (tag.indexOf("hi") === 0) return "hi";
     }
     return FALLBACK;
   }
