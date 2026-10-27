@@ -3,6 +3,7 @@ package notes
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
@@ -25,6 +26,7 @@ import (
 
 	"devos/internal/plugin"
 	"devos/internal/secure"
+	"devos/internal/sqlstore"
 )
 
 //go:embed web
@@ -197,11 +199,55 @@ type SearchResult struct {
 type API struct {
 	mu       sync.RWMutex
 	ws       Workspace
-	file     string
+	db       *sql.DB
 	filesDir string
 	keys     *secure.Keyring
 	log      *slog.Logger
 }
+
+var noteMigrations = []string{`
+CREATE TABLE pages (
+	id         TEXT PRIMARY KEY,
+	parent_id  TEXT NOT NULL DEFAULT '',
+	title      TEXT NOT NULL DEFAULT '',
+	icon       TEXT NOT NULL DEFAULT '',
+	cover      TEXT NOT NULL DEFAULT '',
+	folder     INTEGER NOT NULL DEFAULT 0,
+	favorite   INTEGER NOT NULL DEFAULT 0,
+	trashed    INTEGER NOT NULL DEFAULT 0,
+	trashed_at TEXT NOT NULL DEFAULT '',
+	ord        INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL DEFAULT '',
+	updated_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX idx_pages_parent ON pages(parent_id, ord);
+CREATE TABLE blocks (
+	page_id    TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+	id         TEXT NOT NULL,
+	ord        INTEGER NOT NULL DEFAULT 0,
+	type       TEXT NOT NULL DEFAULT 'paragraph',
+	content    TEXT NOT NULL DEFAULT '',
+	props_json TEXT NOT NULL DEFAULT '{}',
+	PRIMARY KEY (page_id, id)
+);
+CREATE INDEX idx_blocks_page ON blocks(page_id, ord);
+`}
+
+const (
+	pageColumns = `id, parent_id, title, icon, cover, folder, favorite, trashed,
+	trashed_at, ord, created_at, updated_at`
+
+	upsertPage = `INSERT INTO pages (` + pageColumns + `)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+	parent_id = excluded.parent_id, title = excluded.title, icon = excluded.icon,
+	cover = excluded.cover, folder = excluded.folder, favorite = excluded.favorite,
+	trashed = excluded.trashed, trashed_at = excluded.trashed_at, ord = excluded.ord,
+	created_at = excluded.created_at, updated_at = excluded.updated_at`
+
+	insertBlock = `INSERT INTO blocks (page_id, id, ord, type, content, props_json)
+VALUES (?, ?, ?, ?, ?, ?)`
+)
 
 func New() *API { return &API{} }
 
@@ -224,7 +270,6 @@ func (p *API) Manifest() plugin.Manifest {
 }
 
 func (p *API) Init(ctx *plugin.Context) error {
-	p.file = filepath.Join(ctx.DataDir, "notes.json")
 	p.filesDir = filepath.Join(ctx.DataDir, "files")
 	p.log = ctx.Logger
 	if err := os.MkdirAll(p.filesDir, 0o755); err != nil {
@@ -235,11 +280,24 @@ func (p *API) Init(ctx *plugin.Context) error {
 		return fmt.Errorf("初始化加密密钥失败: %w", err)
 	}
 	p.keys = keys
-	if err := p.readEncrypted(p.file, &p.ws, "笔记数据"); err != nil {
+	db, err := sqlstore.Open(ctx.DataDir, "notes.db", noteMigrations)
+	if err != nil {
+		return fmt.Errorf("打开笔记数据库失败: %w", err)
+	}
+	p.db = db
+	if err := p.migrateLegacy(filepath.Join(ctx.DataDir, "notes.json")); err != nil {
+		return err
+	}
+	if err := p.loadWorkspace(); err != nil {
 		return err
 	}
 	p.normalizeWorkspace()
-	return p.persist()
+	return nil
+}
+
+// Close 关闭笔记数据库，主要供测试与插件卸载使用。
+func (p *API) Close() error {
+	return p.db.Close()
 }
 
 func (p *API) Assets() fs.FS {
@@ -331,7 +389,7 @@ func (p *API) handleCreatePage(c *fiber.Ctx) error {
 	}
 	p.ws.Pages = append(p.ws.Pages, page)
 	p.mu.Unlock()
-	if err := p.persist(); err != nil {
+	if err := p.savePages(page); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.Status(fiber.StatusCreated).JSON(page)
@@ -377,7 +435,7 @@ func (p *API) handleSavePage(c *fiber.Ctx) error {
 	page.UpdatedAt = time.Now().Format(time.RFC3339)
 	result := *page
 	p.mu.Unlock()
-	if err := p.persist(); err != nil {
+	if err := p.savePages(result); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(result)
@@ -400,8 +458,9 @@ func (p *API) handleFavorite(c *fiber.Ctx) error {
 		page.Favorite = !page.Favorite
 	}
 	page.UpdatedAt = time.Now().Format(time.RFC3339)
+	result := *page
 	p.mu.Unlock()
-	if err := p.persist(); err != nil {
+	if err := p.savePages(result); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(fiber.Map{"ok": true})
@@ -457,8 +516,22 @@ func (p *API) handleMove(c *fiber.Ctx) error {
 	if oldParent != parent {
 		p.reindex(oldParent)
 	}
+	affected := make([]Page, 0, len(list)+8)
+	seen := make(map[string]bool, len(list)+8)
+	collect := func(items []*Page) {
+		for _, item := range items {
+			if item == nil || seen[item.ID] {
+				continue
+			}
+			seen[item.ID] = true
+			affected = append(affected, *item)
+		}
+	}
+	collect(list)
+	collect(p.siblings(parent, ""))
+	collect(p.siblings(oldParent, ""))
 	p.mu.Unlock()
-	if err := p.persist(); err != nil {
+	if err := p.savePages(affected...); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(fiber.Map{"ok": true})
@@ -472,15 +545,17 @@ func (p *API) handleTrash(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusNotFound, "页面不存在")
 	}
 	stamp := nowString()
+	affected := make([]Page, 0, 4)
 	for _, id := range p.subtreeIDs(page.ID) {
 		if item := p.findPage(id); item != nil {
 			item.Trashed = true
 			item.TrashedAt = stamp
 			item.Favorite = false
+			affected = append(affected, *item)
 		}
 	}
 	p.mu.Unlock()
-	if err := p.persist(); err != nil {
+	if err := p.savePages(affected...); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(fiber.Map{"ok": true})
@@ -498,14 +573,16 @@ func (p *API) handleRestore(c *fiber.Ctx) error {
 		page.ParentID = ""
 		page.Order = p.nextOrder("")
 	}
+	affected := make([]Page, 0, 4)
 	for _, id := range p.subtreeIDs(page.ID) {
 		if item := p.findPage(id); item != nil {
 			item.Trashed = false
 			item.TrashedAt = ""
+			affected = append(affected, *item)
 		}
 	}
 	p.mu.Unlock()
-	if err := p.persist(); err != nil {
+	if err := p.savePages(affected...); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(fiber.Map{"ok": true})
@@ -575,8 +652,12 @@ func (p *API) handleDuplicate(c *fiber.Ctx) error {
 	p.ws.Pages = append(p.ws.Pages, copied...)
 	p.reindex(page.ParentID)
 	rootID := mapping[page.ID]
+	affected := append([]Page{}, copied...)
+	for _, sibling := range p.siblings(page.ParentID, "") {
+		affected = append(affected, *sibling)
+	}
 	p.mu.Unlock()
-	if err := p.persist(); err != nil {
+	if err := p.savePages(affected...); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(fiber.Map{"ok": true, "pageId": rootID})
@@ -610,7 +691,7 @@ func (p *API) handleDeletePage(c *fiber.Ctx) error {
 	for _, name := range files {
 		_ = os.Remove(filepath.Join(p.filesDir, filepath.FromSlash(name)))
 	}
-	if err := p.persist(); err != nil {
+	if err := p.deletePages(ids); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(fiber.Map{"ok": true})
@@ -619,10 +700,12 @@ func (p *API) handleDeletePage(c *fiber.Ctx) error {
 func (p *API) handleEmptyTrash(c *fiber.Ctx) error {
 	p.mu.Lock()
 	var files []string
+	var ids []string
 	out := p.ws.Pages[:0]
 	for _, page := range p.ws.Pages {
 		if page.Trashed {
 			files = append(files, pageFiles(page)...)
+			ids = append(ids, page.ID)
 			continue
 		}
 		out = append(out, page)
@@ -632,7 +715,7 @@ func (p *API) handleEmptyTrash(c *fiber.Ctx) error {
 	for _, name := range files {
 		_ = os.Remove(filepath.Join(p.filesDir, filepath.FromSlash(name)))
 	}
-	if err := p.persist(); err != nil {
+	if err := p.deletePages(ids); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(fiber.Map{"ok": true})
@@ -1398,7 +1481,8 @@ func tableMarkdown(block Block) string {
 	return out.String()
 }
 
-func (p *API) readEncrypted(path string, target any, label string) error {
+// migrateLegacy 把历史上的 notes.json 导入数据库，成功后保留 .bak 备份。
+func (p *API) migrateLegacy(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1406,37 +1490,187 @@ func (p *API) readEncrypted(path string, target any, label string) error {
 		}
 		return err
 	}
-	plain, err := p.keys.DecryptBytes(data)
-	if err != nil {
-		return fmt.Errorf("解密%s失败: %w", label, err)
+	var count int
+	if err := p.db.QueryRow("SELECT COUNT(*) FROM pages").Scan(&count); err != nil {
+		return err
 	}
-	if err := json.Unmarshal(plain, target); err != nil {
-		return fmt.Errorf("解析%s失败: %w", label, err)
+	if count == 0 {
+		plain, err := p.keys.DecryptBytes(data)
+		if err != nil {
+			return fmt.Errorf("解密笔记数据失败: %w", err)
+		}
+		var ws Workspace
+		if err := json.Unmarshal(plain, &ws); err != nil {
+			return fmt.Errorf("解析笔记数据失败: %w", err)
+		}
+		p.ws = ws
+		p.normalizeWorkspace()
+		pages := p.ws.Pages
+		p.ws = Workspace{}
+		if err := p.savePages(pages...); err != nil {
+			return err
+		}
 	}
-	if string(plain) == string(data) {
-		// 历史明文数据在加载时立即重新加密落盘。
-		return p.writeEncrypted(path, target)
+	if err := sqlstore.BackupLegacy(path); err != nil && p.log != nil {
+		p.log.Warn("备份历史笔记数据失败", "err", err)
 	}
 	return nil
 }
 
-func (p *API) writeEncrypted(path string, value any) error {
-	data, err := json.MarshalIndent(value, "", "  ")
+// loadWorkspace 从数据库读取全部页面与块。
+func (p *API) loadWorkspace() error {
+	rows, err := p.db.Query("SELECT " + pageColumns + " FROM pages ORDER BY parent_id, ord, created_at")
 	if err != nil {
 		return err
 	}
-	encrypted, err := p.keys.EncryptBytes(data)
+	pages := make([]Page, 0, 16)
+	index := make(map[string]int, 16)
+	for rows.Next() {
+		var page Page
+		var folder, favorite, trashed int
+		if err := rows.Scan(&page.ID, &page.ParentID, &page.Title, &page.Icon, &page.Cover,
+			&folder, &favorite, &trashed, &page.TrashedAt, &page.Order,
+			&page.CreatedAt, &page.UpdatedAt); err != nil {
+			rows.Close()
+			return err
+		}
+		page.Folder = folder != 0
+		page.Favorite = favorite != 0
+		page.Trashed = trashed != 0
+		page.Blocks = []Block{}
+		if page.Title, err = p.keys.Decrypt(page.Title); err != nil {
+			rows.Close()
+			return fmt.Errorf("解密笔记标题失败: %w", err)
+		}
+		index[page.ID] = len(pages)
+		pages = append(pages, page)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	blockRows, err := p.db.Query("SELECT page_id, id, type, content, props_json FROM blocks ORDER BY page_id, ord")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(encrypted, '\n'), 0o600)
+	defer blockRows.Close()
+	for blockRows.Next() {
+		var pageID string
+		var block Block
+		var propsJSON string
+		if err := blockRows.Scan(&pageID, &block.ID, &block.Type, &block.Content, &propsJSON); err != nil {
+			return err
+		}
+		if block.Content, err = p.keys.Decrypt(block.Content); err != nil {
+			return fmt.Errorf("解密笔记内容失败: %w", err)
+		}
+		if propsJSON, err = p.keys.Decrypt(propsJSON); err != nil {
+			return fmt.Errorf("解密笔记块属性失败: %w", err)
+		}
+		if propsJSON != "" && propsJSON != "{}" {
+			if err := json.Unmarshal([]byte(propsJSON), &block.Props); err != nil {
+				return fmt.Errorf("解析笔记块属性失败: %w", err)
+			}
+		}
+		if i, ok := index[pageID]; ok {
+			pages[i].Blocks = append(pages[i].Blocks, block)
+		}
+	}
+	if err := blockRows.Err(); err != nil {
+		return err
+	}
+
+	p.ws = Workspace{Pages: pages}
+	if p.ws.Pages == nil {
+		p.ws.Pages = []Page{}
+	}
+	return nil
 }
 
-func (p *API) persist() error {
-	p.mu.RLock()
-	ws := p.ws
-	p.mu.RUnlock()
-	return p.writeEncrypted(p.file, ws)
+// savePages 在事务中写入页面及其全部块，用于单页编辑与局部变更。
+func (p *API) savePages(pages ...Page) error {
+	if len(pages) == 0 {
+		return nil
+	}
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	pageStmt, err := tx.Prepare(upsertPage)
+	if err != nil {
+		return err
+	}
+	defer pageStmt.Close()
+	blockStmt, err := tx.Prepare(insertBlock)
+	if err != nil {
+		return err
+	}
+	defer blockStmt.Close()
+	for _, page := range pages {
+		title, err := p.keys.Encrypt(page.Title)
+		if err != nil {
+			return err
+		}
+		if _, err := pageStmt.Exec(page.ID, page.ParentID, title, page.Icon, page.Cover,
+			b2i(page.Folder), b2i(page.Favorite), b2i(page.Trashed), page.TrashedAt,
+			page.Order, page.CreatedAt, page.UpdatedAt); err != nil {
+			return err
+		}
+		if _, err := tx.Exec("DELETE FROM blocks WHERE page_id = ?", page.ID); err != nil {
+			return err
+		}
+		for i, block := range page.Blocks {
+			content, err := p.keys.Encrypt(block.Content)
+			if err != nil {
+				return err
+			}
+			props, err := json.Marshal(block.Props)
+			if err != nil {
+				return err
+			}
+			propsEnc, err := p.keys.Encrypt(string(props))
+			if err != nil {
+				return err
+			}
+			if _, err := blockStmt.Exec(page.ID, block.ID, i, block.Type, content, propsEnc); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
+}
+
+// deletePages 删除页面，块由外键级联清理。
+func (p *API) deletePages(ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.Prepare("DELETE FROM pages WHERE id = ?")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, id := range ids {
+		if _, err := stmt.Exec(id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func b2i(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func newID() string {

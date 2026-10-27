@@ -3,6 +3,7 @@ package dbapp
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"embed"
 	"encoding/hex"
 	"encoding/json"
@@ -20,6 +21,7 @@ import (
 
 	"devos/internal/plugin"
 	"devos/internal/secure"
+	"devos/internal/sqlstore"
 )
 
 //go:embed web
@@ -82,7 +84,7 @@ func (c *Connection) ApplyDefaults() {
 type DB struct {
 	mu    sync.RWMutex
 	conns []Connection
-	file  string
+	db    *sql.DB
 	keys  *secure.Keyring
 	log   *slog.Logger
 
@@ -94,6 +96,34 @@ type DB struct {
 	nativeMu sync.Mutex
 	native   map[string]any
 }
+
+var connMigrations = []string{`
+CREATE TABLE connections (
+	id         TEXT PRIMARY KEY,
+	name       TEXT NOT NULL DEFAULT '',
+	grp        TEXT NOT NULL DEFAULT '',
+	driver     TEXT NOT NULL DEFAULT '',
+	host       TEXT NOT NULL DEFAULT '',
+	port       INTEGER NOT NULL DEFAULT 0,
+	user       TEXT NOT NULL DEFAULT '',
+	password   TEXT NOT NULL DEFAULT '',
+	database   TEXT NOT NULL DEFAULT '',
+	file       TEXT NOT NULL DEFAULT '',
+	charset    TEXT NOT NULL DEFAULT '',
+	ssl_mode   TEXT NOT NULL DEFAULT '',
+	params     TEXT NOT NULL DEFAULT '',
+	read_only  INTEGER NOT NULL DEFAULT 0,
+	color      TEXT NOT NULL DEFAULT ''
+);
+`}
+
+const (
+	connColumns = `id, name, grp, driver, host, port, user, password, database,
+	file, charset, ssl_mode, params, read_only, color`
+
+	insertConn = `INSERT INTO connections (` + connColumns + `)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+)
 
 // New 创建数据库插件。
 func New() *DB {
@@ -124,14 +154,23 @@ func (p *DB) Manifest() plugin.Manifest {
 }
 
 func (p *DB) Init(ctx *plugin.Context) error {
-	p.file = filepath.Join(ctx.DataDir, "connections.json")
 	p.log = ctx.Logger
 	keys, err := secure.Open(ctx.DataDir, "connections.key")
 	if err != nil {
 		return fmt.Errorf("初始化连接加密密钥失败: %w", err)
 	}
 	p.keys = keys
-	return p.load()
+	db, err := sqlstore.Open(ctx.DataDir, "connections.db", connMigrations)
+	if err != nil {
+		return fmt.Errorf("打开连接数据库失败: %w", err)
+	}
+	p.db = db
+	return p.load(ctx.DataDir)
+}
+
+// Close 关闭连接数据库，主要供测试与插件卸载使用。
+func (p *DB) Close() error {
+	return p.db.Close()
 }
 
 func (p *DB) Assets() fs.FS {
@@ -377,34 +416,81 @@ func (p *DB) handleImportConnections(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"ok": true, "imported": count})
 }
 
-func (p *DB) load() error {
-	data, err := os.ReadFile(p.file)
+func (p *DB) load(dir string) error {
+	if err := p.migrateLegacy(filepath.Join(dir, "connections.json")); err != nil {
+		return err
+	}
+	rows, err := p.db.Query("SELECT " + connColumns + " FROM connections")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	conns := make([]Connection, 0, 8)
+	for rows.Next() {
+		var c Connection
+		var readOnly int
+		if err := rows.Scan(&c.ID, &c.Name, &c.Group, &c.Driver, &c.Host, &c.Port, &c.User,
+			&c.Password, &c.Database, &c.File, &c.Charset, &c.SSLMode, &c.Params,
+			&readOnly, &c.Color); err != nil {
+			return err
+		}
+		c.ReadOnly = readOnly != 0
+		if secure.IsEncrypted(c.Password) {
+			plain, err := p.keys.Decrypt(c.Password)
+			if err != nil {
+				return fmt.Errorf("解密连接「%s」的密码失败: %w", c.Name, err)
+			}
+			c.Password = plain
+		}
+		conns = append(conns, c)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	p.mu.Lock()
+	p.conns = conns
+	p.mu.Unlock()
+	return nil
+}
+
+// migrateLegacy 把历史上的 connections.json 导入数据库，成功后保留 .bak 备份。
+func (p *DB) migrateLegacy(path string) error {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if err := json.Unmarshal(data, &p.conns); err != nil {
+	var count int
+	if err := p.db.QueryRow("SELECT COUNT(*) FROM connections").Scan(&count); err != nil {
 		return err
 	}
-	plaintext := false
-	for i := range p.conns {
-		if secure.IsEncrypted(p.conns[i].Password) {
-			plain, err := p.keys.Decrypt(p.conns[i].Password)
-			if err != nil {
-				return fmt.Errorf("解密连接「%s」的密码失败: %w", p.conns[i].Name, err)
+	if count == 0 {
+		var items []Connection
+		if err := json.Unmarshal(data, &items); err != nil {
+			return fmt.Errorf("解析连接配置失败: %w", err)
+		}
+		for i := range items {
+			if !secure.IsEncrypted(items[i].Password) {
+				continue
 			}
-			p.conns[i].Password = plain
-		} else if p.conns[i].Password != "" {
-			plaintext = true
+			plain, err := p.keys.Decrypt(items[i].Password)
+			if err != nil {
+				return fmt.Errorf("解密连接「%s」的密码失败: %w", items[i].Name, err)
+			}
+			items[i].Password = plain
+		}
+		p.mu.Lock()
+		p.conns = items
+		err = p.persistLocked()
+		p.mu.Unlock()
+		if err != nil {
+			return err
 		}
 	}
-	if plaintext {
-		// 历史明文密码在加载时立即重新加密落盘。
-		return p.persistLocked()
+	if err := sqlstore.BackupLegacy(path); err != nil && p.log != nil {
+		p.log.Warn("备份历史连接配置失败", "err", err)
 	}
 	return nil
 }
@@ -415,22 +501,41 @@ func (p *DB) persist() error {
 	return p.persistLocked()
 }
 
-// persistLocked 在已持有写锁时写入配置文件。
+// persistLocked 在已持有写锁时把内存中的连接配置同步到数据库。
 func (p *DB) persistLocked() error {
-	out := make([]Connection, len(p.conns))
-	copy(out, p.conns)
-	for i := range out {
-		encrypted, err := p.keys.Encrypt(out[i].Password)
-		if err != nil {
-			return err
-		}
-		out[i].Password = encrypted
-	}
-	data, err := json.MarshalIndent(out, "", "  ")
+	tx, err := p.db.Begin()
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(p.file, append(data, '\n'), 0o600)
+	defer tx.Rollback()
+	if _, err := tx.Exec("DELETE FROM connections"); err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(insertConn)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for i := range p.conns {
+		encrypted, err := p.keys.Encrypt(p.conns[i].Password)
+		if err != nil {
+			return err
+		}
+		c := p.conns[i]
+		if _, err := stmt.Exec(c.ID, c.Name, c.Group, c.Driver, c.Host, c.Port, c.User,
+			encrypted, c.Database, c.File, c.Charset, c.SSLMode, c.Params,
+			boolInt(c.ReadOnly), c.Color); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func boolInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func jsonErr(c *fiber.Ctx, status int, msg string) error {

@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"database/sql"
 	"embed"
 	"encoding/base64"
 	"encoding/hex"
@@ -28,6 +29,7 @@ import (
 	"golang.org/x/crypto/scrypt"
 
 	"devos/internal/plugin"
+	"devos/internal/sqlstore"
 )
 
 //go:embed web
@@ -136,16 +138,54 @@ type API struct {
 	sessMu   sync.Mutex
 	sessions map[string]time.Time
 
-	metaPath  string
-	storePath string
-	log       *slog.Logger
-	kdfN      int
+	db   *sql.DB
+	log  *slog.Logger
+	kdfN int
+
+	// legacyStorePath 记录历史上的整库加密文件，解锁迁移成功后改名备份。
+	legacyStorePath string
+	legacyLoaded    bool
 }
 
 // New 创建一个保险库实例。
 func New() *API {
 	return &API{sessions: map[string]time.Time{}, kdfN: defaultKDFN}
 }
+
+var vaultMigrations = []string{`
+CREATE TABLE meta (
+	id         INTEGER PRIMARY KEY CHECK (id = 1),
+	version    INTEGER NOT NULL DEFAULT 1,
+	salt       TEXT NOT NULL,
+	verifier   TEXT NOT NULL,
+	kdf_n      INTEGER NOT NULL,
+	kdf_r      INTEGER NOT NULL,
+	kdf_p      INTEGER NOT NULL,
+	kdf_len    INTEGER NOT NULL,
+	created_at TEXT NOT NULL DEFAULT '',
+	updated_at TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE groups (
+	id    TEXT PRIMARY KEY,
+	name  TEXT NOT NULL DEFAULT '',
+	icon  TEXT NOT NULL DEFAULT '',
+	color TEXT NOT NULL DEFAULT '',
+	ord   INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE secrets (
+	id         TEXT PRIMARY KEY,
+	group_id   TEXT NOT NULL DEFAULT '',
+	name       TEXT NOT NULL DEFAULT '',
+	key_enc    TEXT NOT NULL DEFAULT '',
+	value_enc  TEXT NOT NULL DEFAULT '',
+	note_enc   TEXT NOT NULL DEFAULT '',
+	tags_enc   TEXT NOT NULL DEFAULT '',
+	ord        INTEGER NOT NULL DEFAULT 0,
+	created_at TEXT NOT NULL DEFAULT '',
+	updated_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX idx_secrets_group ON secrets(group_id, ord);
+`}
 
 func (p *API) Manifest() plugin.Manifest {
 	return plugin.Manifest{
@@ -166,8 +206,6 @@ func (p *API) Manifest() plugin.Manifest {
 }
 
 func (p *API) Init(ctx *plugin.Context) error {
-	p.metaPath = filepath.Join(ctx.DataDir, "meta.json")
-	p.storePath = filepath.Join(ctx.DataDir, "vault.json")
 	p.log = ctx.Logger
 	if p.sessions == nil {
 		p.sessions = map[string]time.Time{}
@@ -175,22 +213,26 @@ func (p *API) Init(ctx *plugin.Context) error {
 	if err := os.MkdirAll(ctx.DataDir, 0o755); err != nil {
 		return fmt.Errorf("创建密钥库目录失败: %w", err)
 	}
-	data, err := os.ReadFile(p.metaPath)
+	db, err := sqlstore.Open(ctx.DataDir, "vault.db", vaultMigrations)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return fmt.Errorf("读取密钥库元信息失败: %w", err)
+		return fmt.Errorf("打开密钥库数据库失败: %w", err)
 	}
-	var meta Meta
-	if err := json.Unmarshal(data, &meta); err != nil {
-		return fmt.Errorf("解析密钥库元信息失败: %w", err)
+	p.db = db
+	p.legacyStorePath = filepath.Join(ctx.DataDir, "vault.json")
+	if err := p.migrateLegacyMeta(filepath.Join(ctx.DataDir, "meta.json")); err != nil {
+		return err
 	}
-	if meta.Salt == "" || meta.Verifier == "" {
-		return errors.New("密钥库元信息不完整")
+	meta, err := p.loadMeta()
+	if err != nil {
+		return err
 	}
-	p.meta = &meta
+	p.meta = meta
 	return nil
+}
+
+// Close 关闭密钥库数据库，主要供测试与插件卸载使用。
+func (p *API) Close() error {
+	return p.db.Close()
 }
 
 func (p *API) Assets() fs.FS {
@@ -336,7 +378,7 @@ func (p *API) handleSetup(c *fiber.Ctx) error {
 	}
 	if err := p.persistMetaLocked(); err != nil {
 		p.meta, p.store, p.key = nil, Store{}, nil
-		_ = os.Remove(p.storePath)
+		_ = p.clearStore()
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	token := p.newSession()
@@ -388,7 +430,15 @@ func (p *API) handleUnlock(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
 	snapshot := p.snapshotLocked()
+	legacyLoaded := p.legacyLoaded
+	p.legacyLoaded = false
 	p.mu.Unlock()
+
+	if legacyLoaded {
+		if err := sqlstore.BackupLegacy(p.legacyStorePath); err != nil && p.log != nil {
+			p.log.Warn("备份历史密钥库数据失败", "err", err)
+		}
+	}
 
 	token := p.newSession()
 	return c.JSON(fiber.Map{"token": token, "snapshot": snapshot})
@@ -751,8 +801,17 @@ func (p *API) snapshotLocked() Snapshot {
 	return Snapshot{Groups: groups, Secrets: secrets, Tags: tags}
 }
 
+// loadStore 读取分组与条目；历史 vault.json 在首次解锁时解密导入。
 func (p *API) loadStore(key []byte) (Store, error) {
-	raw, err := os.ReadFile(p.storePath)
+	store, err := p.readStore(key)
+	if err != nil {
+		return Store{}, err
+	}
+	if len(store.Groups) > 0 || len(store.Secrets) > 0 {
+		return p.normalized(store), nil
+	}
+
+	raw, err := os.ReadFile(p.legacyStorePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return p.emptyStore(), nil
@@ -763,11 +822,84 @@ func (p *API) loadStore(key []byte) (Store, error) {
 	if err != nil {
 		return Store{}, err
 	}
-	var store Store
 	if err := json.Unmarshal(plain, &store); err != nil {
 		return Store{}, errCorrupted
 	}
+	p.legacyLoaded = true
 	return p.normalized(store), nil
+}
+
+// readStore 从数据库读取分组与加密条目。
+func (p *API) readStore(key []byte) (Store, error) {
+	var store Store
+	rows, err := p.db.Query("SELECT id, name, icon, color, ord FROM groups ORDER BY ord")
+	if err != nil {
+		return Store{}, err
+	}
+	for rows.Next() {
+		var group Group
+		if err := rows.Scan(&group.ID, &group.Name, &group.Icon, &group.Color, &group.Order); err != nil {
+			rows.Close()
+			return Store{}, err
+		}
+		if group.Name, err = openString(key, group.Name); err != nil {
+			rows.Close()
+			return Store{}, fmt.Errorf("解密分组名称失败: %w", err)
+		}
+		store.Groups = append(store.Groups, group)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return Store{}, err
+	}
+	rows.Close()
+
+	rows, err = p.db.Query(`SELECT id, group_id, name, key_enc, value_enc, note_enc, tags_enc,
+		ord, created_at, updated_at FROM secrets ORDER BY ord`)
+	if err != nil {
+		return Store{}, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var secret Secret
+		var keyEnc, valueEnc, noteEnc, tagsEnc string
+		if err := rows.Scan(&secret.ID, &secret.GroupID, &secret.Name, &keyEnc, &valueEnc,
+			&noteEnc, &tagsEnc, &secret.Order, &secret.CreatedAt, &secret.UpdatedAt); err != nil {
+			return Store{}, err
+		}
+		if secret.Name, err = openString(key, secret.Name); err != nil {
+			return Store{}, fmt.Errorf("解密条目名称失败: %w", err)
+		}
+		if len(keyEnc) > 0 {
+			if secret.Key, err = openString(key, keyEnc); err != nil {
+				return Store{}, err
+			}
+		}
+		if len(valueEnc) > 0 {
+			if secret.Value, err = openString(key, valueEnc); err != nil {
+				return Store{}, err
+			}
+		}
+		if len(noteEnc) > 0 {
+			if secret.Note, err = openString(key, noteEnc); err != nil {
+				return Store{}, err
+			}
+		}
+		if len(tagsEnc) > 0 {
+			tags, err := openString(key, tagsEnc)
+			if err != nil {
+				return Store{}, err
+			}
+			if tags != "" {
+				_ = json.Unmarshal([]byte(tags), &secret.Tags)
+			}
+		}
+		store.Secrets = append(store.Secrets, secret)
+	}
+	if err := rows.Err(); err != nil {
+		return Store{}, err
+	}
+	return store, nil
 }
 
 func (p *API) emptyStore() Store {
@@ -851,30 +983,162 @@ func (p *API) normalized(store Store) Store {
 	return store
 }
 
+// persistStoreLocked 以事务写入分组与条目，敏感字段逐条加密。
 func (p *API) persistStoreLocked() error {
 	if p.key == nil {
 		return errors.New("密钥库已锁定")
 	}
-	data, err := json.Marshal(p.store)
+	tx, err := p.db.Begin()
 	if err != nil {
 		return err
 	}
-	sealed, err := sealBytes(p.key, data)
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("DELETE FROM groups"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM secrets"); err != nil {
+		return err
+	}
+	groupStmt, err := tx.Prepare("INSERT INTO groups (id, name, icon, color, ord) VALUES (?, ?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
-	return writeAtomic(p.storePath, sealed)
+	defer groupStmt.Close()
+	for i, group := range p.store.Groups {
+		name, err := sealString(p.key, group.Name)
+		if err != nil {
+			return err
+		}
+		if _, err := groupStmt.Exec(group.ID, name, group.Icon, group.Color, i); err != nil {
+			return err
+		}
+	}
+
+	secretStmt, err := tx.Prepare(`INSERT INTO secrets
+		(id, group_id, name, key_enc, value_enc, note_enc, tags_enc, ord, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer secretStmt.Close()
+	for i, secret := range p.store.Secrets {
+		name, err := sealString(p.key, secret.Name)
+		if err != nil {
+			return err
+		}
+		keyEnc, err := sealString(p.key, secret.Key)
+		if err != nil {
+			return err
+		}
+		valueEnc, err := sealString(p.key, secret.Value)
+		if err != nil {
+			return err
+		}
+		noteEnc, err := sealString(p.key, secret.Note)
+		if err != nil {
+			return err
+		}
+		tagsJSON, err := json.Marshal(secret.Tags)
+		if err != nil {
+			return err
+		}
+		tagsEnc, err := sealString(p.key, string(tagsJSON))
+		if err != nil {
+			return err
+		}
+		if _, err := secretStmt.Exec(secret.ID, secret.GroupID, name, keyEnc, valueEnc,
+			noteEnc, tagsEnc, i, secret.CreatedAt, secret.UpdatedAt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (p *API) persistMetaLocked() error {
 	if p.meta == nil {
 		return errors.New("缺少密钥库元信息")
 	}
-	data, err := json.MarshalIndent(p.meta, "", "  ")
+	_, err := p.db.Exec(`INSERT INTO meta
+		(id, version, salt, verifier, kdf_n, kdf_r, kdf_p, kdf_len, created_at, updated_at)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			version = excluded.version, salt = excluded.salt, verifier = excluded.verifier,
+			kdf_n = excluded.kdf_n, kdf_r = excluded.kdf_r, kdf_p = excluded.kdf_p,
+			kdf_len = excluded.kdf_len, created_at = excluded.created_at,
+			updated_at = excluded.updated_at`,
+		p.meta.Version, p.meta.Salt, p.meta.Verifier, p.meta.KDF.N, p.meta.KDF.R,
+		p.meta.KDF.P, p.meta.KDF.KeyLen, p.meta.CreatedAt, p.meta.UpdatedAt)
+	return err
+}
+
+// loadMeta 读取密钥库元信息，数据库为空时返回 nil。
+func (p *API) loadMeta() (*Meta, error) {
+	var meta Meta
+	err := p.db.QueryRow(`SELECT version, salt, verifier, kdf_n, kdf_r, kdf_p, kdf_len,
+		created_at, updated_at FROM meta WHERE id = 1`).Scan(&meta.Version, &meta.Salt,
+		&meta.Verifier, &meta.KDF.N, &meta.KDF.R, &meta.KDF.P, &meta.KDF.KeyLen,
+		&meta.CreatedAt, &meta.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("读取密钥库元信息失败: %w", err)
+	}
+	if meta.Salt == "" || meta.Verifier == "" {
+		return nil, errors.New("密钥库元信息不完整")
+	}
+	return &meta, nil
+}
+
+// migrateLegacyMeta 把历史上的 meta.json 导入数据库，成功后保留 .bak 备份。
+func (p *API) migrateLegacyMeta(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("读取密钥库元信息失败: %w", err)
+	}
+	var count int
+	if err := p.db.QueryRow("SELECT COUNT(*) FROM meta").Scan(&count); err != nil {
+		return err
+	}
+	if count == 0 {
+		var meta Meta
+		if err := json.Unmarshal(data, &meta); err != nil {
+			return fmt.Errorf("解析密钥库元信息失败: %w", err)
+		}
+		if meta.Salt == "" || meta.Verifier == "" {
+			return errors.New("密钥库元信息不完整")
+		}
+		p.meta = &meta
+		if err := p.persistMetaLocked(); err != nil {
+			p.meta = nil
+			return err
+		}
+		p.meta = nil
+	}
+	if err := sqlstore.BackupLegacy(path); err != nil && p.log != nil {
+		p.log.Warn("备份历史密钥库元信息失败", "err", err)
+	}
+	return nil
+}
+
+// clearStore 清空数据库中的分组与条目，用于初始化失败回滚。
+func (p *API) clearStore() error {
+	tx, err := p.db.Begin()
 	if err != nil {
 		return err
 	}
-	return writeAtomic(p.metaPath, append(data, '\n'))
+	defer tx.Rollback()
+	if _, err := tx.Exec("DELETE FROM groups"); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM secrets"); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // ---------- 密码与加密 ----------
@@ -939,6 +1203,22 @@ func openBytes(key, raw []byte) ([]byte, error) {
 		return nil, errCorrupted
 	}
 	return plain, nil
+}
+
+func sealString(key []byte, plain string) (string, error) {
+	sealed, err := sealBytes(key, []byte(plain))
+	if err != nil {
+		return "", err
+	}
+	return string(sealed), nil
+}
+
+func openString(key []byte, encrypted string) (string, error) {
+	plain, err := openBytes(key, []byte(encrypted))
+	if err != nil {
+		return "", err
+	}
+	return string(plain), nil
 }
 
 func gcmOf(key []byte) (cipher.AEAD, error) {
@@ -1018,33 +1298,4 @@ func truncate(value string, limit int) string {
 		return value
 	}
 	return string(runes[:limit])
-}
-
-func writeAtomic(path string, data []byte) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(dir, ".vault-*")
-	if err != nil {
-		return err
-	}
-	name := tmp.Name()
-	defer os.Remove(name)
-	if err := tmp.Chmod(0o600); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if _, err := tmp.Write(data); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(name, path)
 }

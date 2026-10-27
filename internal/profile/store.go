@@ -2,15 +2,16 @@ package profile
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 
 	"devos/internal/secure"
+	"devos/internal/sqlstore"
 )
 
 // Profile 描述一个 SSH/SFTP 连接配置，字段设计参照 Xshell 的会话属性。
@@ -94,13 +95,12 @@ func (p Profile) ColorSchemeOrDefault() string {
 	return p.ColorScheme
 }
 
-// Store 以 JSON 文件持久化连接配置，供 SSH 与 SFTP 插件共享。
+// Store 以 SQLite 数据库持久化连接配置，供 SSH 与 SFTP 插件共享。
 // 密码、私钥与口令以 AES-256-GCM 加密后落盘。
 type Store struct {
-	mu   sync.RWMutex
 	path string
+	db   *sql.DB
 	keys *secure.Keyring
-	list []Profile
 }
 
 var (
@@ -108,9 +108,53 @@ var (
 	stores   = map[string]*Store{}
 )
 
+var migrations = []string{`
+CREATE TABLE profiles (
+	id              TEXT PRIMARY KEY,
+	name            TEXT NOT NULL DEFAULT '',
+	grp             TEXT NOT NULL DEFAULT '',
+	description     TEXT NOT NULL DEFAULT '',
+	host            TEXT NOT NULL DEFAULT '',
+	port            INTEGER NOT NULL DEFAULT 22,
+	user            TEXT NOT NULL DEFAULT '',
+	auth            TEXT NOT NULL DEFAULT 'password',
+	password        TEXT NOT NULL DEFAULT '',
+	private_key     TEXT NOT NULL DEFAULT '',
+	passphrase      TEXT NOT NULL DEFAULT '',
+	jump_profile_id TEXT NOT NULL DEFAULT '',
+	terminal_type   TEXT NOT NULL DEFAULT '',
+	encoding        TEXT NOT NULL DEFAULT '',
+	startup_command TEXT NOT NULL DEFAULT '',
+	keep_alive_sec  INTEGER NOT NULL DEFAULT 0,
+	log_enabled     INTEGER NOT NULL DEFAULT 0,
+	font_size       INTEGER NOT NULL DEFAULT 0,
+	color_scheme    TEXT NOT NULL DEFAULT '',
+	auto_reconnect  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_profiles_group ON profiles(grp, name);
+`}
+
+const (
+	profileColumns = `id, name, grp, description, host, port, user, auth, password,
+	private_key, passphrase, jump_profile_id, terminal_type, encoding, startup_command,
+	keep_alive_sec, log_enabled, font_size, color_scheme, auto_reconnect`
+
+	upsertProfile = `INSERT INTO profiles (` + profileColumns + `)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+	name = excluded.name, grp = excluded.grp, description = excluded.description,
+	host = excluded.host, port = excluded.port, user = excluded.user, auth = excluded.auth,
+	password = excluded.password, private_key = excluded.private_key,
+	passphrase = excluded.passphrase, jump_profile_id = excluded.jump_profile_id,
+	terminal_type = excluded.terminal_type, encoding = excluded.encoding,
+	startup_command = excluded.startup_command, keep_alive_sec = excluded.keep_alive_sec,
+	log_enabled = excluded.log_enabled, font_size = excluded.font_size,
+	color_scheme = excluded.color_scheme, auto_reconnect = excluded.auto_reconnect`
+)
+
 // Open 按目录返回共享的配置存储，同一路径只会加载一次。
 func Open(dir string) (*Store, error) {
-	path := filepath.Join(dir, "profiles.json")
+	path := filepath.Join(dir, "profiles.db")
 	storesMu.Lock()
 	defer storesMu.Unlock()
 	if s, ok := stores[path]; ok {
@@ -120,47 +164,61 @@ func Open(dir string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("初始化会话加密密钥失败: %w", err)
 	}
-	s := &Store{path: path, keys: keys}
-	data, err := os.ReadFile(path)
-	if err == nil {
-		if err := json.Unmarshal(data, &s.list); err != nil {
-			return nil, fmt.Errorf("解析连接配置失败: %w", err)
-		}
-		plaintext, err := s.decryptSensitive()
-		if err != nil {
-			return nil, err
-		}
-		if plaintext {
-			// 历史明文数据在加载时立即重新加密落盘。
-			if err := s.persist(); err != nil {
-				return nil, err
-			}
-		}
-	} else if !os.IsNotExist(err) {
+	db, err := sqlstore.Open(dir, "profiles.db", migrations)
+	if err != nil {
+		return nil, fmt.Errorf("打开会话数据库失败: %w", err)
+	}
+	s := &Store{path: path, db: db, keys: keys}
+	if err := s.migrateLegacy(filepath.Join(dir, "profiles.json")); err != nil {
+		_ = db.Close()
 		return nil, err
 	}
 	stores[path] = s
 	return s, nil
 }
 
-// decryptSensitive 解密已加密的凭据字段，并报告是否存在历史明文。
-func (s *Store) decryptSensitive() (bool, error) {
-	plaintext := false
-	for i := range s.list {
-		fields := sensitiveFields(&s.list[i])
-		for _, field := range fields {
-			if secure.IsEncrypted(*field) {
-				plain, err := s.keys.Decrypt(*field)
-				if err != nil {
-					return false, fmt.Errorf("解密会话「%s」的凭据失败: %w", s.list[i].Name, err)
+// Close 关闭数据库并从共享缓存中移除，主要供测试与插件卸载使用。
+func (s *Store) Close() error {
+	storesMu.Lock()
+	delete(stores, s.path)
+	storesMu.Unlock()
+	return s.db.Close()
+}
+
+// migrateLegacy 把历史上的 profiles.json 导入数据库，成功后保留 .bak 备份。
+func (s *Store) migrateLegacy(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	var count int
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM profiles").Scan(&count); err != nil {
+		return err
+	}
+	if count == 0 {
+		var list []Profile
+		if err := json.Unmarshal(data, &list); err != nil {
+			return fmt.Errorf("解析连接配置失败: %w", err)
+		}
+		for i := range list {
+			for _, field := range sensitiveFields(&list[i]) {
+				if secure.IsEncrypted(*field) {
+					plain, err := s.keys.Decrypt(*field)
+					if err != nil {
+						return fmt.Errorf("解密会话「%s」的凭据失败: %w", list[i].Name, err)
+					}
+					*field = plain
 				}
-				*field = plain
-			} else if *field != "" {
-				plaintext = true
 			}
 		}
+		if _, err := s.Import(list); err != nil {
+			return err
+		}
 	}
-	return plaintext, nil
+	return sqlstore.BackupLegacy(path)
 }
 
 func sensitiveFields(p *Profile) []*string {
@@ -168,34 +226,42 @@ func sensitiveFields(p *Profile) []*string {
 }
 
 func (s *Store) List() []Profile {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	out := append([]Profile{}, s.list...)
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Group != out[j].Group {
-			return out[i].Group < out[j].Group
+	rows, err := s.db.Query("SELECT " + profileColumns + " FROM profiles ORDER BY grp, name")
+	if err != nil {
+		return []Profile{}
+	}
+	defer rows.Close()
+	out := make([]Profile, 0, 8)
+	for rows.Next() {
+		p, err := scanProfile(rows)
+		if err != nil {
+			return []Profile{}
 		}
-		return out[i].Name < out[j].Name
-	})
+		if err := s.decrypt(&p); err != nil {
+			return []Profile{}
+		}
+		out = append(out, p)
+	}
+	if rows.Err() != nil {
+		return []Profile{}
+	}
 	return out
 }
 
 func (s *Store) Get(id string) (Profile, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	for _, p := range s.list {
-		if p.ID == id {
-			return p, true
-		}
+	row := s.db.QueryRow("SELECT "+profileColumns+" FROM profiles WHERE id = ?", id)
+	p, err := scanProfile(row)
+	if err != nil {
+		return Profile{}, false
 	}
-	return Profile{}, false
+	if err := s.decrypt(&p); err != nil {
+		return Profile{}, false
+	}
+	return p, true
 }
 
 // Save 新增或更新配置，返回保存后的配置。
 func (s *Store) Save(p Profile) (Profile, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	isNew := p.ID == ""
 	if isNew {
 		p.ID = newID()
@@ -203,31 +269,19 @@ func (s *Store) Save(p Profile) (Profile, error) {
 	} else if p.Port == 0 {
 		p.Port = 22
 	}
-
-	found := false
-	for i := range s.list {
-		if s.list[i].ID == p.ID {
-			s.list[i] = p
-			found = true
-			break
-		}
+	args, err := s.profileArgs(&p)
+	if err != nil {
+		return Profile{}, err
 	}
-	if !found {
-		s.list = append(s.list, p)
+	if _, err := s.db.Exec(upsertProfile, args...); err != nil {
+		return Profile{}, err
 	}
-	return p, s.persist()
+	return p, nil
 }
 
 func (s *Store) Delete(id string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i := range s.list {
-		if s.list[i].ID == id {
-			s.list = append(s.list[:i], s.list[i+1:]...)
-			return s.persist()
-		}
-	}
-	return nil
+	_, err := s.db.Exec("DELETE FROM profiles WHERE id = ?", id)
+	return err
 }
 
 // Duplicate 复制一个会话（名称追加「副本」）。
@@ -243,13 +297,35 @@ func (s *Store) Duplicate(id string) (Profile, error) {
 
 // Import 导入会话列表，ID 冲突时自动分配新 ID，返回导入数量。
 func (s *Store) Import(items []Profile) (int, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	ids := make(map[string]bool, len(s.list))
-	for _, p := range s.list {
-		ids[p.ID] = true
+	ids := make(map[string]bool, 16)
+	rows, err := s.db.Query("SELECT id FROM profiles")
+	if err != nil {
+		return 0, err
 	}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		ids[id] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(upsertProfile)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
 
 	count := 0
 	for _, p := range items {
@@ -262,36 +338,91 @@ func (s *Store) Import(items []Profile) (int, error) {
 		}
 		p.ApplyDefaults()
 		ids[p.ID] = true
-		s.list = append(s.list, p)
+		args, err := s.profileArgs(&p)
+		if err != nil {
+			return 0, err
+		}
+		if _, err := stmt.Exec(args...); err != nil {
+			return 0, err
+		}
 		count++
 	}
 	if count == 0 {
 		return 0, nil
 	}
-	return count, s.persist()
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
-func (s *Store) persist() error {
-	out := make([]Profile, len(s.list))
-	copy(out, s.list)
-	for i := range out {
-		for _, field := range sensitiveFields(&out[i]) {
-			encrypted, err := s.keys.Encrypt(*field)
-			if err != nil {
-				return err
-			}
-			*field = encrypted
+// encrypt 把凭据字段替换为密文，用于写入数据库。
+func (s *Store) encrypt(p *Profile) error {
+	for _, field := range sensitiveFields(p) {
+		encrypted, err := s.keys.Encrypt(*field)
+		if err != nil {
+			return err
 		}
+		*field = encrypted
 	}
-	data, err := json.MarshalIndent(out, "", "  ")
+	return nil
+}
+
+func (s *Store) decrypt(p *Profile) error {
+	for _, field := range sensitiveFields(p) {
+		if !secure.IsEncrypted(*field) {
+			continue
+		}
+		plain, err := s.keys.Decrypt(*field)
+		if err != nil {
+			return fmt.Errorf("解密会话「%s」的凭据失败: %w", p.Name, err)
+		}
+		*field = plain
+	}
+	return nil
+}
+
+// profileArgs 返回写入数据库的参数，凭据字段已加密。
+func (s *Store) profileArgs(p *Profile) ([]any, error) {
+	if err := s.encrypt(p); err != nil {
+		return nil, err
+	}
+	return []any{
+		p.ID, p.Name, p.Group, p.Description, p.Host, p.Port, p.User, p.Auth,
+		p.Password, p.PrivateKey, p.Passphrase, p.JumpProfileID, p.TerminalType,
+		p.Encoding, p.StartupCmd, p.KeepAliveSec, b2i(p.LogEnabled), p.FontSize,
+		p.ColorScheme, b2i(p.AutoReconnect),
+	}, nil
+}
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanProfile(row rowScanner) (Profile, error) {
+	var p Profile
+	var logEnabled, autoReconnect int
+	err := row.Scan(&p.ID, &p.Name, &p.Group, &p.Description, &p.Host, &p.Port, &p.User, &p.Auth,
+		&p.Password, &p.PrivateKey, &p.Passphrase, &p.JumpProfileID, &p.TerminalType,
+		&p.Encoding, &p.StartupCmd, &p.KeepAliveSec, &logEnabled, &p.FontSize,
+		&p.ColorScheme, &autoReconnect)
 	if err != nil {
-		return err
+		return Profile{}, err
 	}
-	return os.WriteFile(s.path, append(data, '\n'), 0o600)
+	p.LogEnabled = logEnabled != 0
+	p.AutoReconnect = autoReconnect != 0
+	return p, nil
 }
 
 func newID() string {
 	buf := make([]byte, 6)
 	_, _ = rand.Read(buf)
 	return hex.EncodeToString(buf)
+}
+
+func b2i(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }

@@ -2,6 +2,8 @@ package vault
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -21,6 +23,7 @@ const testPassword = "vault-pass-123"
 type client struct {
 	t     *testing.T
 	app   *fiber.App
+	dir   string
 	token string
 }
 
@@ -32,9 +35,10 @@ func newClient(t *testing.T) *client {
 	if err := api.Init(&plugin.Context{DataDir: dir, Logger: slog.Default()}); err != nil {
 		t.Fatalf("初始化失败: %v", err)
 	}
+	t.Cleanup(func() { _ = api.Close() })
 	app := fiber.New()
 	api.Register(app.Group("/api/apps/vault"))
-	return &client{t: t, app: app}
+	return &client{t: t, app: app, dir: dir}
 }
 
 func (c *client) do(method, path string, body any) (int, map[string]any) {
@@ -150,6 +154,81 @@ func TestSetupAndUnlockFlow(t *testing.T) {
 	}
 }
 
+// readDBFiles 读取数据库主文件与 WAL，确保新写入的密文也被检查到。
+func readDBFiles(t *testing.T, path string) []byte {
+	t.Helper()
+	var out []byte
+	for _, name := range []string{path, path + "-wal"} {
+		data, err := os.ReadFile(name)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			t.Fatalf("读取数据库 %s: %v", name, err)
+		}
+		out = append(out, data...)
+	}
+	return out
+}
+
+func TestMigratesLegacyFilesOnUnlock(t *testing.T) {
+	dir := t.TempDir()
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		t.Fatal(err)
+	}
+	const kdfN = 1 << 12
+	key, err := deriveKey(testPassword, salt, kdfN, defaultKDFR, defaultKDFP, defaultKeyLength)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta := Meta{
+		Version:  1,
+		Salt:     base64.StdEncoding.EncodeToString(salt),
+		Verifier: verifierOf(key),
+		KDF:      KDFParams{N: kdfN, R: defaultKDFR, P: defaultKDFP, KeyLen: defaultKeyLength},
+	}
+	metaJSON, _ := json.Marshal(meta)
+	if err := os.WriteFile(filepath.Join(dir, "meta.json"), metaJSON, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	legacy := Store{
+		Groups:  []Group{{ID: "g1", Name: "旧分组"}},
+		Secrets: []Secret{{ID: "s1", GroupID: "g1", Name: "旧条目", Key: "user", Value: "old-secret"}},
+	}
+	storeJSON, _ := json.Marshal(legacy)
+	sealed, err := sealBytes(key, storeJSON)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "vault.json"), sealed, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	api := New()
+	if err := api.Init(&plugin.Context{DataDir: dir, Logger: slog.Default()}); err != nil {
+		t.Fatalf("初始化失败: %v", err)
+	}
+	defer api.Close()
+	app := fiber.New()
+	api.Register(app.Group("/api/apps/vault"))
+	c := &client{t: t, app: app, dir: dir}
+
+	status, payload := c.do("POST", "/unlock", map[string]any{"password": testPassword})
+	groups, secrets, _ := snapshotOf(payload)
+	if status != fiber.StatusOK || len(groups) != 1 || len(secrets) != 1 {
+		t.Fatalf("历史数据解锁失败: %d %v", status, payload)
+	}
+	if name := secrets[0].(map[string]any)["name"]; name != "旧条目" {
+		t.Fatalf("条目名称未正确迁移: %v", name)
+	}
+	for _, name := range []string{"meta.json", "vault.json"} {
+		if _, err := os.Stat(filepath.Join(dir, name+".bak")); err != nil {
+			t.Fatalf("%s 未保留备份: %v", name, err)
+		}
+	}
+}
+
 func TestPersistenceAndChangePassword(t *testing.T) {
 	dir := t.TempDir()
 	first := New()
@@ -157,6 +236,7 @@ func TestPersistenceAndChangePassword(t *testing.T) {
 	if err := first.Init(&plugin.Context{DataDir: dir, Logger: slog.Default()}); err != nil {
 		t.Fatalf("初始化失败: %v", err)
 	}
+	t.Cleanup(func() { _ = first.Close() })
 	app := fiber.New()
 	first.Register(app.Group("/api/apps/vault"))
 
@@ -199,23 +279,16 @@ func TestPersistenceAndChangePassword(t *testing.T) {
 	_, secrets, _ := snapshotOf(payload)
 	secretID := secrets[0].(map[string]any)["id"].(string)
 
-	// 磁盘上不应出现明文，且应带加密前缀。
-	raw, err := os.ReadFile(filepath.Join(dir, "vault.json"))
-	if err != nil {
-		t.Fatalf("读取数据文件失败: %v", err)
-	}
-	if !strings.HasPrefix(string(raw), storePrefix) {
-		t.Fatalf("数据文件未加密: %s", raw)
+	// 磁盘上不应出现明文，敏感字段应带加密前缀。
+	raw := readDBFiles(t, filepath.Join(dir, "vault.db"))
+	if !strings.Contains(string(raw), storePrefix) {
+		t.Fatalf("条目未加密落盘")
 	}
 	if strings.Contains(string(raw), "p@ssw0rd") || strings.Contains(string(raw), "数据库") {
-		t.Fatal("数据文件中出现明文")
+		t.Fatal("数据库中出现明文")
 	}
-	metaRaw, err := os.ReadFile(filepath.Join(dir, "meta.json"))
-	if err != nil {
-		t.Fatalf("读取元信息失败: %v", err)
-	}
-	if strings.Contains(string(metaRaw), testPassword) {
-		t.Fatal("元信息中不应包含密码明文")
+	if strings.Contains(string(raw), testPassword) {
+		t.Fatal("数据库元信息中不应包含密码明文")
 	}
 
 	// 模拟应用重启。
@@ -224,6 +297,7 @@ func TestPersistenceAndChangePassword(t *testing.T) {
 	if err := second.Init(&plugin.Context{DataDir: dir, Logger: slog.Default()}); err != nil {
 		t.Fatalf("重启初始化失败: %v", err)
 	}
+	t.Cleanup(func() { _ = second.Close() })
 	app2 := fiber.New()
 	second.Register(app2.Group("/api/apps/vault"))
 	do2 := func(method, path string, body any, token string) (int, map[string]any) {

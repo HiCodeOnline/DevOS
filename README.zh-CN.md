@@ -89,9 +89,15 @@ go run .
 ├── config.json          # 端口与浏览器行为
 ├── security.json        # 应用密码、语言、壁纸偏好
 ├── wallpapers/          # 上传的壁纸图片
-├── apps/<应用ID>/        # 各应用数据（会话、连接、笔记等）
+├── apps/<应用ID>/        # 各应用数据，按领域拆分为独立 SQLite 文件
+│   ├── profiles.db      # SSH / SFTP 会话配置
+│   ├── connections.db   # 数据库连接配置
+│   ├── vault.db         # 密钥库元信息、分组与条目
+│   └── notes.db         # 笔记页面与内容块
 └── plugins/<插件ID>/     # 已安装的 Web 插件
 ```
+
+各领域使用独立数据库文件，开启 WAL 模式且只保留一个写连接，不同应用并发写入时不会争抢同一把数据库锁；表结构升级通过 `PRAGMA user_version` 顺序执行。从旧版本升级时，原有的 `profiles.json`、`connections.json`、`notes.json`、`meta.json` 与 `vault.json` 会在首次启动时自动导入，并改名为 `*.bak` 保留备份。
 
 ## 安全
 

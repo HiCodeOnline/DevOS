@@ -1,4 +1,4 @@
-/* SSH 终端应用词典：简体中文 / 英文 / 繁体中文。缺失的键会回退英语，再回退键名。 */
+﻿/* SSH 终端应用词典：简体中文 / 英文 / 繁体中文。缺失的键会回退英语，再回退键名。 */
 DevOSAppI18n.registerAll({
   "zh-CN": {
     "ssh.app.title": "SSH 终端",
@@ -70,7 +70,7 @@ DevOSAppI18n.registerAll({
     "ssh.form.password": "密码",
     "ssh.form.privateKey": "私钥内容",
     "ssh.form.passphrase": "私钥口令（可选）",
-    "ssh.form.credentialNote": "凭据仅保存在本机数据目录（profiles.json），导出会话时请妥善保管。",
+    "ssh.form.credentialNote": "凭据仅保存在本机数据目录（profiles.db），导出会话时请妥善保管。",
     "ssh.form.termType": "终端类型",
     "ssh.form.encoding": "编码",
     "ssh.form.fontSize": "字号",
@@ -229,7 +229,7 @@ DevOSAppI18n.registerAll({
     "ssh.form.password": "Password",
     "ssh.form.privateKey": "Private key",
     "ssh.form.passphrase": "Key passphrase (optional)",
-    "ssh.form.credentialNote": "Credentials are stored only in the local data directory (profiles.json). Keep exported sessions safe.",
+    "ssh.form.credentialNote": "Credentials are stored only in the local data directory (profiles.db). Keep exported sessions safe.",
     "ssh.form.termType": "Terminal type",
     "ssh.form.encoding": "Encoding",
     "ssh.form.fontSize": "Font size",
@@ -388,7 +388,7 @@ DevOSAppI18n.registerAll({
     "ssh.form.password": "密碼",
     "ssh.form.privateKey": "私鑰內容",
     "ssh.form.passphrase": "私鑰密碼（選填）",
-    "ssh.form.credentialNote": "認證資訊僅儲存在本機資料目錄（profiles.json），匯出工作階段時請妥善保管。",
+    "ssh.form.credentialNote": "認證資訊僅儲存在本機資料目錄（profiles.db），匯出工作階段時請妥善保管。",
     "ssh.form.termType": "終端機類型",
     "ssh.form.encoding": "編碼",
     "ssh.form.fontSize": "字型大小",
@@ -478,3 +478,4 @@ DevOSAppI18n.registerAll({
     "ssh.tab.closeTitle": "關閉"
   }
 });
+

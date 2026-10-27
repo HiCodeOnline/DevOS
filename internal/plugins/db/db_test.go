@@ -21,13 +21,32 @@ func newTestDB(t *testing.T) (*DB, string) {
 	if err := p.Init(&plugin.Context{DataDir: dir, Logger: slog.Default()}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
-	return p, filepath.Join(dir, "connections.json")
+	t.Cleanup(func() { _ = p.Close() })
+	return p, filepath.Join(dir, "connections.db")
+}
+
+// readDBFiles 读取数据库主文件与 WAL，确保新写入的密文也被检查到。
+func readDBFiles(t *testing.T, path string) []byte {
+	t.Helper()
+	var out []byte
+	for _, name := range []string{path, path + "-wal"} {
+		data, err := os.ReadFile(name)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			t.Fatalf("读取数据库 %s: %v", name, err)
+		}
+		out = append(out, data...)
+	}
+	return out
 }
 
 func TestConnectionsEncryptedAtRest(t *testing.T) {
 	dir := t.TempDir()
+	legacy := filepath.Join(dir, "connections.json")
 	seed := `[{"id":"c1","name":"生产库","driver":"mysql","host":"10.0.0.1","port":3306,"user":"root","password":"db-pass-123"}]`
-	if err := os.WriteFile(filepath.Join(dir, "connections.json"), []byte(seed), 0o600); err != nil {
+	if err := os.WriteFile(legacy, []byte(seed), 0o600); err != nil {
 		t.Fatalf("写入初始数据: %v", err)
 	}
 
@@ -35,16 +54,17 @@ func TestConnectionsEncryptedAtRest(t *testing.T) {
 	if err := p.Init(&plugin.Context{DataDir: dir, Logger: slog.Default()}); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
+	defer p.Close()
 
-	raw, err := os.ReadFile(filepath.Join(dir, "connections.json"))
-	if err != nil {
-		t.Fatalf("读取存储: %v", err)
+	if _, err := os.Stat(legacy + ".bak"); err != nil {
+		t.Fatalf("历史 JSON 未保留备份: %v", err)
 	}
+	raw := readDBFiles(t, filepath.Join(dir, "connections.db"))
 	if strings.Contains(string(raw), "db-pass-123") {
-		t.Fatalf("存储文件中仍存在明文密码: %s", raw)
+		t.Fatalf("数据库中仍存在明文密码")
 	}
 	if !strings.Contains(string(raw), "enc:v1:") {
-		t.Fatalf("存储文件未加密: %s", raw)
+		t.Fatalf("密码未加密落盘")
 	}
 
 	conn, err := p.conn("c1")
@@ -55,11 +75,12 @@ func TestConnectionsEncryptedAtRest(t *testing.T) {
 		t.Fatalf("内存密码未正确解密 = %q", conn.Password)
 	}
 
-	// 模拟重启：新的实例重新读取已加密的文件。
+	// 模拟重启：新的实例重新读取数据库。
 	reopened := New()
 	if err := reopened.Init(&plugin.Context{DataDir: dir, Logger: slog.Default()}); err != nil {
 		t.Fatalf("重新 Init: %v", err)
 	}
+	defer reopened.Close()
 	again, err := reopened.conn("c1")
 	if err != nil || again.Password != "db-pass-123" {
 		t.Fatalf("重启后解密失败: %#v, err=%v", again, err)
@@ -72,12 +93,9 @@ func TestExportImportRequiresKey(t *testing.T) {
 		t.Fatalf("saveConnection: %v", err)
 	}
 
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("读取存储: %v", err)
-	}
+	raw := readDBFiles(t, path)
 	if strings.Contains(string(raw), "secret-xyz") || !strings.Contains(string(raw), "enc:v1:") {
-		t.Fatalf("落盘内容未正确加密: %s", raw)
+		t.Fatalf("落盘内容未正确加密")
 	}
 
 	app := fiber.New()

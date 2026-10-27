@@ -16,6 +16,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"devos/internal/plugin"
+	"devos/internal/secure"
 )
 
 func newTestAPI(t *testing.T) (*API, *fiber.App) {
@@ -36,6 +37,7 @@ func newTestAPI(t *testing.T) (*API, *fiber.App) {
 	if err := api.Init(ctx); err != nil {
 		t.Fatalf("Init: %v", err)
 	}
+	t.Cleanup(func() { _ = api.Close() })
 	app := fiber.New()
 	api.Register(app.Group("/api"))
 	return api, app
@@ -100,16 +102,72 @@ func findSummary(pages []PageSummary, id string) *PageSummary {
 }
 
 func TestInitCreatesEncryptedStore(t *testing.T) {
-	api, _ := newTestAPI(t)
-	data, err := os.ReadFile(api.file)
-	if err != nil {
-		t.Fatalf("读取 notes.json: %v", err)
-	}
-	if !strings.HasPrefix(string(data), "enc:v1:") {
-		t.Fatalf("笔记数据未加密落盘: %.40s", data)
+	api, app := newTestAPI(t)
+	if _, err := os.Stat(filepath.Join(filepath.Dir(api.filesDir), "notes.db")); err != nil {
+		t.Fatalf("笔记数据库未创建: %v", err)
 	}
 	if _, err := os.Stat(api.filesDir); err != nil {
 		t.Fatalf("附件目录未创建: %v", err)
+	}
+
+	page := createPage(t, app, map[string]any{
+		"title":  "机密标题",
+		"blocks": []map[string]any{{"id": "aaaa0001", "type": "paragraph", "content": "机密正文"}},
+	})
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(api.filesDir), "notes.db"))
+	if err != nil {
+		t.Fatalf("读取数据库: %v", err)
+	}
+	for _, secret := range []string{"机密标题", "机密正文"} {
+		if strings.Contains(string(raw), secret) {
+			t.Fatalf("数据库中仍存在明文: %s", secret)
+		}
+	}
+	if got := api.findPage(page.ID); got == nil || got.Title != "机密标题" || got.Blocks[0].Content != "机密正文" {
+		t.Fatalf("内存中的笔记未正确解密: %+v", got)
+	}
+}
+
+func TestMigratesLegacyJSON(t *testing.T) {
+	dir := t.TempDir()
+	keys, err := secure.Open(dir, "notes.key")
+	if err != nil {
+		t.Fatalf("生成密钥: %v", err)
+	}
+	legacy := Workspace{Pages: []Page{{
+		ID:     "aaaa1111",
+		Title:  "旧笔记",
+		Blocks: []Block{{ID: "bbbb1111", Type: "paragraph", Content: "旧内容"}},
+	}}}
+	data, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sealed, err := keys.EncryptBytes(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "notes.json")
+	if err := os.WriteFile(path, append(sealed, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	api := New()
+	ctx := &plugin.Context{DataDir: dir, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	if err := api.Init(ctx); err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+	defer api.Close()
+
+	page := api.findPage("aaaa1111")
+	if page == nil || page.Title != "旧笔记" || len(page.Blocks) != 1 || page.Blocks[0].Content != "旧内容" {
+		t.Fatalf("历史数据未正确迁移: %+v", page)
+	}
+	if _, err := os.Stat(path + ".bak"); err != nil {
+		t.Fatalf("历史文件未保留备份: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("历史文件应已改名")
 	}
 }
 

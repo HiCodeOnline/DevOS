@@ -89,9 +89,15 @@ The chosen directory is recorded in `location.json` inside the OS configuration 
 ├── config.json          # port / browser behaviour
 ├── security.json        # app password, locale, wallpaper preference
 ├── wallpapers/          # uploaded wallpaper images
-├── apps/<app-id>/       # per-app data (sessions, connections, notes, ...)
+├── apps/<app-id>/       # per-app data, one SQLite file per domain
+│   ├── profiles.db      # ssh / sftp session profiles
+│   ├── connections.db   # database connections
+│   ├── vault.db         # vault metadata, groups and entries
+│   └── notes.db         # notes pages and blocks
 └── plugins/<plugin-id>/ # installed web plugins
 ```
+
+Each app domain uses its own SQLite file with WAL mode and a single writer connection, so concurrent writes from different apps never contend for the same database lock. Schema upgrades are applied through `PRAGMA user_version`. When upgrading from an older build, the previous `profiles.json`, `connections.json`, `notes.json`, `meta.json` and `vault.json` files are imported automatically on first start and renamed to `*.bak`.
 
 ## Security
 
