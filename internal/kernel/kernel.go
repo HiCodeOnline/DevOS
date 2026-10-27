@@ -22,6 +22,9 @@ import (
 	"devos/internal/security"
 )
 
+// Version 是应用版本号，发布构建时通过 -ldflags "-X devos/internal/kernel.Version=..." 覆盖。
+var Version = "0.1.0"
+
 // Kernel 持有内核运行时状态。
 type Kernel struct {
 	app     *fiber.App
@@ -128,7 +131,7 @@ func (k *Kernel) routes() {
 	app.Use(k.securityGuard)
 
 	app.Get("/api/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"app": "devos", "version": "0.1.0", "pid": os.Getpid()})
+		return c.JSON(fiber.Map{"app": "devos", "version": Version, "pid": os.Getpid()})
 	})
 
 	k.registerSecurityRoutes(app)
