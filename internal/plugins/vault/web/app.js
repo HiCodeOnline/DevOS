@@ -14,7 +14,8 @@
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
     all: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5 12 4l8 3.5-8 3.5-8-3.5Z"/><path d="M4 12l8 3.5 8-3.5"/><path d="M4 16.5 12 20l8-3.5"/></svg>',
     lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
-    key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="M11 11l8.5 8.5M16 16l2-2M19 19l2-2"/></svg>'
+    key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="M11 11l8.5 8.5M16 16l2-2M19 19l2-2"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
   };
 
   var i18n = window.DevOSAppI18n;
@@ -48,6 +49,7 @@
     editingId: '',
     editorTags: [],
     editingGroupId: '',
+    entryGroupId: '',
     groupColor: PALETTE[0],
     pendingConfirm: null,
     idleTimer: null,
@@ -151,6 +153,7 @@
     $('entrySave').addEventListener('click', saveEntry);
     $('entryDelete').addEventListener('click', deleteSecret);
     $('entryCopy').addEventListener('click', function () { copyText($('entryValue').value); });
+    $('entryGroupTrigger').addEventListener('click', toggleGroupSelect);
     $('entryName').addEventListener('keydown', function (event) {
       if (event.key === 'Enter') { event.preventDefault(); saveEntry(); }
     });
@@ -190,6 +193,8 @@
         if (event.target === overlay && overlay.id !== 'entryOverlay') closeOverlay(overlay.id);
       });
     });
+    $('entryOverlay').querySelector('.modal-body').addEventListener('scroll', closePopover, { passive: true });
+    window.addEventListener('resize', closePopover);
     document.addEventListener('click', function () { closePopover(); });
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
@@ -581,20 +586,67 @@
     $('entryDelete').classList.toggle('hidden', !secret);
     $('entryError').classList.add('hidden');
 
-    var select = $('entryGroup');
-    select.innerHTML = '';
-    var preferred = secret ? secret.groupId : (state.groupId || (state.groups[0] && state.groups[0].id));
-    state.groups.forEach(function (group) {
-      var option = document.createElement('option');
-      option.value = group.id;
-      option.textContent = group.name;
-      if (group.id === preferred) option.selected = true;
-      select.appendChild(option);
-    });
+    state.entryGroupId = secret ? secret.groupId : (state.groupId || (state.groups[0] && state.groups[0].id) || '');
+    renderGroupTrigger();
     $('entryTagInput').value = '';
     renderEditorTags();
     showOverlay('entryOverlay');
     setTimeout(function () { $('entryName').focus(); }, 40);
+  }
+
+  function currentEntryGroup() {
+    return findGroup(state.entryGroupId) || state.groups[0] || null;
+  }
+
+  function renderGroupTrigger() {
+    var group = currentEntryGroup();
+    $('entryGroupLabel').textContent = group ? group.name : t('vault.group.default');
+    $('entryGroupDot').style.background = group ? group.color : '#6366f1';
+  }
+
+  function toggleGroupSelect(event) {
+    if (event) event.stopPropagation();
+    var popover = $('popover');
+    if (!popover.classList.contains('hidden') && popover.getAttribute('data-kind') === 'group') {
+      closePopover();
+      return;
+    }
+    popover.className = 'popover is-select';
+    popover.setAttribute('data-kind', 'group');
+    popover.innerHTML = '';
+    var current = currentEntryGroup();
+    state.groups.forEach(function (group) {
+      var option = el('button', 'select-option' + (current && group.id === current.id ? ' is-active' : ''));
+      option.type = 'button';
+      var dot = el('span', 'opt-dot');
+      dot.style.background = group.color;
+      option.appendChild(dot);
+      option.appendChild(el('span', 'opt-name', group.name));
+      if (current && group.id === current.id) {
+        var check = el('span', 'opt-check');
+        check.innerHTML = iconHtml('check');
+        option.appendChild(check);
+      }
+      option.addEventListener('click', function (clickEvent) {
+        clickEvent.stopPropagation();
+        state.entryGroupId = group.id;
+        renderGroupTrigger();
+        closePopover();
+      });
+      popover.appendChild(option);
+    });
+    popover.classList.remove('hidden');
+    popover.addEventListener('click', function (clickEvent) { clickEvent.stopPropagation(); });
+
+    var trigger = $('entryGroupTrigger');
+    var rect = trigger.getBoundingClientRect();
+    var menuHeight = Math.min(popover.scrollHeight, 224);
+    var openUp = rect.bottom + menuHeight + 8 > window.innerHeight;
+    popover.style.left = Math.round(rect.left) + 'px';
+    popover.style.width = Math.round(rect.width) + 'px';
+    popover.style.top = openUp ? 'auto' : Math.round(rect.bottom + 4) + 'px';
+    popover.style.bottom = openUp ? Math.round(window.innerHeight - rect.top + 4) + 'px' : 'auto';
+    trigger.setAttribute('aria-expanded', 'true');
   }
 
   function renderEditorTags() {
@@ -639,7 +691,7 @@
       $('entryTagInput').value = '';
     }
     var body = {
-      groupId: $('entryGroup').value,
+      groupId: state.entryGroupId,
       name: name,
       key: $('entryKey').value,
       value: $('entryValue').value,
@@ -831,6 +883,8 @@
       closePopover();
       return;
     }
+    popover.className = 'popover';
+    popover.removeAttribute('data-kind');
     popover.innerHTML = '';
     var change = menuItem('lock', t('vault.menu.changePassword'), function () {
       closePopover();
@@ -864,15 +918,20 @@
   }
 
   function closePopover() {
-    $('popover').classList.add('hidden');
+    var popover = $('popover');
+    popover.classList.add('hidden');
+    popover.removeAttribute('data-kind');
+    var trigger = $('entryGroupTrigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
   }
 
   function showOverlay(id) {
-    $('popover').classList.add('hidden');
+    closePopover();
     $(id).classList.remove('hidden');
   }
 
   function closeOverlay(id) {
+    closePopover();
     $(id).classList.add('hidden');
     if (id === 'confirmOverlay' && state.pendingConfirm) {
       state.pendingConfirm(false);

@@ -510,8 +510,8 @@ func doUpload(t *testing.T, app *fiber.App, filename string, content []byte) (in
 func TestUploadValidationAndServing(t *testing.T) {
 	_, app := newTestAPI(t)
 
-	if status, _ := doUpload(t, app, "note.txt", []byte("hello")); status != http.StatusBadRequest {
-		t.Fatalf("非图片扩展名应被拒绝，实际 %d", status)
+	if status, _ := doUpload(t, app, "evil.html", []byte("<script>alert(1)</script>")); status != http.StatusBadRequest {
+		t.Fatalf("可执行内容扩展名应被拒绝，实际 %d", status)
 	}
 	if status, _ := doUpload(t, app, "fake.png", []byte("not an image")); status != http.StatusBadRequest {
 		t.Fatalf("伪造扩展名应被拒绝，实际 %d", status)
@@ -523,14 +523,18 @@ func TestUploadValidationAndServing(t *testing.T) {
 		t.Fatalf("上传失败: %d %s", status, data)
 	}
 	var out struct {
-		URL string `json:"url"`
+		URL  string `json:"url"`
+		Kind string `json:"kind"`
 	}
 	if err := json.Unmarshal(data, &out); err != nil {
 		t.Fatal(err)
 	}
-	name := strings.TrimPrefix(out.URL, "/api/apps/notes/files/")
-	if !fileNamePattern.MatchString(name) || name == out.URL {
-		t.Fatalf("上传地址异常: %q", out.URL)
+	name := assetRelPath(out.URL)
+	if name == "" || out.Kind != "image" {
+		t.Fatalf("上传地址异常: %q kind=%q", out.URL, out.Kind)
+	}
+	if !strings.HasPrefix(name, "images/") {
+		t.Fatalf("图片应存放在分层目录: %q", name)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/files/"+name, nil)

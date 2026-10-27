@@ -85,7 +85,8 @@
     .side-scroll::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 6px; }
     .side-section { margin: 2px 0 10px; }
     .section-title { display: flex; align-items: center; gap: 4px; padding: 2px 8px 2px 14px; font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-    .section-title button { margin-left: auto; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; color: var(--muted); opacity: 0; }
+    .section-title button { margin-left: 0; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 5px; color: var(--muted); opacity: 0; }
+    .section-actions { margin-left: auto; display: flex; align-items: center; gap: 1px; }
     .side-section:hover .section-title button { opacity: 1; }
     .section-title button:hover { background: var(--hover); color: var(--text); }
     .section-title svg { width: 11px; height: 11px; }
@@ -99,6 +100,13 @@
     .page-row:hover { background: var(--hover); }
     .page-row.is-active { background: var(--active); color: var(--text); font-weight: 500; }
     .page-row.drop-child { background: var(--accent-soft); box-shadow: inset 0 0 0 1px #fcd34d; }
+    .page-row.drop-before::before, .page-row.drop-after::after {
+      content: ""; position: absolute; left: 6px; right: 6px; height: 2px; border-radius: 2px; background: var(--accent);
+    }
+    .page-row.drop-before::before { top: -2px; }
+    .page-row.drop-after::after { bottom: -2px; }
+    .page-row.is-folder .tree-icon svg { color: #b45309; }
+    #treeRoot.drop-root { border-radius: 8px; box-shadow: inset 0 0 0 1px var(--border-strong); background: #fbfaf9; }
     .tree-chevron { display: grid; place-items: center; width: 16px; height: 16px; flex: none; border-radius: 4px; color: var(--muted); }
     .tree-chevron:hover { background: rgba(0,0,0,.06); }
     .tree-chevron svg { width: 11px; height: 11px; transition: transform .12s ease; }
@@ -277,6 +285,19 @@
     .image-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; opacity: 0; transition: opacity .15s ease; }
     .blk-image:hover .image-actions { opacity: 1; }
     .image-caption { width: 100%; margin-top: 5px; border: 0; outline: 0; background: transparent; font-size: 11px; color: var(--muted); }
+    .blk-media { position: relative; width: 100%; }
+    .blk-media video { display: block; width: 100%; max-height: 420px; border-radius: 4px; border: 1px solid var(--border); background: #000; }
+    .blk-media audio { display: block; width: 100%; }
+    .blk-media .image-actions { position: static; opacity: 1; margin-top: 6px; }
+    .folder-view { margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+    .folder-card { display: flex; align-items: center; gap: 9px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 8px; background: #fff; text-align: left; color: inherit; }
+    .folder-card:hover { border-color: var(--border-strong); background: #fbfaf9; }
+    .folder-card .page-icon { width: 22px; height: 22px; font-size: 16px; }
+    .folder-card-main { min-width: 0; flex: 1; }
+    .folder-card-title { font-size: 12.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .folder-card-sub { font-size: 10.5px; color: var(--muted); }
+    .folder-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .folder-empty { padding: 18px 4px; font-size: 11.5px; color: var(--muted); }
     .image-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 28px 16px; border: 1px dashed var(--border-strong); border-radius: 6px; color: var(--muted); background: #fbfaf9; }
     .image-empty svg { width: 26px; height: 26px; }
     .image-empty .row { display: flex; gap: 8px; }
@@ -465,9 +486,14 @@
         <section class="side-section">
           <div class="section-title">
             <span data-i18n="notes.sidebar.pages">页面</span>
-            <button id="rootNewBtn" data-i18n-title="notes.sidebar.newPage" title="新建页面">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-            </button>
+            <span class="section-actions">
+              <button id="rootNewFolderBtn" data-i18n-title="notes.sidebar.newFolder" title="新建文件夹">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/><path d="M12 11v6M9 14h6"/></svg>
+              </button>
+              <button id="rootNewBtn" data-i18n-title="notes.sidebar.newPage" title="新建页面">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              </button>
+            </span>
           </div>
           <div id="treeRoot"></div>
           <div id="treeEmpty" class="side-empty hidden" data-i18n="notes.sidebar.empty">还没有页面</div>
@@ -523,6 +549,7 @@
           </div>
           <input id="titleInput" class="page-title" data-i18n-placeholder="notes.page.untitled" placeholder="无标题" autocomplete="off" spellcheck="false" />
           <div id="editor" class="editor" spellcheck="false"></div>
+          <div id="folderView" class="folder-view hidden"></div>
           <div id="childPages" class="child-pages"></div>
           <div id="pageMeta" class="page-meta"></div>
         </div>
@@ -619,13 +646,16 @@
   <div id="popover" class="popover hidden"></div>
   <div id="toast" class="toast hidden"></div>
   <input type="file" id="imageInput" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" class="hidden" />
+  <input type="file" id="audioInput" accept="audio/*" class="hidden" />
+  <input type="file" id="videoInput" accept="video/*" class="hidden" />
+  <input type="file" id="fileInput" accept=".pdf,.txt,.md,.csv,.json,.zip,.rar,.7z,.epub,.doc,.docx,.xls,.xlsx,.ppt,.pptx" class="hidden" />
   <input type="file" id="mdInput" accept=".md,.markdown,.txt,text/markdown,text/plain" class="hidden" />
 
-  <script src="common.js?v=3"></script>
-  <script src="editor.js?v=3"></script>
-  <script src="editing.js?v=3"></script>
-  <script src="app.js?v=3"></script>
-  <script src="views.js?v=3"></script>
-  <script src="rich.js?v=3"></script>
+  <script src="common.js?v=4"></script>
+  <script src="editor.js?v=4"></script>
+  <script src="editing.js?v=4"></script>
+  <script src="app.js?v=4"></script>
+  <script src="views.js?v=4"></script>
+  <script src="rich.js?v=4"></script>
 </body>
 </html>

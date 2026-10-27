@@ -209,7 +209,7 @@
   /* ---------------- 键盘 ---------------- */
   function handleEnter(e, info, block, el) {
     e.preventDefault();
-    if (block.type === "divider" || block.type === "image" || block.type === "bookmark" || block.type === "table") {
+    if (block.type === "divider" || block.type === "image" || block.type === "bookmark" || block.type === "audio" || block.type === "video" || block.type === "file" || block.type === "table") {
       N.addBlockAfter(block.id, "paragraph", "", true);
       return;
     }
@@ -527,6 +527,65 @@
     }
   }
 
+  /* ---------------- 粘贴：附件、链接、公式 ---------------- */
+  const IMAGE_URL_RE = /\.(png|jpe?g|gif|webp|bmp|avif)(\?|#|$)/i;
+  const AUDIO_URL_RE = /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?|#|$)/i;
+  const VIDEO_URL_RE = /\.(mp4|webm|ogv|mov|m4v)(\?|#|$)/i;
+
+  function clipboardFiles(e) {
+    const dt = e.clipboardData || window.clipboardData;
+    if (!dt) return [];
+    const files = [];
+    if (dt.items) {
+      Array.prototype.slice.call(dt.items).forEach(function (item) {
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      });
+    }
+    if (!files.length && dt.files) {
+      Array.prototype.push.apply(files, Array.prototype.slice.call(dt.files));
+    }
+    return files;
+  }
+
+  function singleLink(text) {
+    const value = (text || "").trim();
+    return /^https?:\/\/\S+$/i.test(value) ? value : null;
+  }
+
+  function formulaSource(text) {
+    const value = (text || "").trim();
+    const match = value.match(/^\$\$([\s\S]+)\$\$$/) ||
+      value.match(/^\\\[([\s\S]+)\\\]$/) ||
+      value.match(/^\\\(([\s\S]+)\\\)$/) ||
+      value.match(/^\$([^$\n]+)\$$/);
+    return match ? match[1].trim() : null;
+  }
+
+  function linkBlockType(url) {
+    if (IMAGE_URL_RE.test(url)) return "image";
+    if (AUDIO_URL_RE.test(url)) return "audio";
+    if (VIDEO_URL_RE.test(url)) return "video";
+    return "bookmark";
+  }
+
+  function pasteAsBlock(block, type, value) {
+    N.pushHistory();
+    block.content = "";
+    block.type = type;
+    if (type === "equation") block.content = value;
+    else {
+      block.props.url = value;
+      block.props.caption = "";
+    }
+    N.renderEditor();
+    N.scheduleSave();
+    if (type === "equation" && N.startRichEdit) N.startRichEdit(block.id);
+    else N.addBlockAfter(block.id, "paragraph", "", true);
+  }
+
   function onEditorPaste(e) {
     const target = e.target;
     if (!target.classList) return;
@@ -541,11 +600,27 @@
     if (!target.classList.contains("block-input")) return;
     const block = activeBlock(target);
     if (!block) return;
+
+    const files = clipboardFiles(e);
+    if (files.length) {
+      e.preventDefault();
+      N.insertFilesAt(block.id, files);
+      return;
+    }
+
     const text = (e.clipboardData || window.clipboardData).getData("text/plain");
     if (text == null || text === "") return;
     e.preventDefault();
     const normalized = text.replace(/\r\n?/g, "\n");
     if (normalized.indexOf("\n") < 0) {
+      const trimmed = normalized.trim();
+      const empty = (target.textContent || "").trim() === "";
+      if (empty && block.type === "paragraph" && trimmed) {
+        const formula = formulaSource(trimmed);
+        if (formula) { pasteAsBlock(block, "equation", formula); return; }
+        const link = singleLink(trimmed);
+        if (link) { pasteAsBlock(block, linkBlockType(link), link); return; }
+      }
       document.execCommand("insertText", false, normalized);
       syncFromEl(target, block, false);
       return;
@@ -687,6 +762,13 @@
     });
   }
 
+  function hasFiles(e) {
+    const dt = e.dataTransfer;
+    if (!dt) return false;
+    const types = dt.types ? Array.prototype.slice.call(dt.types) : [];
+    return types.indexOf("Files") >= 0;
+  }
+
   function bindDrag() {
     const editor = N.$("#editor");
     if (!editor) return;
@@ -700,6 +782,11 @@
       } catch (_) { /* 某些浏览器禁止设置数据 */ }
     });
     editor.addEventListener("dragover", function (e) {
+      if (hasFiles(e)) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        return;
+      }
       if (!N.state.dragBlockId) return;
       const wrapper = e.target.closest && e.target.closest(".block");
       if (!wrapper || wrapper.dataset.id === N.state.dragBlockId) return;
@@ -710,6 +797,17 @@
       wrapper.classList.add(after ? "drop-after" : "drop-before");
     });
     editor.addEventListener("drop", function (e) {
+      if (hasFiles(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const files = Array.prototype.slice.call(e.dataTransfer.files || []);
+        if (!files.length || !N.state.page) return;
+        const wrapper = e.target.closest && e.target.closest(".block");
+        const blocks = N.state.page.blocks || [];
+        const anchor = wrapper ? wrapper.dataset.id : (blocks.length ? blocks[blocks.length - 1].id : "");
+        N.insertFilesAt(anchor, files);
+        return;
+      }
       if (!N.state.dragBlockId) return;
       const wrapper = e.target.closest && e.target.closest(".block");
       if (!wrapper) return;
@@ -734,6 +832,19 @@
     editor.addEventListener("keydown", onEditorKeydown);
     editor.addEventListener("input", onEditorInput);
     editor.addEventListener("paste", onEditorPaste);
+    // 页面已打开但没有聚焦到块时，也允许直接粘贴文件。
+    document.addEventListener("paste", function (e) {
+      const target = e.target;
+      if (target && target.closest && target.closest("#editor")) return;
+      const tag = target && target.tagName ? target.tagName.toLowerCase() : "";
+      if (tag === "input" || tag === "textarea" || (target && target.isContentEditable)) return;
+      if (!N.state.page || N.state.page.folder || N.state.view !== "page") return;
+      const files = clipboardFiles(e);
+      if (!files.length) return;
+      e.preventDefault();
+      const blocks = N.state.page.blocks || [];
+      N.insertFilesAt(blocks.length ? blocks[blocks.length - 1].id : "", files);
+    });
     editor.addEventListener("focusout", function (e) {
       const target = e.target;
       if (!target.classList || !target.classList.contains("block-input")) return;

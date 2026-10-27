@@ -83,6 +83,11 @@
 
   N.ICONS = {
     page: '<path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="M9 12h6M9 16h6"/>',
+    folder: '<path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/>',
+    folderPlus: '<path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/><path d="M12 11v6M9 14h6"/>',
+    audio: '<path d="M4 14V10M8 18V6M12 15V9M16 19V5M20 13v-2"/>',
+    video: '<rect x="3" y="5" width="13" height="14" rx="2"/><path d="M16 10l5-3v10l-5-3Z"/>',
+    file: '<path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/>',
     equation: '<path d="M5 6h5l4 6-4 6H5"/><path d="M15 9l4 6M19 9l-4 6"/>',
     diagram: '<rect x="3" y="3" width="7" height="5" rx="1"/><rect x="14" y="16" width="7" height="5" rx="1"/><path d="M6.5 8v3.5a2 2 0 0 0 2 2H17"/><path d="M15 11.5 17 13.5l-2 2"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -419,6 +424,7 @@
       title: page.title,
       icon: page.icon || "",
       cover: page.cover || "",
+      folder: !!page.folder,
       blocks: page.blocks,
     };
     const id = page.id;
@@ -516,7 +522,7 @@
     (page.blocks || []).forEach(function (block) {
       if (block.type === "code") text += " " + (block.content || "");
       else if (block.type === "table") (block.props.rows || []).forEach(function (row) { text += " " + row.join(" "); });
-      else if (block.type === "image" || block.type === "bookmark") text += " " + (block.props.caption || "");
+      else if (block.type === "image" || block.type === "bookmark" || block.type === "audio" || block.type === "video" || block.type === "file") text += " " + (block.props.caption || "");
       else text += " " + N.plainText(block.content || "");
     });
     const trimmed = text.trim();

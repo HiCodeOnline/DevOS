@@ -325,7 +325,7 @@
         const page = N.summaryOf(parentId);
         const icon = N.el("span", "page-icon");
         if (page && page.icon) icon.textContent = page.icon;
-        else icon.appendChild(N.svg("page"));
+        else icon.appendChild(N.svg(page && page.folder ? "folder" : "page"));
         btn.appendChild(icon);
       }
       btn.appendChild(N.el("span", "", label));
@@ -341,7 +341,7 @@
     function walk(parentId, depth) {
       N.pageTreeOrder(N.childrenOf(parentId)).forEach(function (page) {
         if (blocked[page.id]) return;
-        row(page.id, page.title || T("notes.page.untitled"), depth, false);
+        row(page.id, page.title || T(page.folder ? "notes.folder.untitled" : "notes.page.untitled"), depth, false);
         walk(page.id, depth + 1);
       });
     }
@@ -503,33 +503,22 @@
     });
   }
 
-  /* ---------------- 图片上传 ---------------- */
+  /* ---------------- 附件上传 ---------------- */
   async function handleUploadFile(file) {
     const pending = N.state.pendingUpload;
     N.state.pendingUpload = null;
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) {
-      N.toast(T("notes.toast.imageTooLarge"), true);
-      return;
-    }
-    const form = new FormData();
-    form.append("file", file);
+    const kind = pending && pending.kind === "block" && pending.blockKind ? pending.blockKind : "image";
     try {
-      const res = await fetch(N.API_BASE + "/upload", { method: "POST", body: form });
-      if (!res.ok) {
-        let message = "";
-        try { const data = await res.json(); message = data.message || data.error || ""; } catch (_) { /* 忽略 */ }
-        throw new Error(message || ("HTTP " + res.status));
-      }
-      const data = await res.json();
-      const url = data.url;
+      const data = await N.uploadFile(file, kind);
       if (pending && pending.kind === "cover") {
-        N.setPageCover(url);
+        N.setPageCover(data.url);
       } else if (pending && pending.kind === "block") {
         const block = N.findBlock(pending.blockId);
         if (block) {
           N.pushHistory();
-          block.props.url = url;
+          block.props.url = data.url;
+          if (block.type === "file") block.props.caption = data.name || "";
           N.renderEditor();
           N.scheduleSave();
         }
@@ -580,6 +569,7 @@
     N.$("#searchBtn").addEventListener("click", N.openSearch);
     N.$("#newPageBtn").addEventListener("click", function () { N.openTemplateDialog(""); });
     N.$("#rootNewBtn").addEventListener("click", function () { N.openTemplateDialog(""); });
+    N.$("#rootNewFolderBtn").addEventListener("click", function () { N.createFolder(""); });
     N.$("#emptyCreateBtn").addEventListener("click", function () { N.openTemplateDialog(""); });
     N.$("#trashBtn").addEventListener("click", N.openTrashView);
     N.$("#importBtn").addEventListener("click", function () { N.$("#mdInput").click(); });
@@ -622,6 +612,15 @@
       const file = this.files && this.files[0];
       this.value = "";
       if (file) handleUploadFile(file);
+    });
+    ["audioInput", "videoInput", "fileInput"].forEach(function (id) {
+      const input = N.$("#" + id);
+      if (!input) return;
+      input.addEventListener("change", function () {
+        const file = input.files && input.files[0];
+        input.value = "";
+        if (file) handleUploadFile(file);
+      });
     });
 
     document.querySelectorAll("[data-close]").forEach(function (btn) {
@@ -700,6 +699,31 @@
       }
     });
 
+    // 拖到树空白处：移动到根层级末尾。
+    const treeRoot = N.$("#treeRoot");
+    treeRoot.addEventListener("dragover", function (e) {
+      if (!N.state.dragPageId) return;
+      e.preventDefault();
+      treeRoot.classList.add("drop-root");
+    });
+    treeRoot.addEventListener("dragleave", function (e) {
+      if (!e.relatedTarget || !treeRoot.contains(e.relatedTarget)) treeRoot.classList.remove("drop-root");
+    });
+    treeRoot.addEventListener("drop", function (e) {
+      treeRoot.classList.remove("drop-root");
+      const dragId = N.state.dragPageId;
+      N.state.dragPageId = "";
+      if (!dragId) return;
+      e.preventDefault();
+      N.movePageTo(dragId, "", -1);
+    });
+
+    document.addEventListener("dragend", function () {
+      if (N.clearPageDropMarks) N.clearPageDropMarks();
+      N.state.dragPageId = "";
+      N.$("#treeRoot").classList.remove("drop-root");
+    });
+
     window.addEventListener("pagehide", function () {
       if (N.state.dirty && N.state.page) {
         try {
@@ -710,6 +734,7 @@
               title: N.state.page.title,
               icon: N.state.page.icon,
               cover: N.state.page.cover,
+              folder: !!N.state.page.folder,
               blocks: N.state.page.blocks,
             }),
             keepalive: true,

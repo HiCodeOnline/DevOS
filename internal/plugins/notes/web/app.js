@@ -36,9 +36,24 @@
   function makePageIcon(page, cls) {
     const icon = N.el("span", cls || "page-icon");
     if (page.icon) icon.textContent = page.icon;
-    else icon.appendChild(N.svg("page"));
+    else icon.appendChild(N.svg(page.folder ? "folder" : "page"));
     return icon;
   }
+
+  function dropPlacement(e, row) {
+    const rect = row.getBoundingClientRect();
+    const offset = e.clientY - rect.top;
+    if (offset < rect.height * 0.3) return "before";
+    if (offset > rect.height * 0.7) return "after";
+    return "child";
+  }
+
+  function clearDropMarks() {
+    document.querySelectorAll(".page-row.drop-child, .page-row.drop-before, .page-row.drop-after").forEach(function (row) {
+      row.classList.remove("drop-child", "drop-before", "drop-after");
+    });
+  }
+  N.clearPageDropMarks = clearDropMarks;
 
   function makeRow(page, depth, options) {
     options = options || {};
@@ -46,9 +61,10 @@
     const row = N.el("div", "page-row");
     row.dataset.pageId = page.id;
     row.style.setProperty("--depth", String(depth));
+    if (page.folder) row.classList.add("is-folder");
     if (N.state.view === "page" && N.state.page && N.state.page.id === page.id) row.classList.add("is-active");
     row.appendChild(makePageIcon(page, "page-icon tree-icon"));
-    row.appendChild(N.el("span", "page-label", page.title || T("notes.page.untitled")));
+    row.appendChild(N.el("span", "page-label", page.title || T(page.folder ? "notes.folder.untitled" : "notes.page.untitled")));
 
     if (!options.favorite) {
       const children = N.pageTreeOrder(N.childrenOf(page.id));
@@ -87,19 +103,26 @@
         } catch (_) { /* 忽略 */ }
       });
       row.addEventListener("dragover", function (e) {
-        if (!N.state.dragPageId || N.state.dragPageId === page.id) return;
+        const dragId = N.state.dragPageId;
+        if (!dragId || dragId === page.id) return;
         e.preventDefault();
         e.stopPropagation();
-        row.classList.add("drop-child");
+        clearDropMarks();
+        row.classList.add("drop-" + dropPlacement(e, row));
       });
-      row.addEventListener("dragleave", function () { row.classList.remove("drop-child"); });
+      row.addEventListener("dragleave", function () {
+        row.classList.remove("drop-child", "drop-before", "drop-after");
+      });
       row.addEventListener("drop", function (e) {
         e.preventDefault();
         e.stopPropagation();
-        row.classList.remove("drop-child");
+        const placement = row.classList.contains("drop-before") ? "before" : row.classList.contains("drop-after") ? "after" : "child";
+        clearDropMarks();
         const dragId = N.state.dragPageId;
         N.state.dragPageId = "";
-        if (dragId) N.movePageTo(dragId, page.id);
+        if (!dragId) return;
+        if (placement === "child") N.movePageTo(dragId, page.id);
+        else N.moveBeside(dragId, page.id, placement === "after");
       });
     }
     node.appendChild(row);
@@ -160,7 +183,7 @@
       const btn = N.el("button", "crumb");
       btn.type = "button";
       if (page.icon) btn.appendChild(N.el("span", "", page.icon));
-      else btn.appendChild(N.svg("page"));
+      else btn.appendChild(N.svg(page.folder ? "folder" : "page"));
       btn.appendChild(N.el("span", "", page.title || T("notes.page.untitled")));
       btn.title = page.title || "";
       btn.addEventListener("click", function () { N.openPage(page.id); });
@@ -174,11 +197,12 @@
     if (!page) return;
     const title = N.$("#titleInput");
     if (title && document.activeElement !== title) title.value = page.title || "";
+    if (title) title.placeholder = T(page.folder ? "notes.folder.untitled" : "notes.page.untitled");
     const icon = N.$("#iconBtn");
     N.clear(icon);
     icon.classList.toggle("empty", !page.icon);
     if (page.icon) icon.textContent = page.icon;
-    else icon.appendChild(N.svg("page"));
+    else icon.appendChild(N.svg(page.folder ? "folder" : "page"));
     icon.title = T("notes.page.changeIcon");
 
     const coverWrap = N.$("#coverWrap");
@@ -236,9 +260,19 @@
     N.$("#emptyState").classList.add("hidden");
     N.renderPageHeader();
     N.renderCrumbs();
-    N.renderEditor();
-    renderChildPages();
-    N.updatePageMeta();
+    const folder = !!N.state.page.folder;
+    N.$("#editor").classList.toggle("hidden", folder);
+    N.$("#folderView").classList.toggle("hidden", !folder);
+    N.clear(N.$("#childPages"));
+    if (folder) {
+      N.$("#pageMeta").classList.add("hidden");
+      renderFolderView();
+    } else {
+      N.$("#pageMeta").classList.remove("hidden");
+      N.renderEditor();
+      renderChildPages();
+      N.updatePageMeta();
+    }
     N.renderSidebar();
     if (options.focusTitle) {
       const input = N.$("#titleInput");
@@ -246,6 +280,40 @@
       input.select();
     }
   };
+
+  function renderFolderView() {
+    const box = N.$("#folderView");
+    if (!box || !N.state.page) return;
+    N.clear(box);
+    const children = N.pageTreeOrder(N.childrenOf(N.state.page.id));
+    if (!children.length) {
+      box.appendChild(N.el("div", "folder-empty", T("notes.folder.empty")));
+    }
+    children.forEach(function (page) {
+      const card = N.el("button", "folder-card");
+      card.type = "button";
+      card.appendChild(makePageIcon(page));
+      const main = N.el("div", "folder-card-main");
+      main.appendChild(N.el("div", "folder-card-title", page.title || T(page.folder ? "notes.folder.untitled" : "notes.page.untitled")));
+      const sub = page.folder
+        ? T("notes.folder.items", { n: N.childrenOf(page.id).length })
+        : T("notes.folder.edited", { time: N.fmtDate(page.updatedAt, true) });
+      main.appendChild(N.el("div", "folder-card-sub", sub));
+      card.appendChild(main);
+      card.addEventListener("click", function () { N.openPage(page.id); });
+      box.appendChild(card);
+    });
+    const actions = N.el("div", "folder-actions");
+    const addPage = N.el("button", "pill", T("notes.folder.newPage"));
+    addPage.type = "button";
+    addPage.addEventListener("click", function () { N.createChildPage(N.state.page.id); });
+    const addFolder = N.el("button", "pill", T("notes.folder.newFolder"));
+    addFolder.type = "button";
+    addFolder.addEventListener("click", function () { N.createFolder(N.state.page.id); });
+    actions.appendChild(addPage);
+    actions.appendChild(addFolder);
+    box.appendChild(actions);
+  }
 
   N.showEmptyState = function () {
     N.state.view = "empty";
@@ -295,12 +363,17 @@
           title: options.title || "",
           icon: options.icon || "",
           cover: options.cover || "",
+          folder: !!options.folder,
           blocks: options.blocks || [],
         },
       });
       if (options.parentId) N.state.expanded[options.parentId] = true;
       await N.refreshWorkspace();
-      await N.openPage(page.id, { focusTitle: options.focusTitle !== false });
+      if (options.folder) {
+        await N.openPage(page.id, { focusTitle: true });
+      } else {
+        await N.openPage(page.id, { focusTitle: options.focusTitle !== false });
+      }
       return page;
     } catch (err) {
       N.toast(T("notes.toast.createFailed", { error: err.message }), true);
@@ -312,16 +385,38 @@
     return N.createPage({ parentId: parentId, title: "", blocks: [] });
   };
 
-  N.movePageTo = async function (id, parentId) {
+  N.createFolder = function (parentId) {
+    return N.createPage({ parentId: parentId || "", folder: true, icon: "📁", title: "" });
+  };
+
+  N.movePageTo = async function (id, parentId, index) {
     try {
-      await N.api("/pages/" + id + "/move", { method: "POST", body: { parentId: parentId, index: -1 } });
+      await N.api("/pages/" + id + "/move", {
+        method: "POST",
+        body: { parentId: parentId, index: typeof index === "number" ? index : -1 },
+      });
       if (parentId) N.state.expanded[parentId] = true;
       await N.refreshWorkspace();
-      if (N.state.page && N.state.page.id === id) N.renderCrumbs();
+      if (N.state.page && N.state.page.id === id) {
+        N.renderCrumbs();
+        if (N.state.page.folder) N.renderPageView();
+      }
       N.toast(T("notes.toast.moved"));
     } catch (err) {
       N.toast(err.message, true);
     }
+  };
+
+  // 把页面拖到另一页面前/后，成为同一层级的相邻节点。
+  N.moveBeside = function (dragId, targetId, after) {
+    const target = N.summaryOf(targetId);
+    if (!target || dragId === targetId) return;
+    const parentId = target.parentId || "";
+    const list = N.pageTreeOrder(N.childrenOf(parentId)).filter(function (page) { return page.id !== dragId; });
+    let index = list.findIndex(function (page) { return page.id === targetId; });
+    if (index < 0) index = list.length;
+    if (after) index += 1;
+    N.movePageTo(dragId, parentId, index);
   };
 
   N.toggleFavorite = async function () {
@@ -476,6 +571,8 @@
     const items = [
       { label: T("notes.page.favorite"), icon: N.state.page.favorite ? "starFill" : "star", run: function () { N.toggleFavorite(); } },
       { label: T("notes.page.addChild"), icon: "plus", run: function () { N.createChildPage(N.state.page.id); } },
+      { label: T("notes.folder.newFolder"), icon: "folderPlus", run: function () { N.createFolder(N.state.page.id); } },
+      { label: N.state.page.folder ? T("notes.folder.toPage") : T("notes.folder.toFolder"), icon: N.state.page.folder ? "page" : "folder", run: function () { N.toggleFolderType(); } },
       { label: T("notes.page.duplicate"), icon: "copy", run: function () { N.duplicateCurrentPage(); } },
       { label: T("notes.page.move"), icon: "arrowDown", run: function () { N.openMoveDialog(); } },
       { label: T("notes.page.export"), icon: "download", run: function () { N.exportCurrentPage(); } },
@@ -501,6 +598,18 @@
       menu.appendChild(btn);
     });
     N.showPopover(menu, N.$("#moreBtn").getBoundingClientRect(), { align: "right" });
+  };
+
+  N.toggleFolderType = function () {
+    const page = N.state.page;
+    if (!page) return;
+    page.folder = !page.folder;
+    if (page.folder && !page.icon) page.icon = "📁";
+    const summary = N.summaryOf(page.id);
+    if (summary) summary.folder = page.folder;
+    N.renderPageView();
+    N.scheduleSave();
+    N.toast(page.folder ? T("notes.toast.toFolder") : T("notes.toast.toPage"));
   };
 
   N.duplicateCurrentPage = async function () {

@@ -31,11 +31,14 @@ import (
 var webFS embed.FS
 
 const (
-	maxPages         = 5000
-	maxBlocksPerPage = 600
-	maxContentRunes  = 20000
-	maxUploadBytes   = 3 << 20
-	maxSearchResults = 50
+	maxPages           = 5000
+	maxBlocksPerPage   = 600
+	maxContentRunes    = 20000
+	maxImageBytes      = 10 << 20
+	maxAudioBytes      = 40 << 20
+	maxVideoBytes      = 60 << 20
+	maxAttachmentBytes = 40 << 20
+	maxSearchResults   = 50
 )
 
 // 支持的块类型，与前端编辑器保持一致。
@@ -45,6 +48,7 @@ var blockTypes = map[string]bool{
 	"quote": true, "callout": true, "code": true, "divider": true,
 	"image": true, "bookmark": true, "table": true,
 	"equation": true, "diagram": true,
+	"audio": true, "video": true, "file": true,
 }
 
 var blockColors = map[string]bool{
@@ -55,6 +59,68 @@ var blockColors = map[string]bool{
 
 var imageExts = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".webp": true, ".bmp": true,
+}
+
+var audioExts = map[string]bool{
+	".mp3": true, ".wav": true, ".ogg": true, ".m4a": true, ".aac": true, ".flac": true, ".opus": true,
+}
+
+var videoExts = map[string]bool{
+	".mp4": true, ".webm": true, ".ogv": true, ".mov": true, ".m4v": true,
+}
+
+// 附件只接受文档类扩展名，避免 HTML/SVG 等可执行内容带来安全风险。
+var attachmentExts = map[string]bool{
+	".pdf": true, ".txt": true, ".md": true, ".csv": true, ".json": true,
+	".zip": true, ".rar": true, ".7z": true, ".epub": true,
+	".doc": true, ".docx": true, ".xls": true, ".xlsx": true, ".ppt": true, ".pptx": true,
+}
+
+// 上传类型到存储子目录的映射，按类型与年月分层，便于迁移与备份。
+var uploadDirs = map[string]string{
+	"image": "images",
+	"audio": "audio",
+	"video": "video",
+	"file":  "attachments",
+}
+
+func uploadLimit(kind string) int64 {
+	switch kind {
+	case "image":
+		return maxImageBytes
+	case "audio":
+		return maxAudioBytes
+	case "video":
+		return maxVideoBytes
+	default:
+		return maxAttachmentBytes
+	}
+}
+
+func extAllowed(kind, ext string) bool {
+	switch kind {
+	case "image":
+		return imageExts[ext]
+	case "audio":
+		return audioExts[ext]
+	case "video":
+		return videoExts[ext]
+	default:
+		return attachmentExts[ext]
+	}
+}
+
+func detectKind(ext, mime string) string {
+	switch {
+	case imageExts[ext], strings.HasPrefix(mime, "image/"):
+		return "image"
+	case audioExts[ext], strings.HasPrefix(mime, "audio/"):
+		return "audio"
+	case videoExts[ext], strings.HasPrefix(mime, "video/"):
+		return "video"
+	default:
+		return "file"
+	}
 }
 
 // BlockProps 保存不同块类型的附加属性。
@@ -78,13 +144,14 @@ type Block struct {
 	Props   BlockProps `json:"props"`
 }
 
-// Page 是一个笔记页面，支持无限层级嵌套。
+// Page 是一个笔记页面，支持无限层级嵌套；Folder 为真时作为文件夹收纳子页面。
 type Page struct {
 	ID        string  `json:"id"`
 	ParentID  string  `json:"parentId"`
 	Title     string  `json:"title"`
 	Icon      string  `json:"icon"`
 	Cover     string  `json:"cover"`
+	Folder    bool    `json:"folder,omitempty"`
 	Favorite  bool    `json:"favorite"`
 	Trashed   bool    `json:"trashed"`
 	TrashedAt string  `json:"trashedAt"`
@@ -101,6 +168,7 @@ type PageSummary struct {
 	Title      string `json:"title"`
 	Icon       string `json:"icon"`
 	Cover      string `json:"cover"`
+	Folder     bool   `json:"folder,omitempty"`
 	Favorite   bool   `json:"favorite"`
 	Trashed    bool   `json:"trashed"`
 	TrashedAt  string `json:"trashedAt"`
@@ -194,7 +262,7 @@ func (p *API) Register(api fiber.Router) {
 	api.Get("/pages/:id/export", p.handleExport)
 	api.Delete("/trash", p.handleEmptyTrash)
 	api.Post("/upload", p.handleUpload)
-	api.Get("/files/:name", p.handleFile)
+	api.Get("/files/*", p.handleFile)
 }
 
 func (p *API) handleWorkspace(c *fiber.Ctx) error {
@@ -224,6 +292,7 @@ type createInput struct {
 	Title    string  `json:"title"`
 	Icon     string  `json:"icon"`
 	Cover    string  `json:"cover"`
+	Folder   bool    `json:"folder"`
 	Blocks   []Block `json:"blocks"`
 }
 
@@ -250,10 +319,15 @@ func (p *API) handleCreatePage(c *fiber.Ctx) error {
 		Title:     normalizeTitle(in.Title),
 		Icon:      normalizeIcon(in.Icon),
 		Cover:     normalizeCover(in.Cover),
+		Folder:    in.Folder,
 		Order:     p.nextOrder(parent),
 		Blocks:    normalizeBlocks(in.Blocks),
 		CreatedAt: now,
 		UpdatedAt: now,
+	}
+	if page.Folder {
+		// 文件夹主要收纳子页面，块内容保留为空段落以便后续转为普通页面。
+		page.Blocks = normalizeBlocks(nil)
 	}
 	p.ws.Pages = append(p.ws.Pages, page)
 	p.mu.Unlock()
@@ -267,6 +341,7 @@ type saveInput struct {
 	Title  *string  `json:"title"`
 	Icon   *string  `json:"icon"`
 	Cover  *string  `json:"cover"`
+	Folder *bool    `json:"folder"`
 	Blocks *[]Block `json:"blocks"`
 }
 
@@ -290,8 +365,14 @@ func (p *API) handleSavePage(c *fiber.Ctx) error {
 	if in.Cover != nil {
 		page.Cover = normalizeCover(*in.Cover)
 	}
+	if in.Folder != nil {
+		page.Folder = *in.Folder
+	}
 	if in.Blocks != nil {
 		page.Blocks = normalizeBlocks(*in.Blocks)
+	}
+	if page.Folder {
+		page.Blocks = normalizeBlocks(nil)
 	}
 	page.UpdatedAt = time.Now().Format(time.RFC3339)
 	result := *page
@@ -486,6 +567,11 @@ func (p *API) handleDuplicate(c *fiber.Ctx) error {
 		}
 		copied = append(copied, target)
 	}
+	cache := make(map[string]string)
+	for i := range copied {
+		// 副本独立持有附件，避免删除任一页面时误删另一份引用的文件。
+		p.remapAssets(&copied[i], cache)
+	}
 	p.ws.Pages = append(p.ws.Pages, copied...)
 	p.reindex(page.ParentID)
 	rootID := mapping[page.ID]
@@ -522,7 +608,7 @@ func (p *API) handleDeletePage(c *fiber.Ctx) error {
 	p.reindex(page.ParentID)
 	p.mu.Unlock()
 	for _, name := range files {
-		_ = os.Remove(filepath.Join(p.filesDir, name))
+		_ = os.Remove(filepath.Join(p.filesDir, filepath.FromSlash(name)))
 	}
 	if err := p.persist(); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
@@ -544,7 +630,7 @@ func (p *API) handleEmptyTrash(c *fiber.Ctx) error {
 	p.ws.Pages = out
 	p.mu.Unlock()
 	for _, name := range files {
-		_ = os.Remove(filepath.Join(p.filesDir, name))
+		_ = os.Remove(filepath.Join(p.filesDir, filepath.FromSlash(name)))
 	}
 	if err := p.persist(); err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
@@ -617,12 +703,16 @@ func (p *API) handleUpload(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "未收到上传文件")
 	}
-	if file.Size <= 0 || file.Size > maxUploadBytes {
-		return fiber.NewError(fiber.StatusBadRequest, "图片大小需在 3MB 以内")
-	}
 	ext := strings.ToLower(filepath.Ext(file.Filename))
-	if !imageExts[ext] {
-		return fiber.NewError(fiber.StatusBadRequest, "仅支持 PNG/JPG/GIF/WebP/BMP 图片")
+	kind := strings.ToLower(strings.TrimSpace(c.FormValue("kind")))
+	if _, ok := uploadDirs[kind]; !ok || !extAllowed(kind, ext) {
+		kind = detectKind(ext, file.Header.Get("Content-Type"))
+	}
+	if file.Size <= 0 || file.Size > uploadLimit(kind) {
+		return fiber.NewError(fiber.StatusBadRequest, "文件大小超出限制")
+	}
+	if !extAllowed(kind, ext) {
+		return fiber.NewError(fiber.StatusBadRequest, "不支持的文件类型")
 	}
 	src, err := file.Open()
 	if err != nil {
@@ -631,30 +721,115 @@ func (p *API) handleUpload(c *fiber.Ctx) error {
 	head := make([]byte, 512)
 	n, _ := io.ReadFull(src, head)
 	_ = src.Close()
-	if !strings.HasPrefix(http.DetectContentType(head[:n]), "image/") {
+	if kind == "image" && !strings.HasPrefix(http.DetectContentType(head[:n]), "image/") {
 		return fiber.NewError(fiber.StatusBadRequest, "文件内容不是有效图片")
 	}
-	name := newID() + ext
-	if err := c.SaveFile(file, filepath.Join(p.filesDir, name)); err != nil {
-		return fiber.NewError(fiber.StatusInternalServerError, "保存图片失败")
+	// 按类型与年月分层存储：files/images/202510/<id>.png、files/audio/…、files/attachments/…。
+	rel := filepath.ToSlash(filepath.Join(uploadDirs[kind], time.Now().Format("200601"), newID()+ext))
+	abs := filepath.Join(p.filesDir, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "创建附件目录失败")
 	}
-	return c.JSON(fiber.Map{"url": "/api/apps/notes/files/" + name})
+	if err := c.SaveFile(file, abs); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "保存文件失败")
+	}
+	return c.JSON(fiber.Map{
+		"url":  filesURL(rel),
+		"kind": kind,
+		"name": filepath.Base(file.Filename),
+		"size": file.Size,
+	})
 }
 
-var fileNamePattern = regexp.MustCompile(`^[a-f0-9]{16}\.(png|jpg|jpeg|gif|webp|bmp)$`)
+var (
+	// legacyFilePattern 兼容旧版本平铺在 files/ 下的图片文件名。
+	legacyFilePattern = regexp.MustCompile(`^[a-f0-9]{16}\.(png|jpg|jpeg|gif|webp|bmp)$`)
+	assetPathPattern  = regexp.MustCompile(`^(images|audio|video|attachments)/[0-9]{6}/[a-f0-9]{16}\.(png|jpg|jpeg|gif|webp|bmp|mp3|wav|ogg|m4a|aac|flac|opus|mp4|webm|ogv|mov|m4v|pdf|txt|md|csv|json|zip|rar|7z|epub|doc|docx|xls|xlsx|ppt|pptx)$`)
+)
+
+// fileNamePattern 保留给测试与历史路径校验使用。
+var fileNamePattern = legacyFilePattern
+
+func assetKind(rel string) (string, bool) {
+	if legacyFilePattern.MatchString(rel) {
+		return "images", true
+	}
+	if !assetPathPattern.MatchString(rel) {
+		return "", false
+	}
+	return strings.SplitN(rel, "/", 2)[0], true
+}
+
+// assetRelPath 将附件 URL 归一化为相对 files/ 的路径，非本应用附件返回空串。
+func assetRelPath(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	value = strings.TrimPrefix(value, "/api/apps/notes/files/")
+	value = strings.TrimPrefix(value, "files/")
+	value = filepath.ToSlash(strings.TrimPrefix(value, "/"))
+	if _, ok := assetKind(value); !ok {
+		return ""
+	}
+	return value
+}
+
+func filesURL(rel string) string {
+	return "/api/apps/notes/files/" + filepath.ToSlash(rel)
+}
 
 func (p *API) handleFile(c *fiber.Ctx) error {
-	name := c.Params("name")
-	if !fileNamePattern.MatchString(name) {
+	rel := filepath.ToSlash(strings.TrimPrefix(c.Params("*"), "/"))
+	kind, ok := assetKind(rel)
+	if !ok {
 		return fiber.ErrNotFound
 	}
-	path := filepath.Join(p.filesDir, name)
+	path := filepath.Join(p.filesDir, filepath.FromSlash(rel))
 	if _, err := os.Stat(path); err != nil {
 		return fiber.ErrNotFound
 	}
 	c.Set("Cache-Control", "public, max-age=31536000, immutable")
 	c.Set("X-Content-Type-Options", "nosniff")
+	if kind == "attachments" {
+		c.Set("Content-Disposition", `attachment; filename="`+filepath.Base(rel)+`"`)
+	}
 	return c.SendFile(path)
+}
+
+// remapAssets 为副本复制附件并改写引用，保证每个页面独立持有自己的文件。
+func (p *API) remapAssets(page *Page, cache map[string]string) {
+	remap := func(url string) string {
+		rel := assetRelPath(url)
+		if rel == "" {
+			return url
+		}
+		if next, ok := cache[rel]; ok {
+			return filesURL(next)
+		}
+		dir := "images"
+		if idx := strings.Index(rel, "/"); idx >= 0 {
+			dir = rel[:idx]
+		}
+		next := filepath.ToSlash(filepath.Join(dir, time.Now().Format("200601"), newID()+strings.ToLower(filepath.Ext(rel))))
+		data, err := os.ReadFile(filepath.Join(p.filesDir, filepath.FromSlash(rel)))
+		if err != nil {
+			return url
+		}
+		dst := filepath.Join(p.filesDir, filepath.FromSlash(next))
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return url
+		}
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
+			return url
+		}
+		cache[rel] = next
+		return filesURL(next)
+	}
+	page.Cover = remap(page.Cover)
+	for i := range page.Blocks {
+		page.Blocks[i].Props.URL = remap(page.Blocks[i].Props.URL)
+	}
 }
 
 // findPage 在已持锁的情况下按 ID 查找页面。
@@ -755,6 +930,9 @@ func (p *API) normalizeWorkspace() {
 		page.Icon = normalizeIcon(page.Icon)
 		page.Cover = normalizeCover(page.Cover)
 		page.Blocks = normalizeBlocks(page.Blocks)
+		if page.Folder {
+			page.Blocks = normalizeBlocks(nil)
+		}
 		pages = append(pages, page)
 		if len(pages) >= maxPages {
 			break
@@ -821,6 +999,9 @@ func normalizeContent(blockType, content string) string {
 	// 代码、分割线、公式与流程图的正文是原始源码，不做行内 HTML 清洗。
 	if blockType == "code" || blockType == "divider" || blockType == "equation" || blockType == "diagram" {
 		return truncateRunes(content, maxContentRunes)
+	}
+	if blockType == "audio" || blockType == "video" || blockType == "file" {
+		return ""
 	}
 	safe := sanitizeInline(content)
 	return truncateRunes(safe, maxContentRunes)
@@ -906,6 +1087,7 @@ func summarize(page Page) PageSummary {
 		Title:      page.Title,
 		Icon:       page.Icon,
 		Cover:      page.Cover,
+		Folder:     page.Folder,
 		Favorite:   page.Favorite,
 		Trashed:    page.Trashed,
 		TrashedAt:  page.TrashedAt,
@@ -946,7 +1128,7 @@ func blockPlainText(block Block) string {
 			}
 		}
 		return strings.Join(parts, " ")
-	case "image", "bookmark":
+	case "image", "bookmark", "audio", "video", "file":
 		return strings.TrimSpace(block.Props.Caption)
 	default:
 		return plainText(block.Content)
@@ -956,17 +1138,14 @@ func blockPlainText(block Block) string {
 func pageFiles(page Page) []string {
 	var out []string
 	add := func(value string) {
-		value = strings.TrimPrefix(value, "files/")
-		if strings.HasPrefix(value, "/api/apps/notes/files/") {
-			value = strings.TrimPrefix(value, "/api/apps/notes/files/")
-		}
-		if fileNamePattern.MatchString(value) {
-			out = append(out, value)
+		if rel := assetRelPath(value); rel != "" {
+			out = append(out, rel)
 		}
 	}
 	add(page.Cover)
 	for _, block := range page.Blocks {
-		if block.Type == "image" {
+		switch block.Type {
+		case "image", "audio", "video", "file":
 			add(block.Props.URL)
 		}
 	}
@@ -1083,11 +1262,11 @@ func safeURL(value string) bool {
 	return false
 }
 
-// safeAssetURL 额外允许插件自身上传的图片地址。
+// safeAssetURL 额外允许插件自身上传的附件地址。
 func safeAssetURL(value string) bool {
 	value = strings.TrimSpace(value)
 	if strings.HasPrefix(value, "/api/apps/notes/files/") || strings.HasPrefix(value, "files/") {
-		return true
+		return assetRelPath(value) != ""
 	}
 	return safeURL(value)
 }
@@ -1168,6 +1347,16 @@ func exportMarkdown(page Page) string {
 			out.WriteString("```mermaid\n" + block.Content + "\n```\n\n")
 		case "image":
 			out.WriteString("![" + block.Props.Caption + "](" + block.Props.URL + ")\n\n")
+		case "audio":
+			out.WriteString("<audio controls src=\"" + block.Props.URL + "\"></audio>\n\n")
+		case "video":
+			out.WriteString("<video controls src=\"" + block.Props.URL + "\"></video>\n\n")
+		case "file":
+			label := block.Props.Caption
+			if label == "" {
+				label = block.Props.URL
+			}
+			out.WriteString("[" + label + "](" + block.Props.URL + ")\n\n")
 		case "bookmark":
 			label := block.Props.Caption
 			if label == "" {

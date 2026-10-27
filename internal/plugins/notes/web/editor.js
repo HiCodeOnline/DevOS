@@ -22,6 +22,9 @@
     { type: "table", icon: "table", labelKey: "notes.block.table", keywords: "table grid 表格" },
     { type: "divider", icon: "divider", labelKey: "notes.block.divider", keywords: "divider line hr 分割线 分隔线" },
     { type: "image", icon: "image", labelKey: "notes.block.image", keywords: "image picture photo 图片 照片" },
+    { type: "audio", icon: "audio", labelKey: "notes.block.audio", keywords: "audio music sound mp3 wav 音频 音乐 语音" },
+    { type: "video", icon: "video", labelKey: "notes.block.video", keywords: "video movie mp4 webm 视频 影片" },
+    { type: "file", icon: "file", labelKey: "notes.block.file", keywords: "file attachment pdf zip doc 附件 文件 文档" },
     { type: "bookmark", icon: "bookmark", labelKey: "notes.block.bookmark", keywords: "bookmark link url 书签 链接 网址" },
   ];
 
@@ -244,6 +247,13 @@
       case "image":
         body.appendChild(N.buildImage(block));
         break;
+      case "audio":
+      case "video":
+        body.appendChild(N.buildMedia(block));
+        break;
+      case "file":
+        body.appendChild(N.buildFile(block));
+        break;
       case "bookmark":
         body.appendChild(N.buildBookmark(block));
         break;
@@ -296,6 +306,92 @@
       empty.appendChild(row);
       wrap.appendChild(empty);
     }
+    return wrap;
+  };
+
+  N.buildMedia = function (block) {
+    const isAudio = block.type === "audio";
+    const wrap = N.el("div", "blk-media" + (isAudio ? " is-audio" : ""));
+    if (!block.props.url) {
+      const empty = N.el("div", "image-empty");
+      empty.appendChild(N.svg(isAudio ? "audio" : "video"));
+      empty.appendChild(N.el("span", "", T(isAudio ? "notes.media.audioEmpty" : "notes.media.videoEmpty")));
+      const row = N.el("div", "row");
+      const up = N.el("button", "btn-plain", T(isAudio ? "notes.media.uploadAudio" : "notes.media.uploadVideo"));
+      up.type = "button";
+      up.addEventListener("click", function (e) { e.stopPropagation(); N.pickUpload(block.id, block.type); });
+      const byLink = N.el("button", "btn-plain", T("notes.media.byLink"));
+      byLink.type = "button";
+      byLink.addEventListener("click", function (e) { e.stopPropagation(); N.editMediaURL(block.id); });
+      row.appendChild(up);
+      row.appendChild(byLink);
+      empty.appendChild(row);
+      wrap.appendChild(empty);
+      return wrap;
+    }
+    const media = document.createElement(isAudio ? "audio" : "video");
+    media.controls = true;
+    media.preload = "metadata";
+    media.src = N.assetURL(block.props.url);
+    wrap.appendChild(media);
+    const actions = N.el("div", "image-actions");
+    const change = N.el("button", "pill", T("notes.media.change"));
+    change.type = "button";
+    change.addEventListener("click", function (e) { e.stopPropagation(); N.pickUpload(block.id, block.type); });
+    const link = N.el("button", "pill", T("notes.media.link"));
+    link.type = "button";
+    link.addEventListener("click", function (e) { e.stopPropagation(); N.editMediaURL(block.id); });
+    actions.appendChild(change);
+    actions.appendChild(link);
+    wrap.appendChild(actions);
+    const caption = document.createElement("input");
+    caption.className = "image-caption";
+    caption.value = block.props.caption || "";
+    caption.placeholder = T("notes.media.caption");
+    caption.dataset.field = "caption";
+    wrap.appendChild(caption);
+    return wrap;
+  };
+
+  N.buildFile = function (block) {
+    const wrap = N.el("div", "bookmark-wrap");
+    if (!block.props.url) {
+      const empty = N.el("div", "image-empty");
+      empty.appendChild(N.svg("file"));
+      empty.appendChild(N.el("span", "", T("notes.media.fileEmpty")));
+      const row = N.el("div", "row");
+      const up = N.el("button", "btn-plain", T("notes.media.uploadFile"));
+      up.type = "button";
+      up.addEventListener("click", function (e) { e.stopPropagation(); N.pickUpload(block.id, "file"); });
+      const byLink = N.el("button", "btn-plain", T("notes.media.byLink"));
+      byLink.type = "button";
+      byLink.addEventListener("click", function (e) { e.stopPropagation(); N.editMediaURL(block.id); });
+      row.appendChild(up);
+      row.appendChild(byLink);
+      empty.appendChild(row);
+      wrap.appendChild(empty);
+      return wrap;
+    }
+    const link = document.createElement("a");
+    link.className = "blk-bookmark";
+    link.href = N.assetURL(block.props.url);
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    const icon = N.el("span", "bookmark-icon");
+    icon.appendChild(N.svg("file"));
+    const main = N.el("div", "bookmark-main");
+    main.appendChild(N.el("div", "bookmark-title", block.props.caption || T("notes.media.fileName")));
+    main.appendChild(N.el("div", "bookmark-url", block.props.url));
+    const edit = N.el("span", "bookmark-edit", T("notes.common.edit"));
+    edit.addEventListener("click", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      N.editMediaURL(block.id);
+    });
+    link.appendChild(icon);
+    link.appendChild(main);
+    link.appendChild(edit);
+    wrap.appendChild(link);
     return wrap;
   };
 
@@ -682,11 +778,109 @@
     }
   };
 
-  /* ---------------- 图片与书签 ---------------- */
-  N.uploadImageFor = function (blockId) {
-    N.state.pendingUpload = { kind: "block", blockId: blockId };
-    N.$("#imageInput").click();
+  /* ---------------- 附件上传 ---------------- */
+  const UPLOAD_LIMITS = { image: 10 << 20, audio: 40 << 20, video: 60 << 20, file: 40 << 20 };
+
+  N.fileKind = function (file) {
+    const mime = (file.type || "").toLowerCase();
+    if (mime.indexOf("image/") === 0) return "image";
+    if (mime.indexOf("audio/") === 0) return "audio";
+    if (mime.indexOf("video/") === 0) return "video";
+    const ext = (file.name || "").toLowerCase().split(".").pop();
+    if (["png", "jpg", "jpeg", "gif", "webp", "bmp"].indexOf(ext) >= 0) return "image";
+    if (["mp3", "wav", "ogg", "m4a", "aac", "flac", "opus"].indexOf(ext) >= 0) return "audio";
+    if (["mp4", "webm", "ogv", "mov", "m4v"].indexOf(ext) >= 0) return "video";
+    return "file";
   };
+
+  N.uploadFile = async function (file, forceKind) {
+    const kind = forceKind || N.fileKind(file);
+    if (file.size > (UPLOAD_LIMITS[kind] || UPLOAD_LIMITS.file)) {
+      throw new Error(T("notes.toast.fileTooLarge", { name: file.name || "" }));
+    }
+    const form = new FormData();
+    form.append("file", file);
+    form.append("kind", kind);
+    const res = await fetch(N.API_BASE + "/upload", { method: "POST", body: form });
+    if (!res.ok) {
+      let message = "";
+      try {
+        const data = await res.json();
+        message = data.message || data.error || "";
+      } catch (_) { /* 非 JSON 错误响应 */ }
+      throw new Error(message || ("HTTP " + res.status));
+    }
+    return res.json();
+  };
+
+  function blockTypeForKind(kind) {
+    if (kind === "audio" || kind === "video" || kind === "file") return kind;
+    return "image";
+  }
+
+  // 把一批文件依次上传并插入到锚点块之后，返回成功插入的数量。
+  N.insertFilesAt = async function (anchorId, files) {
+    if (!N.state.page || !files || files.length === 0) return 0;
+    N.pushHistory();
+    const blocks = N.state.page.blocks;
+    let anchor = anchorId;
+    let count = 0;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const data = await N.uploadFile(file);
+        const type = blockTypeForKind(data.kind);
+        const block = N.newBlock(type, "", {
+          url: data.url,
+          caption: type === "file" ? (data.name || "") : "",
+        });
+        let at = N.blockIndex(anchor);
+        if (at < 0) at = blocks.length - 1;
+        blocks.splice(at + 1, 0, block);
+        anchor = block.id;
+        count++;
+      } catch (err) {
+        N.toast(err.message, true);
+      }
+    }
+    if (count) {
+      N.renderEditor();
+      N.scheduleSave();
+      N.toast(T("notes.toast.uploadedCount", { count: count }));
+    }
+    return count;
+  };
+
+  N.pickUpload = function (blockId, kind) {
+    const input = N.$("#" + ({
+      image: "imageInput",
+      audio: "audioInput",
+      video: "videoInput",
+      file: "fileInput",
+    }[kind] || "imageInput"));
+    if (!input) return;
+    N.state.pendingUpload = { kind: "block", blockId: blockId, blockKind: kind };
+    input.click();
+  };
+  N.uploadImageFor = function (blockId) { N.pickUpload(blockId, "image"); };
+
+  N.fillBlockWithFile = async function (blockId, file) {
+    const block = N.findBlock(blockId);
+    if (!block) return;
+    const kind = block.type === "audio" || block.type === "video" || block.type === "file" ? block.type : "image";
+    try {
+      const data = await N.uploadFile(file, kind);
+      N.pushHistory();
+      block.props.url = data.url;
+      if (kind === "file") block.props.caption = data.name || "";
+      N.renderEditor();
+      N.scheduleSave();
+      N.toast(T("notes.toast.uploadedCount", { count: 1 }));
+    } catch (err) {
+      N.toast(err.message, true);
+    }
+  };
+
   N.editImageURL = async function (blockId) {
     const block = N.findBlock(blockId);
     if (!block) return;
@@ -703,6 +897,30 @@
     }
     N.pushHistory();
     block.props.url = url;
+    N.renderEditor();
+    N.scheduleSave();
+  };
+
+  N.editMediaURL = async function (blockId) {
+    const block = N.findBlock(blockId);
+    if (!block) return;
+    const key = block.type === "audio" ? "audio" : block.type === "video" ? "video" : "file";
+    const url = await N.askText({
+      title: T("notes.media." + key + "LinkTitle"),
+      placeholder: "https://example.com/" + (key === "audio" ? "audio.mp3" : key === "video" ? "video.mp4" : "file.pdf"),
+      value: block.props.url || "",
+      hint: T("notes.media.linkHint"),
+    });
+    if (url === null) return;
+    if (!/^https?:\/\//i.test(url)) {
+      N.toast(T("notes.image.linkInvalid"), true);
+      return;
+    }
+    N.pushHistory();
+    block.props.url = url;
+    if (block.type === "file" && !block.props.caption) {
+      block.props.caption = url.split("/").pop().split("?")[0];
+    }
     N.renderEditor();
     N.scheduleSave();
   };
