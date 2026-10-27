@@ -399,34 +399,26 @@
   font-size: 12px;
   color: #94a3b8;
 }
-.start-actions {
+.start-icon-btn {
   display: flex;
-  gap: 8px;
-  padding: 8px 14px 4px;
-  border-top: 1px solid rgba(226, 232, 240, 0.8);
-}
-.start-action {
-  display: flex;
-  flex: 1;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  height: 38px;
-  border-radius: 11px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   border: 1px solid rgba(226, 232, 240, 0.9);
   background: rgba(255, 255, 255, 0.7);
-  font-size: 11.5px;
   color: #475569;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.start-action:hover {
+.start-icon-btn:hover {
   background: rgba(241, 245, 249, 0.95);
   border-color: rgba(203, 213, 225, 0.95);
   color: #0f172a;
 }
-.start-action svg {
-  height: 15px;
-  width: 15px;
+.start-icon-btn svg {
+  height: 16px;
+  width: 16px;
 }
 
 /* Alt+Tab 窗口切换器 */

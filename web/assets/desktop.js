@@ -27,7 +27,6 @@ const startBtn = $("#startBtn");
 const startApps = $("#startApps");
 const searchInput = $("#appSearch");
 const clockEl = $("#clock");
-const statusEl = $("#status");
 const bootEl = $("#boot");
 
 function esc(value) {
@@ -201,7 +200,6 @@ function renderClock() {
 function renderStatus() {
   const sys = state.system;
   if (!sys) return;
-  statusEl.innerHTML = `<span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>${esc(sys.hostname)} · ${esc(t("start.appsCount", { count: sys.apps }))}`;
   $("#startMeta").textContent = `${sys.hostname} · ${sys.os} · ${sys.dataDir}`;
 }
 
