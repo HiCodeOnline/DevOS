@@ -10,6 +10,7 @@ import (
 	"devos/internal/plugins/sftp"
 	"devos/internal/plugins/ssh"
 	"devos/internal/plugins/toolbox"
+	"devos/internal/plugins/vault"
 )
 
 // All 返回随内核编译的内置插件列表。
@@ -21,6 +22,7 @@ func All() []plugin.Plugin {
 		apitool.New(),
 		notesapp.New(),
 		toolbox.New(),
+		vault.New(),
 		pluginmgr.New(),
 	}
 }
