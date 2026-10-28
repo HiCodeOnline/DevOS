@@ -117,6 +117,7 @@ func (p *DB) handleSQLFile(c *fiber.Ctx) error {
 		SQL      string `json:"sql"`
 		Continue bool   `json:"continueOnError"`
 		MaxRows  int    `json:"maxRows"`
+		Confirm  bool   `json:"confirm"`
 	}
 	if err := c.BodyParser(&in); err != nil {
 		return jsonErr(c, fiber.StatusBadRequest, "参数解析失败")
@@ -135,16 +136,27 @@ func (p *DB) handleSQLFile(c *fiber.Ctx) error {
 	if len(statements) > 500 {
 		return jsonErr(c, fiber.StatusBadRequest, "单次最多执行 500 条语句")
 	}
+	// 与单条执行一致：脚本中若存在缺少过滤条件的语句，同样需要用户确认。
+	if !in.Confirm {
+		for _, stmt := range statements {
+			if reason := sqlGuardReason(stmt); reason != "" {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+					"error":        reason,
+					"needsConfirm": true,
+				})
+			}
+		}
+	}
 	db, err := p.pool(conn, in.Database)
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
 	}
 	maxRows := in.MaxRows
 	if maxRows <= 0 {
-		maxRows = 200
+		maxRows = 500
 	}
-	if maxRows > 2000 {
-		maxRows = 2000
+	if maxRows > 5000 {
+		maxRows = 5000
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()

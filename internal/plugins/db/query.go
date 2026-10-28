@@ -63,6 +63,76 @@ func normalizeValue(v any) any {
 	}
 }
 
+// sqlWords 提取语句中的关键字，跳过注释与字符串字面量，避免误判。
+func sqlWords(q string) map[string]bool {
+	words := map[string]bool{}
+	var cur strings.Builder
+	flush := func() {
+		if cur.Len() > 0 {
+			words[strings.ToUpper(cur.String())] = true
+			cur.Reset()
+		}
+	}
+	for i := 0; i < len(q); i++ {
+		ch := q[i]
+		switch {
+		case ch == '\'' || ch == '"' || ch == '`':
+			flush()
+			quote := ch
+			for i++; i < len(q); i++ {
+				if q[i] == '\\' && quote == '\'' {
+					i++
+					continue
+				}
+				if q[i] == quote {
+					break
+				}
+			}
+		case ch == '-' && i+1 < len(q) && q[i+1] == '-':
+			flush()
+			for i < len(q) && q[i] != '\n' {
+				i++
+			}
+		case ch == '/' && i+1 < len(q) && q[i+1] == '*':
+			flush()
+			i += 2
+			for i+1 < len(q) && !(q[i] == '*' && q[i+1] == '/') {
+				i++
+			}
+			i++
+		case (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_':
+			cur.WriteByte(ch)
+		default:
+			flush()
+		}
+	}
+	flush()
+	return words
+}
+
+// sqlGuardReason 判断语句是否缺少过滤条件，返回需要用户确认的原因。
+// 空字符串表示语句可以安全执行。
+func sqlGuardReason(q string) string {
+	words := sqlWords(q)
+	if len(words) == 0 {
+		return ""
+	}
+	selectLike := words["SELECT"] || words["WITH"]
+	writeLike := words["UPDATE"] || words["DELETE"] || words["MERGE"]
+	switch {
+	case selectLike && words["FROM"]:
+		if words["WHERE"] || words["LIMIT"] || words["FETCH"] || words["TOP"] || words["ROWNUM"] {
+			return ""
+		}
+		return "查询未包含 WHERE 条件或行数限制，可能扫描并返回大量数据"
+	case writeLike:
+		if !words["WHERE"] {
+			return "语句未包含 WHERE 条件，可能影响整表数据"
+		}
+	}
+	return ""
+}
+
 // isWriteSQL 粗略判断语句是否会写入数据。
 func isWriteSQL(q string) bool {
 	up := strings.ToUpper(strings.TrimLeft(q, " \t\r\n("))
@@ -84,6 +154,7 @@ func (p *DB) handleQuery(c *fiber.Ctx) error {
 		Database string `json:"database"`
 		SQL      string `json:"sql"`
 		MaxRows  int    `json:"maxRows"`
+		Confirm  bool   `json:"confirm"`
 	}
 	if err := c.BodyParser(&in); err != nil {
 		return jsonErr(c, fiber.StatusBadRequest, "参数解析失败")
@@ -148,6 +219,15 @@ func (p *DB) handleQuery(c *fiber.Ctx) error {
 	if conn.ReadOnly && isWriteSQL(in.SQL) {
 		return jsonErr(c, fiber.StatusForbidden, "该连接为只读模式，已拒绝执行写操作")
 	}
+	// 默认开启查询保护：缺少过滤条件或行数限制的语句需要用户确认后再执行。
+	if !in.Confirm {
+		if reason := sqlGuardReason(in.SQL); reason != "" {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error":        reason,
+				"needsConfirm": true,
+			})
+		}
+	}
 	db, err := p.pool(conn, in.Database)
 	if err != nil {
 		return jsonErr(c, fiber.StatusBadGateway, err.Error())
@@ -155,10 +235,10 @@ func (p *DB) handleQuery(c *fiber.Ctx) error {
 
 	maxRows := in.MaxRows
 	if maxRows <= 0 {
-		maxRows = 2000
+		maxRows = 500
 	}
-	if maxRows > 20000 {
-		maxRows = 20000
+	if maxRows > 5000 {
+		maxRows = 5000
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)

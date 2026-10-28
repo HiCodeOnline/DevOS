@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/assets/vendor/fonts.css" />
   <link rel="stylesheet" href="/assets/ui.css?v=2" />
   <script src="/assets/app-i18n.js?v=3"></script>
-  <script src="/assets/locales/apps/db.js?v=4"></script>
+  <script src="/assets/locales/apps/db.js?v=5"></script>
   <script src="/assets/secure-ui.js?v=2"></script>
   <style>
     .pane { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
@@ -84,6 +84,18 @@
     .editor-field input:focus, .editor-field select:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.14); }
     .result-card { border: 1px solid #e2e8f0; border-radius: 10px; margin: 8px; overflow: hidden; background: #fff; }
     .result-card-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 10.5px; color: #475569; }
+
+    /* 右键菜单：连接树、标签页与结果表格共用 */
+    .ctx-menu { position: fixed; z-index: 90; min-width: 176px; max-width: 260px; padding: 4px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; box-shadow: 0 22px 48px -24px rgba(15, 23, 42, .45), 0 2px 6px rgba(15, 23, 42, .06); }
+    .ctx-menu.hidden { display: none; }
+    .ctx-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; border-radius: 7px; font-size: 11px; color: #334155; text-align: left; }
+    .ctx-item:hover:not(:disabled) { background: #f1f5f9; }
+    .ctx-item:disabled { opacity: .45; cursor: default; }
+    .ctx-item.is-danger { color: #e11d48; }
+    .ctx-item.is-danger:hover:not(:disabled) { background: #fff1f2; }
+    .ctx-item svg { flex: none; }
+    .ctx-item-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .ctx-sep { height: 1px; margin: 4px 2px; background: #f1f5f9; }
   </style>
 </head>
 <body class="flex h-screen flex-col overflow-hidden bg-slate-50 font-sans text-slate-700 antialiased">
@@ -134,7 +146,7 @@
 
   <!-- 连接编辑弹窗 -->
   <div id="connModal" class="modal hidden bg-slate-900/30 p-4 backdrop-blur-sm">
-    <div class="max-h-[92vh] w-[600px] overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
+    <div data-modal-card class="max-h-[92vh] w-[600px] overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
       <div class="mb-4 flex items-center justify-between">
         <h2 id="connTitle" class="text-sm font-semibold text-slate-900" data-i18n="db.conn.newTitle">新建连接</h2>
         <button id="closeConnModal" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
@@ -309,6 +321,8 @@
   <input id="csvFile" type="file" accept=".csv,text/csv" class="hidden" />
   <input id="sqlFile" type="file" accept=".sql,text/plain" class="hidden" />
 
+  <div id="ctxMenu" class="ctx-menu hidden" role="menu"></div>
+
   <div id="toast" class="pointer-events-none fixed bottom-5 left-1/2 z-50 hidden -translate-x-1/2 rounded-lg bg-slate-900 px-4 py-2 text-[11.5px] text-white shadow-lg"></div>
 
 <script>
@@ -342,7 +356,12 @@ async function api(path, opts = {}) {
   const text = await res.text();
   let data;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
-  if (!res.ok || data.error) throw new Error(data.error || ('HTTP ' + res.status));
+  if (!res.ok || data.error) {
+    const err = new Error(data.error || ('HTTP ' + res.status));
+    err.status = res.status;
+    err.needsConfirm = !!data.needsConfirm;
+    throw err;
+  }
   return data;
 }
 
@@ -954,6 +973,75 @@ $('#tabbar').addEventListener('click', (ev) => {
   if (tabEl) activateTab(Number(tabEl.dataset.tab));
 });
 
+/* ---------- 右键菜单入口 ---------- */
+$('#tree').addEventListener('contextmenu', (ev) => {
+  const row = ev.target.closest('[data-node]');
+  if (!row) {
+    // 空白区域右键：直接新建连接，省去回到顶部点击按钮。
+    ev.preventDefault();
+    showCtxMenu(ev, [
+      { label: tr('db.conn.new'), icon: 'plus', onClick: () => openConnModal(null) },
+      { label: tr('db.conn.import'), icon: 'upload', onClick: () => $('#importBtn').click() },
+      { label: tr('db.conn.export'), icon: 'download', onClick: () => $('#exportBtn').click() },
+    ]);
+    return;
+  }
+  const node = S.nodeMap.get(row.dataset.node);
+  const conn = node && findConn(node.connId);
+  if (!node || !conn) return;
+  const items = treeMenuItems(node, conn);
+  if (!items.length) return;
+  ev.preventDefault();
+  showCtxMenu(ev, items);
+});
+
+$('#tabbar').addEventListener('contextmenu', (ev) => {
+  const tabEl = ev.target.closest('[data-tab]');
+  if (!tabEl) return;
+  ev.preventDefault();
+  const id = Number(tabEl.dataset.tab);
+  showCtxMenu(ev, [
+    { label: tr('db.ctx.closeTab'), icon: 'close', onClick: () => closeTab(id) },
+    { label: tr('db.ctx.closeOthers'), icon: 'minus', disabled: S.tabs.length <= 1, onClick: () => closeOtherTabs(id) },
+    { label: tr('db.ctx.closeAll'), icon: 'trash', danger: true, onClick: closeAllTabs },
+  ]);
+});
+
+// 结果表格右键：复制单元格/整行/列名，表数据页额外提供行编辑快捷入口。
+$('#panes').addEventListener('contextmenu', (ev) => {
+  const wrap = ev.target.closest('.grid-wrap');
+  const tr = ev.target.closest('tr[data-row]');
+  const td = ev.target.closest('td');
+  if (!wrap || !tr || !td) return;
+  const tab = S.tabs.find((t) => t.el === wrap.closest('.pane'));
+  const grid = gridDataOf(tab);
+  if (!grid) return;
+  ev.preventDefault();
+  const ri = Number(tr.dataset.row);
+  const ci = [...tr.children].indexOf(td);
+  const row = grid.rows[ri] || [];
+  const editable = tab.type === 'data' && tab.view === 'data';
+  if (editable) {
+    tab.selected = ri;
+    $('.grid-wrap', tab.el).querySelectorAll('tbody tr').forEach((r) => r.classList.toggle('row-selected', r === tr));
+    updateDataToolbar(tab);
+  }
+  const items = [
+    { label: tr('db.ctx.copyCell'), icon: 'copy', onClick: () => copyText(cellText(row[ci])) },
+    { label: tr('db.ctx.copyRow'), icon: 'copy', onClick: () => copyText(grid.columns.map((c, i) => cellText(row[i])).join('\t')) },
+    { label: tr('db.ctx.copyColumn'), icon: 'copy', onClick: () => copyText(grid.columns[ci]) },
+    { sep: true },
+    { label: tr('db.common.copyResult'), icon: 'copy', onClick: () => copyResult(tab) },
+    { label: tr('db.common.exportCsv'), icon: 'download', onClick: () => exportCSV(tab) },
+  ];
+  if (editable) {
+    items.push({ sep: true });
+    items.push({ label: tr('db.rows.edit'), icon: 'edit', disabled: $('.edit-row-btn', tab.el)?.disabled, onClick: () => openRowEditor(tab, 'update') });
+    items.push({ label: tr('db.rows.delete'), icon: 'minus', danger: true, disabled: $('.del-row-btn', tab.el)?.disabled, onClick: () => deleteSelectedRow(tab) });
+  }
+  showCtxMenu(ev, items);
+});
+
 function activateTab(id) {
   S.active = id;
   renderTabs();
@@ -968,6 +1056,163 @@ function closeTab(id) {
   if (S.active === id) S.active = S.tabs.length ? S.tabs[Math.max(0, idx - 1)].id : null;
   renderTabs();
   renderTree();
+}
+
+function closeOtherTabs(id) {
+  for (const t of [...S.tabs]) if (t.id !== id) closeTab(t.id);
+  if (S.tabs.some((t) => t.id === id)) activateTab(id);
+}
+
+function closeAllTabs() {
+  for (const t of [...S.tabs]) closeTab(t.id);
+}
+
+/* ---------- 右键菜单 ---------- */
+function hideCtxMenu() {
+  $('#ctxMenu')?.classList.add('hidden');
+}
+
+// items 支持 { label, icon, danger, disabled, onClick } 与 { sep: true }。
+function showCtxMenu(ev, items) {
+  const valid = items.filter(Boolean);
+  if (!valid.length) return;
+  const menu = $('#ctxMenu');
+  menu.innerHTML = valid.map((it, i) => it.sep
+    ? '<div class="ctx-sep"></div>'
+    : `<button class="ctx-item${it.danger ? ' is-danger' : ''}" data-ctx="${i}" ${it.disabled ? 'disabled' : ''}>${it.icon ? iconSvg(it.icon, 'h-3 w-3') : ''}<span class="ctx-item-label">${esc(it.label)}</span></button>`).join('');
+  menu.querySelectorAll('[data-ctx]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const it = valid[Number(btn.dataset.ctx)];
+      hideCtxMenu();
+      it.onClick?.();
+    });
+  });
+  menu.classList.remove('hidden');
+  // 先展示再量尺寸，保证靠近右/下边缘时能完整显示。
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(ev.clientX, window.innerWidth - rect.width - 8)) + 'px';
+  menu.style.top = Math.max(8, Math.min(ev.clientY, window.innerHeight - rect.height - 8)) + 'px';
+}
+
+document.addEventListener('click', hideCtxMenu);
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hideCtxMenu(); });
+window.addEventListener('resize', hideCtxMenu);
+document.addEventListener('scroll', hideCtxMenu, true);
+
+function copyText(text) {
+  if (text == null || text === '') { toast(tr('db.common.noContent')); return; }
+  navigator.clipboard.writeText(String(text))
+    .then(() => toast(tr('db.common.copied')))
+    .catch(() => toast(tr('db.common.copyFailed'), 'err'));
+}
+
+async function pingConn(conn) {
+  toast(tr('db.ping.testing'));
+  try {
+    const res = await api('/ping?id=' + encodeURIComponent(conn.id));
+    toast(res.ok
+      ? (res.version ? tr('db.ping.ok', { ms: res.latencyMs, version: res.version }) : tr('db.ping.okNoVersion', { ms: res.latencyMs }))
+      : tr('db.ping.failed'));
+  } catch (err) {
+    toast(tr('db.ping.failedWithError', { error: err.message }), 'err');
+  }
+}
+
+async function duplicateConn(conn) {
+  try {
+    await api('/connections/' + encodeURIComponent(conn.id) + '/duplicate', { method: 'POST' });
+    await loadConnections();
+    toast(tr('db.conn.duplicated'));
+  } catch (err) {
+    toast(tr('db.conn.dupFailed', { error: err.message }), 'err');
+  }
+}
+
+async function removeConn(conn) {
+  if (!confirm(tr('db.conn.confirmDelete', { name: conn.name }))) return;
+  try {
+    await api('/connections/' + encodeURIComponent(conn.id), { method: 'DELETE' });
+    S.cache.delete(keyOf('conn', conn.id));
+    await loadConnections();
+    toast(tr('db.conn.deleted'));
+  } catch (err) {
+    toast(tr('db.conn.deleteFailed', { error: err.message }), 'err');
+  }
+}
+
+// 折叠后再展开，强制重新拉取该节点下的数据。
+async function reloadNode(node) {
+  S.cache.delete(node.path);
+  S.loading.delete(node.path);
+  if (S.expanded.has(node.path)) {
+    S.expanded.delete(node.path);
+    await toggleNode(node);
+    return;
+  }
+  renderTree();
+}
+
+function treeMenuItems(node, conn) {
+  const t = typeOf(conn);
+  const planned = isPlanned(t);
+  const sqlMode = !!t.sql;
+  const openConsole = () => {
+    if (planned) { toast(unsupportedMsg(t), 'err'); return; }
+    openQueryTab(node.connId, node.database || conn.database || '', node.table ? objectQueryText(conn, node) : '');
+  };
+  const items = [];
+  if (node.kind === 'conn') {
+    items.push({ label: tr(sqlMode ? 'db.tree.newQuery' : 'db.tree.console'), icon: sqlMode ? 'sql' : 'terminal', disabled: planned, onClick: () => openQueryTab(conn.id, conn.database || '', '') });
+    items.push({ label: tr('db.form.test'), icon: 'plug', disabled: planned, onClick: () => pingConn(conn) });
+    items.push({ label: tr('db.common.refresh'), icon: 'refresh', onClick: () => reloadNode(node) });
+    items.push({ sep: true });
+    items.push({ label: tr('db.tree.edit'), icon: 'edit', onClick: () => openConnModal(conn) });
+    items.push({ label: tr('db.ctx.duplicate'), icon: 'copy', onClick: () => duplicateConn(conn) });
+    items.push({ label: tr('db.tree.delete'), icon: 'trash', danger: true, onClick: () => removeConn(conn) });
+    return items;
+  }
+  if (node.kind === 'db' || node.kind === 'schema') {
+    items.push({ label: tr(sqlMode ? 'db.tree.newQuery' : 'db.tree.console'), icon: sqlMode ? 'sql' : 'terminal', onClick: openConsole });
+    items.push({ label: tr('db.common.refresh'), icon: 'refresh', onClick: () => reloadNode(node) });
+    return items;
+  }
+  // 表的类型键由后端下发，可能是 table/view，也可能是 tag/edge/topic 等，统一按是否有表名判断。
+  if (node.table && node.kind !== 'coll') {
+    items.push({ label: tr('db.ctx.openData'), icon: 'table', onClick: () => (isObjectOnly(conn) ? openQueryTab(node.connId, node.database || '', objectQueryText(conn, node)) : openDataTab(node)) });
+    items.push({ label: tr(sqlMode ? 'db.tree.newQuery' : 'db.tree.console'), icon: sqlMode ? 'sql' : 'terminal', disabled: planned, onClick: openConsole });
+    items.push({ sep: true });
+    items.push({ label: tr('db.ctx.copyName'), icon: 'copy', onClick: () => copyText(node.table) });
+    items.push({ label: tr('db.common.refresh'), icon: 'refresh', onClick: () => reloadNode(node) });
+    return items;
+  }
+  if (node.kind === 'rkey') {
+    items.push({ label: tr('db.ctx.openKey'), icon: 'key', onClick: () => openRedisKeyTab(node) });
+    items.push({ label: tr('db.ctx.copyKey'), icon: 'copy', onClick: () => copyText(node.key) });
+    return items;
+  }
+  if (node.kind === 'coll') {
+    items.push({ label: tr('db.ctx.openCollection'), icon: 'collection', onClick: () => openMongoTab(node) });
+    items.push({ label: tr('db.ctx.copyName'), icon: 'copy', onClick: () => copyText(node.table) });
+    return items;
+  }
+  if (node.kind === 'more') {
+    items.push({ label: tr('db.tree.loadMoreKeys'), icon: 'refresh', onClick: () => loadMoreRedisKeys(node) });
+  }
+  return items;
+}
+
+// 结果表格对应的数据集：查询结果、表数据与 Mongo 文档。
+function gridDataOf(tab) {
+  if (!tab) return null;
+  if (tab.type === 'query') return tab.result && tab.result.kind === 'rows' ? tab.result : null;
+  if (tab.type === 'data' && tab.view === 'data') return tab.data;
+  if (tab.type === 'mongo') return tab.data;
+  return null;
+}
+
+function cellText(v) {
+  if (v === null || v === undefined) return 'NULL';
+  return typeof v === 'object' ? JSON.stringify(v) : String(v);
 }
 
 function openQueryTab(connId, database, sql) {
@@ -1041,7 +1286,7 @@ function createQueryPane(tab) {
         ${iconSvg('play', 'h-3 w-3')} ${esc(tr('db.query.exec'))} <span class="kbd !text-white/80 !border-white/30 !bg-white/10">Ctrl+Enter</span>
       </button>
       <label class="flex items-center gap-1 text-[10.5px] text-slate-500"><span class="rows-label">${esc(tr('db.query.maxRows'))}</span>
-        <input class="max-rows w-16 rounded-md border border-slate-200 px-1.5 py-1 font-mono text-[10.5px] outline-none focus:border-emerald-400" type="number" min="1" max="20000" value="1000" />
+        <input class="max-rows w-16 rounded-md border border-slate-200 px-1.5 py-1 font-mono text-[10.5px] outline-none focus:border-emerald-400" type="number" min="1" max="5000" value="500" />
       </label>
       <button class="export-btn flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${iconSvg('download', 'h-3 w-3')} ${esc(tr('db.common.exportCsv'))}</button>
       <button class="copy-btn rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${esc(tr('db.common.copyResult'))}</button>
@@ -1103,6 +1348,12 @@ function createQueryPane(tab) {
   $('.exec-btn', el).addEventListener('click', () => execQuery(tab));
   $('.export-btn', el).addEventListener('click', () => exportCSV(tab));
   $('.copy-btn', el).addEventListener('click', () => copyResult(tab));
+  $('.grid-wrap', el).addEventListener('click', (ev) => {
+    const tr = ev.target.closest('tr[data-row]');
+    if (!tr) return;
+    tab.selected = Number(tr.dataset.row);
+    $('.grid-wrap', el).querySelectorAll('tbody tr').forEach((r) => r.classList.toggle('row-selected', r === tr));
+  });
   $('.open-sql-btn', el).addEventListener('click', () => {
     $('#sqlFile').dataset.tab = String(tab.id);
     $('#sqlFile').click();
@@ -1122,7 +1373,7 @@ function loadSQLFile(tab, file) {
   }).catch((err) => toast(err.message, 'err'));
 }
 
-async function execScript(tab) {
+async function execScript(tab, confirmed = false) {
   if (tab.busy) return;
   const el = tab.el;
   const sql = $('.sql-input', el).value;
@@ -1130,22 +1381,31 @@ async function execScript(tab) {
   tab.busy = true;
   $('.run-file-btn', el).disabled = true;
   setStatus(tab, () => tr('db.query.running'));
+  let needsConfirm = '';
   try {
     const res = await api('/sqlfile', {
       method: 'POST',
-      body: JSON.stringify({ id: tab.connId, database: tab.database, sql, maxRows: Number($('.max-rows', el).value) || 200 }),
+      body: JSON.stringify({ id: tab.connId, database: tab.database, sql, maxRows: Number($('.max-rows', el).value) || 500, confirm: confirmed }),
     });
     tab.script = res;
     tab.result = null;
     tab.error = '';
     renderScriptOutput(tab);
   } catch (err) {
-    tab.script = null;
-    tab.error = err.message;
-    renderQueryOutput(tab);
+    if (err.needsConfirm && !confirmed) {
+      needsConfirm = err.message;
+    } else {
+      tab.script = null;
+      tab.error = err.message;
+      renderQueryOutput(tab);
+    }
   } finally {
     tab.busy = false;
     $('.run-file-btn', el).disabled = false;
+  }
+  if (needsConfirm) {
+    if (confirm(tr('db.query.guardPrompt', { reason: needsConfirm }))) execScript(tab, true);
+    else setStatus(tab, () => tr('db.query.guardCanceled'));
   }
 }
 
@@ -1201,7 +1461,7 @@ async function execExplain(tab) {
   }
 }
 
-async function execQuery(tab) {
+async function execQuery(tab, confirmed = false) {
   if (tab.busy) return;
   const el = tab.el;
   const sql = $('.sql-input', el).value;
@@ -1211,6 +1471,7 @@ async function execQuery(tab) {
   btn.disabled = true;
   setStatus(tab, () => tr('db.query.running'));
   $('.query-hint', el).textContent = '';
+  let needsConfirm = '';
   try {
     const res = await api('/query', {
       method: 'POST',
@@ -1218,19 +1479,29 @@ async function execQuery(tab) {
         id: tab.connId,
         database: tab.database,
         sql,
-        maxRows: Number($('.max-rows', el).value) || 1000,
+        maxRows: Number($('.max-rows', el).value) || 500,
+        confirm: confirmed,
       }),
     });
     tab.result = res;
     tab.error = '';
     renderQueryOutput(tab);
   } catch (err) {
-    tab.error = err.message;
-    tab.result = null;
-    renderQueryOutput(tab);
+    if (err.needsConfirm && !confirmed) {
+      needsConfirm = err.message;
+    } else {
+      tab.error = err.message;
+      tab.result = null;
+      renderQueryOutput(tab);
+    }
   } finally {
     tab.busy = false;
     btn.disabled = false;
+  }
+  // 查询保护：提示风险，确认后按已确认状态重新执行。
+  if (needsConfirm) {
+    if (confirm(tr('db.query.guardPrompt', { reason: needsConfirm }))) execQuery(tab, true);
+    else setStatus(tab, () => tr('db.query.guardCanceled'));
   }
 }
 
@@ -1253,7 +1524,7 @@ function renderQueryOutput(tab) {
     wrap.innerHTML = `<div class="p-8 text-center text-[11.5px] text-slate-500">${html}</div>`;
     setStatus(tab, () => tr('db.query.affectedStatus', { rows: res.affected, ms: res.durationMs }));
   } else {
-    wrap.innerHTML = renderGrid(res.columns, res.rows, {});
+    wrap.innerHTML = renderGrid(res.columns, res.rows, { selectable: true, selected: tab.selected });
     setStatus(tab, () => tr(res.truncated ? 'db.query.rowsStatusTruncated' : 'db.query.rowsStatus', { rows: res.rowCount, ms: res.durationMs }));
   }
 }
@@ -2496,7 +2767,10 @@ $('#newConnBtn').addEventListener('click', () => openConnModal(null));
 $('#emptyNewBtn').addEventListener('click', () => openConnModal(null));
 $('#closeConnModal').addEventListener('click', closeConnModal);
 $('#cancelConnBtn').addEventListener('click', closeConnModal);
-$('#connModal').addEventListener('click', (ev) => { if (ev.target === $('#connModal')) closeConnModal(); });
+// 点击遮罩空白处关闭；用 pointerdown 判定，避免从表单拖拽到遮罩时误关。
+$('#connModal').addEventListener('pointerdown', (ev) => {
+  if (!ev.target.closest('[data-modal-card]')) closeConnModal();
+});
 $('#fDriverBtn').addEventListener('click', () => {
   if ($('#fDriverMenu').classList.contains('hidden')) openDriverMenu();
   else closeDriverMenu();
@@ -2512,11 +2786,12 @@ $('#connModal').addEventListener('scroll', (ev) => {
 }, true);
 $('#fDriverMenu').addEventListener('wheel', (ev) => ev.stopPropagation(), { passive: true });
 window.addEventListener('resize', closeDriverMenu);
-// Escape：下拉打开时只收起下拉，否则关闭弹窗。
-$('#connModal').addEventListener('keydown', (ev) => {
+// Escape 挂到 document，避免焦点不在输入框时收不到按键；下拉打开时优先收起下拉。
+document.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Escape') return;
+  const modal = $('#connModal');
+  if (!modal || modal.classList.contains('hidden')) return;
   if (!$('#fDriverMenu').classList.contains('hidden')) {
-    ev.stopPropagation();
     closeDriverMenu();
     $('#fDriverBtn').focus();
     return;

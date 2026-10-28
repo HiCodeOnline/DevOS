@@ -258,7 +258,21 @@ DevOSAppI18n.registerAll({
     "db.import.empty": "CSV 文件没有数据行",
     "db.export.exporting": "正在导出…",
     "db.export.done": "导出完成",
-    "db.export.failed": "导出失败：{error}"
+    "db.export.failed": "导出失败：{error}",
+    "db.query.guardPrompt": "查询保护：{reason}。\n仍要继续执行吗？",
+    "db.query.guardCanceled": "已取消执行",
+    "db.ctx.duplicate": "复制连接",
+    "db.ctx.openData": "打开数据",
+    "db.ctx.copyName": "复制名称",
+    "db.ctx.openKey": "打开键",
+    "db.ctx.copyKey": "复制键名",
+    "db.ctx.openCollection": "打开集合",
+    "db.ctx.closeTab": "关闭标签页",
+    "db.ctx.closeOthers": "关闭其他标签页",
+    "db.ctx.closeAll": "关闭全部标签页",
+    "db.ctx.copyCell": "复制单元格",
+    "db.ctx.copyRow": "复制整行",
+    "db.ctx.copyColumn": "复制列名"
   },
   en: {
     "db.app.name": "Database",
@@ -529,7 +543,21 @@ DevOSAppI18n.registerAll({
     "db.import.empty": "The CSV file has no data rows",
     "db.export.exporting": "Exporting…",
     "db.export.done": "Export complete",
-    "db.export.failed": "Export failed: {error}"
+    "db.export.failed": "Export failed: {error}",
+    "db.query.guardPrompt": "Query guard: {reason}.\nContinue anyway?",
+    "db.query.guardCanceled": "Execution canceled",
+    "db.ctx.duplicate": "Duplicate connection",
+    "db.ctx.openData": "Open data",
+    "db.ctx.copyName": "Copy name",
+    "db.ctx.openKey": "Open key",
+    "db.ctx.copyKey": "Copy key name",
+    "db.ctx.openCollection": "Open collection",
+    "db.ctx.closeTab": "Close tab",
+    "db.ctx.closeOthers": "Close other tabs",
+    "db.ctx.closeAll": "Close all tabs",
+    "db.ctx.copyCell": "Copy cell",
+    "db.ctx.copyRow": "Copy row",
+    "db.ctx.copyColumn": "Copy column name"
   },
   "zh-TW": {
     "db.app.name": "資料庫",
@@ -800,6 +828,20 @@ DevOSAppI18n.registerAll({
     "db.import.empty": "CSV 檔案沒有資料列",
     "db.export.exporting": "正在匯出…",
     "db.export.done": "匯出完成",
-    "db.export.failed": "匯出失敗：{error}"
+    "db.export.failed": "匯出失敗：{error}",
+    "db.query.guardPrompt": "查詢保護：{reason}。\n仍要繼續執行嗎？",
+    "db.query.guardCanceled": "已取消執行",
+    "db.ctx.duplicate": "複製連線",
+    "db.ctx.openData": "開啟資料",
+    "db.ctx.copyName": "複製名稱",
+    "db.ctx.openKey": "開啟鍵",
+    "db.ctx.copyKey": "複製鍵名",
+    "db.ctx.openCollection": "開啟集合",
+    "db.ctx.closeTab": "關閉頁籤",
+    "db.ctx.closeOthers": "關閉其他頁籤",
+    "db.ctx.closeAll": "關閉全部頁籤",
+    "db.ctx.copyCell": "複製儲存格",
+    "db.ctx.copyRow": "複製整列",
+    "db.ctx.copyColumn": "複製欄名"
   }
 });
