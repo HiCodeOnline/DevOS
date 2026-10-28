@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/assets/vendor/fonts.css" />
   <link rel="stylesheet" href="/assets/ui.css?v=2" />
   <script src="/assets/app-i18n.js?v=3"></script>
-  <script src="/assets/locales/apps/db.js?v=5"></script>
+  <script src="/assets/locales/apps/db.js?v=6"></script>
   <script src="/assets/secure-ui.js?v=2"></script>
   <style>
     .pane { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
@@ -96,6 +96,14 @@
     .ctx-item svg { flex: none; }
     .ctx-item-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .ctx-sep { height: 1px; margin: 4px 2px; background: #f1f5f9; }
+
+    /* 标签过多时横向滚动：隐藏原生滚动条，用两侧按钮翻页 */
+    #tabbar { scrollbar-width: none; }
+    #tabbar::-webkit-scrollbar { display: none; }
+    .tab-scroll-btn { display: grid; place-items: center; width: 20px; height: 20px; flex: none; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #94a3b8; }
+    .tab-scroll-btn:hover:not(:disabled) { background: #f1f5f9; color: #334155; }
+    .tab-scroll-btn:disabled { opacity: .4; cursor: default; }
+    .tab-scroll-btn.hidden { display: none; }
   </style>
 </head>
 <body class="flex h-screen flex-col overflow-hidden bg-slate-50 font-sans text-slate-700 antialiased">
@@ -129,7 +137,15 @@
     </aside>
 
     <main class="relative flex min-w-0 flex-1 flex-col">
-      <div id="tabbar" class="flex flex-none items-end gap-1 border-b border-slate-200 bg-white/60 px-2 pt-1.5 empty:hidden"></div>
+      <div id="tabbarWrap" class="hidden flex flex-none items-end gap-1 border-b border-slate-200 bg-white/60 px-2 pt-1.5">
+        <button type="button" id="tabScrollLeft" class="tab-scroll-btn hidden self-center" data-i18n-title="db.tab.scrollLeft">
+          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <div id="tabbar" class="flex min-w-0 flex-1 items-end gap-1 overflow-x-auto"></div>
+        <button type="button" id="tabScrollRight" class="tab-scroll-btn hidden self-center" data-i18n-title="db.tab.scrollRight">
+          <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
       <div id="panes" class="relative min-h-0 flex-1"></div>
       <div id="emptyState" class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-center">
         <span class="grid h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-500">
@@ -146,14 +162,15 @@
 
   <!-- 连接编辑弹窗 -->
   <div id="connModal" class="modal hidden bg-slate-900/30 p-4 backdrop-blur-sm">
-    <div data-modal-card class="max-h-[92vh] w-[600px] overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
-      <div class="mb-4 flex items-center justify-between">
+    <div data-modal-card class="flex max-h-[92vh] w-[600px] flex-col overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl">
+      <div class="flex flex-none items-center justify-between border-b border-slate-100 px-5 py-3">
         <h2 id="connTitle" class="text-sm font-semibold text-slate-900" data-i18n="db.conn.newTitle">新建连接</h2>
         <button id="closeConnModal" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
         </button>
       </div>
-      <form id="connForm" class="space-y-3">
+      <form id="connForm" class="flex min-h-0 flex-1 flex-col">
+        <div class="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
         <input type="hidden" id="fId" />
         <div class="grid grid-cols-3 gap-2">
           <label class="col-span-2 block">
@@ -243,8 +260,9 @@
 
         <p id="connError" class="hidden rounded-lg bg-rose-50 px-3 py-2 text-[11px] text-rose-600"></p>
         <p id="connTestResult" class="hidden rounded-lg px-3 py-2 text-[11px]"></p>
+        </div>
 
-        <div class="flex items-center gap-2 pt-1">
+        <div class="flex flex-none items-center gap-2 border-t border-slate-100 px-5 py-3">
           <button type="button" id="testConnBtn" class="rounded-lg border border-slate-200 px-3 py-2 text-[11.5px] text-slate-600 hover:bg-slate-50" data-i18n="db.form.test">测试连接</button>
           <button type="button" id="cancelConnBtn" class="ml-auto rounded-lg border border-slate-200 px-4 py-2 text-[11.5px] text-slate-600 hover:bg-slate-50" data-i18n="db.common.cancel">取消</button>
           <button type="submit" class="rounded-lg bg-emerald-500 px-5 py-2 text-[11.5px] font-semibold text-white hover:bg-emerald-400" data-i18n="db.common.save">保存</button>
@@ -952,15 +970,64 @@ function tabIcon(tab) {
 
 function renderTabs() {
   const bar = $('#tabbar');
+  const prevScroll = bar.scrollLeft;
   bar.innerHTML = S.tabs.map((t) => `
-    <div data-tab="${t.id}" class="group flex cursor-pointer items-center gap-1.5 rounded-t-lg border border-b-0 px-3 py-1.5 text-[11px] ${t.id === S.active ? 'border-slate-200 bg-white font-medium text-slate-800' : 'border-transparent text-slate-500 hover:bg-slate-100'}">
+    <div data-tab="${t.id}" class="group flex shrink-0 cursor-pointer items-center gap-1.5 rounded-t-lg border border-b-0 px-3 py-1.5 text-[11px] ${t.id === S.active ? 'border-slate-200 bg-white font-medium text-slate-800' : 'border-transparent text-slate-500 hover:bg-slate-100'}">
       ${tabIcon(t)}
       <span class="max-w-[160px] truncate">${esc(tabTitle(t))}</span>
       <button data-close="${t.id}" class="ml-1 grid h-4 w-4 place-items-center rounded text-slate-400 hover:bg-slate-200 hover:text-slate-700">${iconSvg('close', 'h-2.5 w-2.5')}</button>
     </div>`).join('');
+  $('#tabbarWrap').classList.toggle('hidden', !S.tabs.length);
   $('#emptyState').style.display = S.tabs.length ? 'none' : 'flex';
   for (const t of S.tabs) if (t.el) t.el.classList.toggle('hidden', t.id !== S.active);
+  // 重绘会重置横向滚动位置，这里恢复并确保当前标签可见。
+  bar.scrollLeft = prevScroll;
+  ensureActiveTabVisible();
+  updateTabScroll();
 }
+
+// 标签溢出时显示左右按钮，滚动到两端后禁用对应方向。
+function updateTabScroll() {
+  const bar = $('#tabbar');
+  const left = $('#tabScrollLeft');
+  const right = $('#tabScrollRight');
+  if (!bar || !left || !right) return;
+  const max = bar.scrollWidth - bar.clientWidth;
+  const overflow = max > 1;
+  left.classList.toggle('hidden', !overflow);
+  right.classList.toggle('hidden', !overflow);
+  left.disabled = bar.scrollLeft <= 0;
+  right.disabled = bar.scrollLeft >= max - 1;
+}
+
+function ensureActiveTabVisible() {
+  const bar = $('#tabbar');
+  const active = S.active == null ? null : bar.querySelector(`[data-tab="${S.active}"]`);
+  if (!active) return;
+  const barRect = bar.getBoundingClientRect();
+  const tabRect = active.getBoundingClientRect();
+  if (tabRect.left < barRect.left) bar.scrollLeft -= barRect.left - tabRect.left + 4;
+  else if (tabRect.right > barRect.right) bar.scrollLeft += tabRect.right - barRect.right + 4;
+}
+
+function scrollTabs(dir) {
+  const bar = $('#tabbar');
+  const step = Math.max(160, Math.round(bar.clientWidth * 0.6));
+  bar.scrollBy({ left: dir * step, behavior: 'smooth' });
+}
+
+$('#tabScrollLeft').addEventListener('click', () => scrollTabs(-1));
+$('#tabScrollRight').addEventListener('click', () => scrollTabs(1));
+$('#tabbar').addEventListener('scroll', updateTabScroll, { passive: true });
+// 鼠标滚轮在标签栏内转为横向滚动，避免误触发页面滚动。
+$('#tabbar').addEventListener('wheel', (ev) => {
+  const bar = $('#tabbar');
+  if (bar.scrollWidth - bar.clientWidth <= 1 || !ev.deltaY) return;
+  ev.preventDefault();
+  bar.scrollLeft += ev.deltaY;
+  updateTabScroll();
+}, { passive: false });
+window.addEventListener('resize', updateTabScroll);
 
 $('#tabbar').addEventListener('click', (ev) => {
   const closeBtn = ev.target.closest('[data-close]');
@@ -2767,10 +2834,7 @@ $('#newConnBtn').addEventListener('click', () => openConnModal(null));
 $('#emptyNewBtn').addEventListener('click', () => openConnModal(null));
 $('#closeConnModal').addEventListener('click', closeConnModal);
 $('#cancelConnBtn').addEventListener('click', closeConnModal);
-// 点击遮罩空白处关闭；用 pointerdown 判定，避免从表单拖拽到遮罩时误关。
-$('#connModal').addEventListener('pointerdown', (ev) => {
-  if (!ev.target.closest('[data-modal-card]')) closeConnModal();
-});
+// 连接弹窗只允许通过标题栏关闭按钮与取消按钮关闭，点击遮罩层不关闭，避免误触丢失已填内容。
 $('#fDriverBtn').addEventListener('click', () => {
   if ($('#fDriverMenu').classList.contains('hidden')) openDriverMenu();
   else closeDriverMenu();

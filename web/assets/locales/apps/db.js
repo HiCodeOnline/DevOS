@@ -270,6 +270,8 @@ DevOSAppI18n.registerAll({
     "db.ctx.closeTab": "关闭标签页",
     "db.ctx.closeOthers": "关闭其他标签页",
     "db.ctx.closeAll": "关闭全部标签页",
+    "db.tab.scrollLeft": "向左滚动标签页",
+    "db.tab.scrollRight": "向右滚动标签页",
     "db.ctx.copyCell": "复制单元格",
     "db.ctx.copyRow": "复制整行",
     "db.ctx.copyColumn": "复制列名"
@@ -555,6 +557,8 @@ DevOSAppI18n.registerAll({
     "db.ctx.closeTab": "Close tab",
     "db.ctx.closeOthers": "Close other tabs",
     "db.ctx.closeAll": "Close all tabs",
+    "db.tab.scrollLeft": "Scroll tabs left",
+    "db.tab.scrollRight": "Scroll tabs right",
     "db.ctx.copyCell": "Copy cell",
     "db.ctx.copyRow": "Copy row",
     "db.ctx.copyColumn": "Copy column name"
@@ -840,6 +844,8 @@ DevOSAppI18n.registerAll({
     "db.ctx.closeTab": "關閉頁籤",
     "db.ctx.closeOthers": "關閉其他頁籤",
     "db.ctx.closeAll": "關閉全部頁籤",
+    "db.tab.scrollLeft": "向左捲動頁籤",
+    "db.tab.scrollRight": "向右捲動頁籤",
     "db.ctx.copyCell": "複製儲存格",
     "db.ctx.copyRow": "複製整列",
     "db.ctx.copyColumn": "複製欄名"
