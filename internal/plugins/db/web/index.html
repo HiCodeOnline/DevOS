@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="/assets/vendor/fonts.css" />
   <link rel="stylesheet" href="/assets/ui.css?v=2" />
   <script src="/assets/app-i18n.js?v=3"></script>
-  <script src="/assets/locales/apps/db.js?v=6"></script>
+  <script src="/assets/locales/apps/db.js?v=8"></script>
   <script src="/assets/secure-ui.js?v=2"></script>
   <style>
     .pane { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
@@ -74,6 +74,28 @@
     .grid-table tbody tr.row-selected td { background: #ecfdf5 !important; }
     .grid-table tbody tr { cursor: default; }
     .grid-table tbody tr.selectable { cursor: pointer; }
+
+    /* SQL 编辑器：左侧行号 + 底层高亮层，输入框文字透明以露出高亮 */
+    .sql-editor, .sql-highlight, .sql-input, .sql-lines {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11.5px;
+      line-height: 1.65;
+      tab-size: 2;
+    }
+    .sql-editor { display: flex; overflow: hidden; background: #fff; }
+    .sql-gutter { flex: none; width: 42px; overflow: hidden; border-right: 1px solid #f1f5f9; background: #fbfdff; }
+    .sql-lines { margin: 0; padding: 12px 8px 12px 0; text-align: right; color: #cbd5e1; }
+    .sql-code { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; }
+    .sql-highlight, .sql-input { position: absolute; inset: 0; margin: 0; padding: 12px; border: 0; outline: none; white-space: pre; }
+    .sql-highlight { overflow: hidden; pointer-events: none; color: #334155; }
+    .sql-input { overflow: auto; resize: none; background: transparent; color: transparent; caret-color: #0f172a; }
+    .sql-input::placeholder { color: #94a3b8; }
+    .sql-input::-webkit-scrollbar { width: 8px; height: 8px; }
+    .sql-input::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 6px; }
+    .sql-highlight .tok-kw { color: #7c3aed; font-weight: 600; }
+    .sql-highlight .tok-str { color: #047857; }
+    .sql-highlight .tok-num { color: #b45309; }
+    .sql-highlight .tok-com { color: #94a3b8; font-style: italic; }
 
     .editor-field { display: flex; flex-direction: column; gap: 4px; }
     .editor-field > label { font-size: 10.5px; color: #64748b; }
@@ -1093,10 +1115,21 @@ $('#panes').addEventListener('contextmenu', (ev) => {
     $('.grid-wrap', tab.el).querySelectorAll('tbody tr').forEach((r) => r.classList.toggle('row-selected', r === tr));
     updateDataToolbar(tab);
   }
+  // 查询结果支持多选：右键的行不在选区内时先改为单选该行。
+  let picked = [ri];
+  if (tab.type === 'query') {
+    if (!tab.selRows || !tab.selRows.has(ri)) selectResultRows(tab, ri, null);
+    picked = [...(tab.selRows || [])].filter((i) => grid.rows[i]).sort((a, b) => a - b);
+    if (!picked.length) picked = [ri];
+  }
+  const insertLabel = picked.length > 1
+    ? tr('db.ctx.copyInsertRows', { count: picked.length })
+    : tr('db.ctx.copyInsert');
   const items = [
     { label: tr('db.ctx.copyCell'), icon: 'copy', onClick: () => copyText(cellText(row[ci])) },
     { label: tr('db.ctx.copyRow'), icon: 'copy', onClick: () => copyText(grid.columns.map((c, i) => cellText(row[i])).join('\t')) },
     { label: tr('db.ctx.copyColumn'), icon: 'copy', onClick: () => copyText(grid.columns[ci]) },
+    { label: insertLabel, icon: 'copy', onClick: () => copyInsertSQL(tab, picked) },
     { sep: true },
     { label: tr('db.common.copyResult'), icon: 'copy', onClick: () => copyResult(tab) },
     { label: tr('db.common.exportCsv'), icon: 'download', onClick: () => exportCSV(tab) },
@@ -1282,6 +1315,138 @@ function cellText(v) {
   return typeof v === 'object' ? JSON.stringify(v) : String(v);
 }
 
+/* ---------- SQL 编辑器（行号 + 语法高亮） ---------- */
+const SQL_KEYWORDS = ('select from where and or not null is in like between group by order having limit offset union all distinct as on join left right inner outer full cross natural using case when then else end insert into values update set delete create table view index alter drop add column primary key foreign references default unique check exists begin commit rollback transaction grant revoke truncate replace with returning asc desc if for while declare procedure function trigger cast convert true false interval current_date current_time current_timestamp show describe use explain analyze vacuum').split(' ');
+const SQL_TOKEN_RE = new RegExp(
+  '(--[^\\n]*|#[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)|(\'(?:[^\']|\'\')*\'|"(?:[^"]|"")*"|`[^`]*`)|(?<![\\w$.])(\\d+(?:\\.\\d+)?)(?![\\w$])|(?<![\\w$.])(?:' + SQL_KEYWORDS.join('|') + ')(?![\\w$])',
+  'gi'
+);
+
+function highlightSQL(src) {
+  if (!src) return '';
+  let out = '';
+  let last = 0;
+  SQL_TOKEN_RE.lastIndex = 0;
+  let m;
+  while ((m = SQL_TOKEN_RE.exec(src))) {
+    if (!m[0]) { SQL_TOKEN_RE.lastIndex++; continue; }
+    out += esc(src.slice(last, m.index));
+    const cls = m[1] ? 'tok-com' : m[2] ? 'tok-str' : m[3] ? 'tok-num' : 'tok-kw';
+    out += '<span class="' + cls + '">' + esc(m[0]) + '</span>';
+    last = SQL_TOKEN_RE.lastIndex;
+  }
+  return out + esc(src.slice(last));
+}
+
+// 编辑器由透明输入框叠加高亮层组成：内容高亮与行号同步刷新，滚动位置跟随。
+function initSqlEditor(el, tab) {
+  const input = $('.sql-input', el);
+  const code = $('.sql-highlight code', el);
+  const lines = $('.sql-lines', el);
+  const hlt = $('.sql-highlight', el);
+  if (!input || !code || !lines) return;
+  const paint = () => {
+    code.innerHTML = highlightSQL(input.value) + '\n';
+    const count = input.value.split('\n').length;
+    lines.textContent = Array.from({ length: count }, (_, i) => i + 1).join('\n');
+  };
+  const follow = () => {
+    hlt.scrollTop = input.scrollTop;
+    hlt.scrollLeft = input.scrollLeft;
+    lines.style.transform = 'translateY(' + -input.scrollTop + 'px)';
+  };
+  input.addEventListener('input', () => { tab.sql = input.value; paint(); });
+  input.addEventListener('scroll', follow, { passive: true });
+  // Tab 插入两个空格，保持 SQL 缩进手感。
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Tab' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    ev.preventDefault();
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    input.value = input.value.slice(0, start) + '  ' + input.value.slice(end);
+    input.selectionStart = input.selectionEnd = start + 2;
+    tab.sql = input.value;
+    paint();
+    follow();
+  });
+  input.addEventListener('change', paint);
+  paint();
+  follow();
+}
+
+/* ---------- 结果多选与 INSERT 复制 ---------- */
+// 单击单选，Ctrl/⌘ 单击切换，Shift 单击按锚点范围选择。
+function selectResultRows(tab, ri, ev) {
+  const total = gridDataOf(tab)?.rows?.length || 0;
+  if (ri < 0 || ri >= total) return;
+  if (!tab.selRows) tab.selRows = new Set();
+  const additive = !!(ev && (ev.ctrlKey || ev.metaKey));
+  const range = !!(ev && ev.shiftKey && tab.selAnchor != null && tab.selAnchor < total);
+  if (range) {
+    if (!additive) tab.selRows.clear();
+    for (let i = Math.min(tab.selAnchor, ri); i <= Math.max(tab.selAnchor, ri); i++) tab.selRows.add(i);
+  } else if (additive) {
+    if (tab.selRows.has(ri)) tab.selRows.delete(ri); else tab.selRows.add(ri);
+    tab.selAnchor = ri;
+  } else {
+    tab.selRows.clear();
+    tab.selRows.add(ri);
+    tab.selAnchor = ri;
+  }
+  paintResultRows(tab);
+}
+
+function paintResultRows(tab) {
+  const wrap = tab.el && $('.grid-wrap', tab.el);
+  if (!wrap) return;
+  const sel = tab.selRows || new Set();
+  wrap.querySelectorAll('tr[data-row]').forEach((r) => r.classList.toggle('row-selected', sel.has(Number(r.dataset.row))));
+}
+
+function quoteIdent(name, fam) {
+  // 只有普通标识符才加引号，表达式列保持原样。
+  if (!/^[A-Za-z_][\w$]*$/.test(name)) return name;
+  if (fam === 'mysql') return '`' + name + '`';
+  if (fam === 'sqlserver') return '[' + name + ']';
+  return '"' + name + '"';
+}
+
+function sqlLiteral(v) {
+  if (v === null || v === undefined) return 'NULL';
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+  let str;
+  if (typeof v === 'object') {
+    try { str = JSON.stringify(v); } catch { str = String(v); }
+  } else {
+    str = String(v);
+  }
+  return "'" + str.replace(/'/g, "''") + "'";
+}
+
+// 优先使用已知表名，其次从查询语句的 FROM 子句推断，都没有时给出占位表名。
+function insertTarget(tab, fam) {
+  if (tab.table) return quoteIdent(tab.table, fam);
+  const m = /\bfrom\s+([`"\[\]\w$.]+)/i.exec(tab.sql || '');
+  if (m) return m[1];
+  return quoteIdent('table_name', fam);
+}
+
+function copyInsertSQL(tab, indices) {
+  const grid = gridDataOf(tab);
+  if (!grid || !grid.columns?.length || !indices.length) { toast(tr('db.common.noResult')); return; }
+  const fam = typeOf(findConn(tab.connId)).family;
+  const target = insertTarget(tab, fam);
+  const cols = grid.columns.map((c) => quoteIdent(c, fam)).join(', ');
+  const text = indices.map((ri) => {
+    const row = grid.rows[ri] || [];
+    return 'INSERT INTO ' + target + ' (' + cols + ') VALUES (' + row.map((v) => sqlLiteral(v)).join(', ') + ');';
+  }).join('\n');
+  navigator.clipboard.writeText(text)
+    .then(() => toast(tr('db.ctx.insertCopied', { count: indices.length })))
+    .catch(() => toast(tr('db.common.copyFailed'), 'err'));
+}
+
 function openQueryTab(connId, database, sql) {
   const fam = typeOf(findConn(connId)).family;
   const tab = {
@@ -1362,7 +1527,13 @@ function createQueryPane(tab) {
       <button class="explain-btn flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1.5 text-[10.5px] text-slate-600 hover:bg-slate-50">${iconSvg('plan', 'h-3 w-3')} ${esc(tr('db.query.explain'))}</button>
       <span class="query-hint ml-auto text-[10px] text-slate-400"></span>
     </div>
-    <textarea class="sql-input min-h-0 flex-none resize-none border-b border-slate-200 bg-white p-3 font-mono text-[11.5px] leading-relaxed text-slate-700 outline-none" style="height:38%;flex:0 0 38%" spellcheck="false" placeholder="${esc(queryPlaceholder(tab))}"></textarea>
+    <div class="sql-editor min-h-0 flex-none border-b border-slate-200" style="height:38%;flex:0 0 38%">
+      <div class="sql-gutter" aria-hidden="true"><pre class="sql-lines"></pre></div>
+      <div class="sql-code">
+        <pre class="sql-highlight" aria-hidden="true"><code></code></pre>
+        <textarea class="sql-input" spellcheck="false" wrap="off" placeholder="${esc(queryPlaceholder(tab))}"></textarea>
+      </div>
+    </div>
     <div class="query-status flex-none border-b border-slate-200 bg-slate-50 px-3 py-1 text-[10px] text-slate-500">${esc(tr('db.common.ready'))}</div>
     <div class="grid-wrap min-h-0 flex-1 overflow-auto bg-white"></div>`;
   $('#panes').appendChild(el);
@@ -1372,6 +1543,7 @@ function createQueryPane(tab) {
   const select = $('.db-select', el);
   const input = $('.sql-input', el);
   input.value = tab.sql || '';
+  initSqlEditor(el, tab);
   const hintKey = QUERY_HINT_KEYS[tab.fam];
   if (hintKey) $('.query-hint', el).textContent = tr(hintKey);
   // 非 SQL 协议族不支持脚本执行、执行计划与 .sql 文件载入。
@@ -1418,8 +1590,7 @@ function createQueryPane(tab) {
   $('.grid-wrap', el).addEventListener('click', (ev) => {
     const tr = ev.target.closest('tr[data-row]');
     if (!tr) return;
-    tab.selected = Number(tr.dataset.row);
-    $('.grid-wrap', el).querySelectorAll('tbody tr').forEach((r) => r.classList.toggle('row-selected', r === tr));
+    selectResultRows(tab, Number(tr.dataset.row), ev);
   });
   $('.open-sql-btn', el).addEventListener('click', () => {
     $('#sqlFile').dataset.tab = String(tab.id);
@@ -1435,7 +1606,10 @@ function loadSQLFile(tab, file) {
     tab.sql = text;
     tab.sqlName = file.name;
     const input = $('.sql-input', tab.el);
-    if (input) input.value = text;
+    if (input) {
+      input.value = text;
+      input.dispatchEvent(new Event('input'));
+    }
     toast(tr('db.query.fileLoaded', { name: file.name }));
   }).catch((err) => toast(err.message, 'err'));
 }
@@ -1516,6 +1690,8 @@ async function execExplain(tab) {
     tab.script = null;
     tab.result = { kind: 'rows', ...res };
     tab.error = '';
+    tab.selRows = new Set();
+    tab.selAnchor = null;
     renderQueryOutput(tab);
     setStatus(tab, () => tr('db.query.planStatus', { rows: res.rowCount, ms: res.durationMs }));
   } catch (err) {
@@ -1552,6 +1728,8 @@ async function execQuery(tab, confirmed = false) {
     });
     tab.result = res;
     tab.error = '';
+    tab.selRows = new Set();
+    tab.selAnchor = null;
     renderQueryOutput(tab);
   } catch (err) {
     if (err.needsConfirm && !confirmed) {
@@ -1591,7 +1769,7 @@ function renderQueryOutput(tab) {
     wrap.innerHTML = `<div class="p-8 text-center text-[11.5px] text-slate-500">${html}</div>`;
     setStatus(tab, () => tr('db.query.affectedStatus', { rows: res.affected, ms: res.durationMs }));
   } else {
-    wrap.innerHTML = renderGrid(res.columns, res.rows, { selectable: true, selected: tab.selected });
+    wrap.innerHTML = renderGrid(res.columns, res.rows, { selectable: true, selectedRows: [...(tab.selRows || [])] });
     setStatus(tab, () => tr(res.truncated ? 'db.query.rowsStatusTruncated' : 'db.query.rowsStatus', { rows: res.rowCount, ms: res.durationMs }));
   }
 }
@@ -2508,7 +2686,10 @@ function renderGrid(columns, rows, opts = {}) {
     if (opts.sortable && opts.sort === c) arrow = opts.dir === 'desc' ? ' ↓' : ' ↑';
     return `<th ${opts.sortable ? `data-col="${esc(c)}"` : ''}>${esc(c)}${arrow}</th>`;
   }).join('');
-  const body = rows.map((row, ri) => `<tr class="${opts.selectable ? 'selectable' : ''}${opts.selected === ri ? ' row-selected' : ''}" data-row="${ri}">${row.map((v) => cellHtml(v)).join('')}</tr>`).join('');
+  const body = rows.map((row, ri) => {
+    const picked = opts.selectedRows ? opts.selectedRows.includes(ri) : opts.selected === ri;
+    return `<tr class="${opts.selectable ? 'selectable' : ''}${picked ? ' row-selected' : ''}" data-row="${ri}">${row.map((v) => cellHtml(v)).join('')}</tr>`;
+  }).join('');
   return `<table class="grid-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
@@ -2765,7 +2946,9 @@ function currentFormConn() {
 function applyDriverLabels() {
   const t = TYPE_MAP[editingDriver] || FALLBACK_TYPES[0];
   $('#fDriverLabel').textContent = t.name;
-  $('#driverHint').textContent = isPlanned(t) ? unsupportedMsg(t) : driverHint(t);
+  // 未内置驱动的类型同时给出“不可用”和具体原因，便于判断替代方案。
+  const hint = driverHint(t);
+  $('#driverHint').textContent = isPlanned(t) ? [unsupportedMsg(t), hint].filter(Boolean).join(' ') : hint;
   $('#dbLabelText').textContent = driverDatabaseLabel(t);
   const planned = isPlanned(t);
   $('#testConnBtn').disabled = planned;

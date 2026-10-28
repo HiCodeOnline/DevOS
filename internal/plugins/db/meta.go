@@ -66,6 +66,10 @@ func resolveDatabase(c Connection, database string) string {
 		if c.Database != "" {
 			return c.Database
 		}
+		// H2 的 PostgreSQL 协议模式必须显式指定 catalog，不能用默认库名兜底。
+		if typeOf(c.Driver).ID == "h2" {
+			return ""
+		}
 		return "postgres"
 	default:
 		if database != "" {
@@ -107,6 +111,9 @@ func buildDSN(c Connection, database string) (string, error) {
 		return c.File, nil
 
 	case familyPostgres:
+		if typeOf(c.Driver).ID == "h2" && db == "" {
+			return "", fmt.Errorf("H2 需要填写数据库名（H2 中的 catalog 名称）")
+		}
 		u := url.URL{
 			Scheme: "postgres",
 			User:   url.UserPassword(c.User, c.Password),

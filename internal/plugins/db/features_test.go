@@ -74,6 +74,24 @@ func TestClickHouseDSN(t *testing.T) {
 	}
 }
 
+// H2 通过 PostgreSQL 协议模式接入：端口、驱动映射与必须填写库名。
+func TestH2DSN(t *testing.T) {
+	if !supportsConnect("h2") || familyOf("h2") != familyPostgres || driverImpl("h2") != "pgx" {
+		t.Fatalf("H2 应复用 PostgreSQL 协议: support=%v family=%s driver=%s",
+			supportsConnect("h2"), familyOf("h2"), driverImpl("h2"))
+	}
+	if _, err := buildDSN(Connection{Driver: "h2", Host: "127.0.0.1"}, ""); err == nil {
+		t.Fatal("H2 未填写数据库名时应报错")
+	}
+	dsn, err := buildDSN(Connection{Driver: "h2", Host: "127.0.0.1", Database: "mydb"}, "")
+	if err != nil {
+		t.Fatalf("buildDSN: %v", err)
+	}
+	if !strings.Contains(dsn, "127.0.0.1:5435/mydb") || !strings.Contains(dsn, "sslmode=disable") {
+		t.Fatalf("H2 DSN 不正确: %s", dsn)
+	}
+}
+
 func TestPlannedTypeRejected(t *testing.T) {
 	p := New()
 	_, err := p.pool(Connection{ID: "x", Driver: "duckdb", Host: "127.0.0.1", Port: 5432}, "")

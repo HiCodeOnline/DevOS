@@ -92,7 +92,7 @@ var dbTypes = func() []DBType {
 		nt("firebird", "Firebird", familyFirebird, groupRelational, 3050, "#f43f5e", "database", SupportNative),
 		nt("exasol", "Exasol", familyExasol, groupRelational, 8563, "#1e40af", "analytics", SupportNative),
 		nt("vertica", "Vertica", familyVertica, groupRelational, 5433, "#2563eb", "analytics", SupportNative),
-		nt("h2", "H2", familyHTTP, groupRelational, 9092, "#2563eb", "database", SupportPlanned),
+		nt("h2", "H2", familyPostgres, groupRelational, 5435, "#2563eb", "database", SupportProtocol),
 		nt("db2", "IBM DB2", familyHTTP, groupRelational, 50000, "#1d4ed8", "database", SupportPlanned),
 		nt("informix", "IBM Informix", familyHTTP, groupRelational, 9088, "#0f766e", "database", SupportPlanned),
 		nt("access", "Microsoft Access", familyHTTP, groupRelational, 0, "#a21caf", "file", SupportPlanned),
@@ -203,19 +203,19 @@ var dbTypes = func() []DBType {
 	return list
 }()
 
-// typeHints 说明尚未内置驱动的类型所需的外部依赖。
+// typeHints 说明尚未内置驱动的类型为何不可用，以及可替代的连接方式。
 var typeHints = map[string]string{
-	"duckdb":   "DuckDB 嵌入式引擎仅提供 CGO 绑定，暂未内置；可将数据导出为 SQLite 使用。",
-	"h2":       "H2 仅提供 JDBC 驱动，请使用 JDBC 通用类型或通过 H2 的 PostgreSQL 兼容模式连接。",
-	"access":   "Microsoft Access 依赖 ODBC 驱动，暂未内置。",
-	"db2":      "IBM DB2 官方驱动依赖 CGO/CLI，暂未内置。",
-	"informix": "IBM Informix 官方驱动依赖 CGO/CLI，暂未内置。",
-	"teradata": "Teradata 官方驱动依赖 CLI，暂未内置。",
-	"gbase8s":  "GBase 8s 基于 Informix 协议，缺少纯 Go 驱动，暂未内置。",
-	"sundb":    "SUNDB 需厂商专用客户端，暂未内置。",
-	"ignite3":  "Ignite 3 使用瘦客户端二进制协议，暂未内置；可选用 Ignite 2.x 的 REST 接入。",
-	"jdbc":     "JDBC 通用类型需 JVM 环境，暂未内置。",
-	"plugin":   "插件驱动需要额外安装驱动文件后启用。",
+	"h2":       "H2 需以 PostgreSQL 协议模式启动服务端（java -cp h2.jar org.h2.tools.Server -pg -pgPort 5435），这里填 PostgreSQL 端口；H2 兼容模式不支持全部 PostgreSQL 语法与系统视图。",
+	"duckdb":   "DuckDB 官方 Go 驱动依赖 CGO 原生库，交叉编译与免安装包无法内置；可在 DuckDB 中导出数据后改用 SQLite 或 PostgreSQL 连接。",
+	"access":   "Microsoft Access 只能通过 ODBC/ACE 驱动访问，Windows 之外无纯 Go 方案；建议先把数据导入 SQLite 或 SQL Server。",
+	"db2":      "IBM DB2 驱动依赖 CGO + IBM 客户端（clidriver），无法内置到免安装构建；可先用 db2look/db2move 导出，再在其他已支持的类型中执行。",
+	"informix": "IBM Informix 依赖 CGO + Informix Client SDK，无纯 Go 驱动；可用 dbexport 导出后在已支持的类型中执行。",
+	"teradata": "Teradata 仅提供 ODBC/JDBC 驱动，需 Teradata CLIv2 客户端；可导出 SQL 后在其他类型执行。",
+	"gbase8s":  "GBase 8s 基于 Informix 协议，只有 JDBC/ODBC 驱动；GBase 8a 已支持，可改用 MySQL 类型连接。",
+	"sundb":    "SUNDB 需厂商专用客户端与 JDBC 驱动，暂无法以纯 Go 方式接入。",
+	"ignite3":  "Ignite 3 的 REST 接口（10300）只能管理集群配置，执行 SQL 需 JDBC 瘦客户端（10800），暂无纯 Go 客户端；如需 SQL 查询请使用 Ignite 2.x 的 REST 接入。",
+	"jdbc":     "JDBC 通用类型需要 JVM 与 JDBC 桥接服务，不在内置驱动范围内；可按数据库类型选择对应原生类型连接。",
+	"plugin":   "插件驱动需要额外安装驱动文件后才能启用，当前版本尚未提供驱动加载器。",
 }
 
 // dbTypeAlias 兼容早期版本保存的连接类型 ID。
