@@ -50,7 +50,7 @@ func New(webFS fs.FS, dataDir, baseURL string, log *slog.Logger) *Kernel {
 		app: fiber.New(fiber.Config{
 			AppName:               "DevOS",
 			DisableStartupMessage: true,
-			BodyLimit:             64 * 1024 * 1024,
+			BodyLimit:             256 * 1024 * 1024, // 允许上传较大的数据备份包
 			ReadTimeout:           0,
 			WriteTimeout:          0,
 			ErrorHandler:          errorHandler,
@@ -135,6 +135,7 @@ func (k *Kernel) routes() {
 	})
 
 	k.registerSecurityRoutes(app)
+	k.registerStorageRoutes(app)
 
 	app.Get("/api/system", func(c *fiber.Ctx) error {
 		host, _ := os.Hostname()

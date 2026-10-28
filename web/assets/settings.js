@@ -1,4 +1,4 @@
-/* DevOS 设置面板：壁纸、语言与应用密码。 */
+/* DevOS 设置面板：壁纸、语言、应用密码与数据备份。 */
 (function () {
   if (window.DevOSSettings) return;
 
@@ -17,6 +17,8 @@
   var overlay = null;
   var status = null;
   var customs = [];
+  var storage = null;
+  var migrateDraft = "";
   var tab = "appearance";
   var busy = false;
 
@@ -43,6 +45,7 @@
         if (!resp.ok) {
           var err = new Error(data.error || "HTTP " + resp.status);
           err.status = resp.status;
+          err.code = data.code || "";
           throw err;
         }
         return data;
@@ -144,6 +147,75 @@
       '<p class="settings-note" data-i18n="settings.security.workHint"></p>';
   }
 
+  function formatBytes(bytes) {
+    var value = Number(bytes) || 0;
+    if (value < 1024) return value + " B";
+    var units = ["KB", "MB", "GB", "TB"];
+    var index = -1;
+    do {
+      value = value / 1024;
+      index++;
+    } while (value >= 1024 && index < units.length - 1);
+    return (value >= 10 ? value.toFixed(0) : value.toFixed(1)) + " " + units[index];
+  }
+
+  function copyIcon() {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>';
+  }
+
+  function storageSection() {
+    var info = storage || {};
+    var dataDir = info.dataDir || "";
+    var pendingRestore = !!info.pendingRestore;
+    var pendingMigrate = info.pendingMigrate || "";
+    var hasPending = pendingRestore || !!pendingMigrate;
+    var pendingHtml = "";
+    if (pendingRestore) {
+      pendingHtml += '<span class="storage-badge is-warn" data-i18n="settings.storage.pendingRestore"></span>';
+    }
+    if (pendingMigrate) {
+      pendingHtml += '<span class="storage-badge is-warn">' +
+        esc(t("settings.storage.pendingMigrate", { dir: pendingMigrate })) + "</span>";
+    }
+    return '<div class="settings-label" data-i18n="settings.storage.title"></div>' +
+      '<p class="settings-desc" data-i18n="settings.storage.desc"></p>' +
+      '<div class="storage-path-row">' +
+      '<div class="storage-path-label" data-i18n="settings.storage.current"></div>' +
+      '<div class="storage-path"><code>' + esc(dataDir || "—") + "</code>" +
+      '<button type="button" class="storage-copy" data-copy-path="' + esc(dataDir) + '" data-i18n-title="settings.storage.copy">' +
+      copyIcon() + "</button></div>" +
+      '<div class="storage-meta">' + esc(t("settings.storage.files", { files: info.files || 0, size: formatBytes(info.bytes) })) + "</div>" +
+      "</div>" +
+      '<div class="storage-block">' +
+      '<div class="settings-label" data-i18n="settings.storage.backup"></div>' +
+      '<p class="settings-desc" data-i18n="settings.storage.backupDesc"></p>' +
+      '<div class="settings-actions storage-actions"><button type="button" id="storageBackupBtn" class="btn-primary" data-i18n="settings.storage.backupBtn"></button></div>' +
+      "</div>" +
+      '<div class="storage-block">' +
+      '<div class="settings-label" data-i18n="settings.storage.restore"></div>' +
+      '<p class="settings-desc" data-i18n="settings.storage.restoreDesc"></p>' +
+      '<div class="settings-actions storage-actions">' +
+      '<button type="button" id="storageRestoreBtn" class="btn-ghost" data-i18n="settings.storage.restoreBtn"></button>' +
+      '<input id="storageRestoreFile" type="file" accept=".zip,application/zip" class="hidden" />' +
+      "</div>" + pendingHtml +
+      "</div>" +
+      '<div class="storage-block">' +
+      '<div class="settings-label" data-i18n="settings.storage.migrate"></div>' +
+      '<p class="settings-desc" data-i18n="settings.storage.migrateDesc"></p>' +
+      '<div class="storage-row">' +
+      '<input id="storageMigrateDir" class="settings-input" type="text" value="' + esc(migrateDraft) + '" data-i18n-placeholder="settings.storage.migratePlaceholder" />' +
+      '<button type="button" id="storageBrowseBtn" class="btn-ghost" data-i18n="settings.storage.browse"></button>' +
+      "</div>" +
+      '<div class="settings-actions storage-actions"><button type="button" id="storageMigrateBtn" class="btn-primary" data-i18n="settings.storage.migrateBtn"></button></div>' +
+      "</div>" +
+      (hasPending
+        ? '<div class="settings-actions storage-actions"><button type="button" id="storageCancelBtn" class="btn-ghost btn-danger" data-i18n="settings.storage.cancel"></button></div>' +
+          '<p class="settings-note" data-i18n="settings.storage.restartHint"></p>'
+        : "") +
+      '<p class="settings-note" data-i18n="settings.storage.note"></p>';
+  }
+
   function render() {
     if (!overlay) return;
     overlay.innerHTML =
@@ -159,11 +231,13 @@
       '<button type="button" class="settings-tab" data-tab="appearance" data-i18n="settings.tab.appearance"></button>' +
       '<button type="button" class="settings-tab" data-tab="language" data-i18n="settings.tab.language"></button>' +
       '<button type="button" class="settings-tab" data-tab="security" data-i18n="settings.tab.security"></button>' +
+      '<button type="button" class="settings-tab" data-tab="storage" data-i18n="settings.tab.storage"></button>' +
       "</div>" +
       '<div class="settings-body">' +
       '<section class="settings-section" data-section="appearance">' + wallpaperSection() + "</section>" +
       '<section class="settings-section" data-section="language">' + languageSection() + "</section>" +
       '<section class="settings-section" data-section="security">' + securitySection() + "</section>" +
+      '<section class="settings-section" data-section="storage">' + storageSection() + "</section>" +
       "</div></div>";
 
     if (window.DevOSI18n) window.DevOSI18n.apply(overlay);
@@ -180,6 +254,135 @@
     overlay.querySelectorAll(".settings-section").forEach(function (section) {
       section.classList.toggle("is-active", section.getAttribute("data-section") === name);
     });
+    // 首次进入数据页时按需加载目录信息。
+    if (name === "storage" && !storage) {
+      loadStorageInfo().then(function () {
+        if (tab === "storage" && overlay && !overlay.classList.contains("hidden")) render();
+      });
+    }
+  }
+
+  function loadStorageInfo() {
+    return request("/api/storage/info", { method: "GET" })
+      .then(function (data) {
+        storage = data || {};
+        return storage;
+      })
+      .catch(function () {
+        storage = storage || {};
+        return storage;
+      });
+  }
+
+  function refreshStorage() {
+    return loadStorageInfo().then(function () {
+      if (overlay) render();
+    });
+  }
+
+  function downloadBackup() {
+    if (busy) return;
+    busy = true;
+    notify(t("settings.storage.backingUp"));
+    fetch("/api/storage/backup", { headers: { "X-DevOS-Request": "1" } })
+      .then(function (resp) {
+        if (resp.ok) return resp.blob();
+        return resp.json().catch(function () { return {}; }).then(function (data) {
+          throw new Error(data.error || "HTTP " + resp.status);
+        });
+      })
+      .then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        var now = new Date();
+        var stamp = now.getFullYear() + String(now.getMonth() + 1).padStart(2, "0") + String(now.getDate()).padStart(2, "0") +
+          "-" + String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0") + String(now.getSeconds()).padStart(2, "0");
+        link.href = url;
+        link.download = "devos-backup-" + stamp + ".zip";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+        notify(t("settings.storage.backupDone"));
+      })
+      .catch(function (err) {
+        notify(t("settings.storage.backupFailed", { error: err.message }));
+      })
+      .then(function () { busy = false; });
+  }
+
+  function restoreFromFile(file) {
+    if (!file || busy) return;
+    if (!window.confirm(t("settings.storage.restoreConfirm"))) return;
+    var form = new FormData();
+    form.append("file", file);
+    busy = true;
+    request("/api/storage/restore", { body: form })
+      .then(function () {
+        notify(t("settings.storage.restoreQueued"));
+        return refreshStorage();
+      })
+      .catch(function (err) {
+        notify(t("settings.storage.restoreFailed", { error: err.message }));
+      })
+      .then(function () { busy = false; });
+  }
+
+  function requestMigrate(dir, overwrite) {
+    return request("/api/storage/migrate", { body: { dir: dir, overwrite: !!overwrite } })
+      .then(function () {
+        notify(t("settings.storage.migrateQueued"));
+        return refreshStorage();
+      });
+  }
+
+  function submitMigrate() {
+    if (busy) return;
+    var input = overlay.querySelector("#storageMigrateDir");
+    var dir = input ? input.value.trim() : "";
+    if (!dir) return notify(t("settings.storage.migratePlaceholder"));
+    if (!window.confirm(t("settings.storage.migrateConfirm", { dir: dir }))) return;
+    busy = true;
+    requestMigrate(dir, false)
+      .catch(function (err) {
+        if (err.code === "not_empty" && window.confirm(t("settings.storage.overwriteConfirm", { dir: dir }))) {
+          return requestMigrate(dir, true);
+        }
+        throw err;
+      })
+      .catch(function (err) {
+        notify(t("settings.storage.migrateFailed", { error: err.message }));
+      })
+      .then(function () { busy = false; });
+  }
+
+  function browseMigrateDir() {
+    if (busy) return;
+    busy = true;
+    request("/api/storage/browse", { body: {} })
+      .then(function (data) {
+        migrateDraft = data.dir || migrateDraft;
+        var input = overlay.querySelector("#storageMigrateDir");
+        if (input) input.value = migrateDraft;
+      })
+      .catch(function (err) {
+        notify(t("settings.storage.browseFailed", { error: err.message }));
+      })
+      .then(function () { busy = false; });
+  }
+
+  function cancelPending() {
+    if (busy) return;
+    busy = true;
+    request("/api/storage/pending/cancel", { body: {} })
+      .then(function () {
+        notify(t("settings.storage.canceled"));
+        return refreshStorage();
+      })
+      .catch(function (err) {
+        notify(t("settings.storage.migrateFailed", { error: err.message }));
+      })
+      .then(function () { busy = false; });
   }
 
   // 按当前壁纸同步内置与自定义壁纸的选中态。
@@ -288,6 +491,38 @@
     if (form) form.addEventListener("submit", submitPassword);
     var removeBtn = overlay.querySelector("#secRemove");
     if (removeBtn) removeBtn.addEventListener("click", removePassword);
+
+    var backupBtn = overlay.querySelector("#storageBackupBtn");
+    if (backupBtn) backupBtn.addEventListener("click", downloadBackup);
+    var restoreBtn = overlay.querySelector("#storageRestoreBtn");
+    var restoreInput = overlay.querySelector("#storageRestoreFile");
+    if (restoreBtn && restoreInput) {
+      restoreBtn.addEventListener("click", function () { restoreInput.click(); });
+      restoreInput.addEventListener("change", function () {
+        var file = restoreInput.files && restoreInput.files[0];
+        restoreFromFile(file);
+        restoreInput.value = "";
+      });
+    }
+    var migrateInput = overlay.querySelector("#storageMigrateDir");
+    if (migrateInput) {
+      migrateInput.addEventListener("input", function () { migrateDraft = migrateInput.value; });
+    }
+    var browseBtn = overlay.querySelector("#storageBrowseBtn");
+    if (browseBtn) browseBtn.addEventListener("click", browseMigrateDir);
+    var migrateBtn = overlay.querySelector("#storageMigrateBtn");
+    if (migrateBtn) migrateBtn.addEventListener("click", submitMigrate);
+    var cancelBtn = overlay.querySelector("#storageCancelBtn");
+    if (cancelBtn) cancelBtn.addEventListener("click", cancelPending);
+    overlay.querySelectorAll("[data-copy-path]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var text = btn.getAttribute("data-copy-path") || "";
+        if (!text) return;
+        navigator.clipboard.writeText(text)
+          .then(function () { notify(t("settings.storage.copied")); })
+          .catch(function (err) { notify(t("settings.storage.copyFailed", { error: err.message })); });
+      });
+    });
   }
 
   function formError(message) {
@@ -366,6 +601,7 @@
     Promise.all([
       request("/api/security/status", { method: "GET" }).catch(function () { return null; }),
       request("/api/security/wallpapers", { method: "GET" }).catch(function () { return null; }),
+      loadStorageInfo(),
     ])
       .then(function (results) {
         if (results[0]) status = results[0];

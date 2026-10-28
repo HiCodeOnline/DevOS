@@ -426,3 +426,89 @@
   line-height: 1.65;
   color: #94a3b8;
 }
+
+/* ---------- 数据备份与迁移 ---------- */
+.storage-path-row {
+  margin-top: 14px;
+}
+.storage-path-label {
+  margin-bottom: 5px;
+  font-size: 10.5px;
+  color: #64748b;
+}
+.storage-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.storage-path code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #334155;
+}
+.storage-copy {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  color: #94a3b8;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.storage-copy:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+.storage-copy svg {
+  width: 13px;
+  height: 13px;
+}
+.storage-meta {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #94a3b8;
+}
+.storage-block {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+.storage-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.storage-row .settings-input {
+  flex: 1;
+  min-width: 0;
+}
+.storage-row .btn-ghost {
+  flex: none;
+  height: 40px;
+  padding: 0 14px;
+}
+.storage-actions {
+  justify-content: flex-start;
+  margin-top: 12px;
+}
+.storage-badge {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+}
+.storage-badge.is-warn {
+  background: #fff7ed;
+  color: #b45309;
+}

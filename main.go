@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"devos/internal/config"
+	"devos/internal/datadir"
 	"devos/internal/kernel"
 	"devos/internal/plugins"
 )
@@ -54,6 +55,8 @@ func main() {
 		logger.Error("无法创建数据目录", "dir", dataDir, "err", err)
 		os.Exit(1)
 	}
+	// 先执行设置页排入的还原/迁移任务，再读取配置与初始化插件。
+	dataDir = datadir.ApplyPending(logger, dataDir)
 
 	cfg, err := config.Load(dataDir)
 	if err != nil {

@@ -1,6 +1,6 @@
 //go:build windows
 
-package main
+package platform
 
 import (
 	"errors"
@@ -10,8 +10,8 @@ import (
 	"syscall"
 )
 
-// browseForFolder 调用系统文件夹选择对话框，返回用户选中的目录。
-func browseForFolder(start string) (string, error) {
+// BrowseForFolder 调用系统文件夹选择对话框，返回用户选中的目录。
+func BrowseForFolder(start string) (string, error) {
 	script := `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; ` +
 		`Add-Type -AssemblyName System.Windows.Forms; ` +
 		`$d=New-Object System.Windows.Forms.FolderBrowserDialog; ` +

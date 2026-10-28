@@ -16,45 +16,37 @@ import (
 	"github.com/gofiber/fiber/v2"
 
 	"devos/internal/config"
+	"devos/internal/datadir"
 	"devos/internal/kernel"
+	"devos/internal/platform"
 )
-
-// dataLocation 记录用户选择的数据存储目录，固定保存在用户配置目录下。
-type dataLocation struct {
-	DataDir string `json:"dataDir"`
-	SavedAt string `json:"savedAt"`
-}
-
-// configRootDir 返回固定的配置目录（默认数据目录），用于存放目录选择结果。
-func configRootDir() (string, error) {
-	dir, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "DevOS"), nil
-}
 
 // resolveDataDir 读取已保存的数据目录。
 // 若不存在选择记录，则返回默认目录并提示需要进入初始化向导；
 // 旧版本安装（默认目录已有数据）会自动写入选择记录，避免重复引导。
 func resolveDataDir(forceSetup bool) (string, bool, error) {
-	root, err := configRootDir()
+	root, err := datadir.ConfigRoot()
 	if err != nil {
 		return "", false, err
 	}
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return "", false, err
 	}
-	locFile := filepath.Join(root, "location.json")
 	if !forceSetup {
+		locFile, err := datadir.LocationPath()
+		if err != nil {
+			return "", false, err
+		}
 		if data, err := os.ReadFile(locFile); err == nil {
-			var loc dataLocation
+			var loc struct {
+				DataDir string `json:"dataDir"`
+			}
 			if json.Unmarshal(data, &loc) == nil && strings.TrimSpace(loc.DataDir) != "" {
 				return loc.DataDir, false, nil
 			}
 		}
 		if hasExistingData(root) {
-			_ = writeLocation(locFile, root)
+			_ = datadir.WriteLocation(root)
 			return root, false, nil
 		}
 	}
@@ -71,54 +63,6 @@ func hasExistingData(dir string) bool {
 	return false
 }
 
-func writeLocation(path, dir string) error {
-	payload, err := json.MarshalIndent(dataLocation{
-		DataDir: dir,
-		SavedAt: time.Now().Format(time.RFC3339),
-	}, "", "  ")
-	if err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, append(payload, '\n'), 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
-}
-
-// normalizeDataDir 校验并创建用户选择的数据目录。
-func normalizeDataDir(input string) (string, error) {
-	dir := strings.TrimSpace(input)
-	if dir == "" {
-		return "", errSetupEmpty
-	}
-	if !filepath.IsAbs(dir) {
-		return "", errSetupNotAbs
-	}
-	clean := filepath.Clean(dir)
-	volume := filepath.VolumeName(clean)
-	if volume != "" && (clean == volume || clean == volume+string(filepath.Separator)) {
-		return "", errSetupVolumeRoot
-	}
-	if err := os.MkdirAll(clean, 0o755); err != nil {
-		return "", fmt.Errorf("%w: %v", errSetupMkdir, err)
-	}
-	probe := filepath.Join(clean, ".devos-write-probe")
-	if err := os.WriteFile(probe, []byte("devos"), 0o600); err != nil {
-		return "", errSetupNotWritable
-	}
-	_ = os.Remove(probe)
-	return clean, nil
-}
-
-var (
-	errSetupEmpty       = errors.New("请输入数据目录")
-	errSetupNotAbs      = errors.New("数据目录必须为绝对路径")
-	errSetupVolumeRoot  = errors.New("不能直接使用磁盘根目录")
-	errSetupMkdir       = errors.New("无法创建数据目录")
-	errSetupNotWritable = errors.New("数据目录不可写")
-)
-
 // setupErrorPayload 返回带错误码的响应，便于前端本地化提示。
 func setupErrorPayload(c *fiber.Ctx, status int, code string, err error) error {
 	return c.Status(status).JSON(fiber.Map{"error": err.Error(), "code": code})
@@ -126,15 +70,15 @@ func setupErrorPayload(c *fiber.Ctx, status int, code string, err error) error {
 
 func setupError(c *fiber.Ctx, err error) error {
 	switch {
-	case errors.Is(err, errSetupEmpty):
+	case errors.Is(err, datadir.ErrEmpty):
 		return setupErrorPayload(c, fiber.StatusBadRequest, "empty", err)
-	case errors.Is(err, errSetupNotAbs):
+	case errors.Is(err, datadir.ErrNotAbs):
 		return setupErrorPayload(c, fiber.StatusBadRequest, "not_abs", err)
-	case errors.Is(err, errSetupVolumeRoot):
+	case errors.Is(err, datadir.ErrVolumeRoot):
 		return setupErrorPayload(c, fiber.StatusBadRequest, "volume_root", err)
-	case errors.Is(err, errSetupMkdir):
+	case errors.Is(err, datadir.ErrMkdir):
 		return setupErrorPayload(c, fiber.StatusBadRequest, "mkdir_failed", err)
-	case errors.Is(err, errSetupNotWritable):
+	case errors.Is(err, datadir.ErrNotWritable):
 		return setupErrorPayload(c, fiber.StatusBadRequest, "not_writable", err)
 	default:
 		return setupErrorPayload(c, fiber.StatusBadRequest, "invalid", err)
@@ -162,10 +106,9 @@ func verifySetupRequest(c *fiber.Ctx, baseURL string) error {
 }
 
 type setupOptions struct {
-	BaseURL      string
-	DefaultDir   string
-	LocationFile string
-	OnReady      func(dataDir string)
+	BaseURL    string
+	DefaultDir string
+	OnReady    func(dataDir string)
 }
 
 // newSetupApp 构造首次启动的初始化向导服务。
@@ -208,7 +151,7 @@ func newSetupApp(webFS fs.FS, opts setupOptions) (*fiber.App, error) {
 		if err := verifySetupRequest(c, opts.BaseURL); err != nil {
 			return err
 		}
-		dir, err := browseForFolder(opts.DefaultDir)
+		dir, err := platform.BrowseForFolder(opts.DefaultDir)
 		if err != nil {
 			return setupErrorPayload(c, fiber.StatusNotImplemented, "browse_unsupported", err)
 		}
@@ -224,14 +167,11 @@ func newSetupApp(webFS fs.FS, opts setupOptions) (*fiber.App, error) {
 		if err := c.BodyParser(&in); err != nil {
 			return setupErrorPayload(c, fiber.StatusBadRequest, "parse_failed", errors.New("参数解析失败"))
 		}
-		dir, err := normalizeDataDir(in.Dir)
+		dir, err := datadir.Normalize(in.Dir)
 		if err != nil {
 			return setupError(c, err)
 		}
-		if err := os.MkdirAll(filepath.Dir(opts.LocationFile), 0o755); err != nil {
-			return setupErrorPayload(c, fiber.StatusInternalServerError, "save_failed", err)
-		}
-		if err := writeLocation(opts.LocationFile, dir); err != nil {
+		if err := datadir.WriteLocation(dir); err != nil {
 			return setupErrorPayload(c, fiber.StatusInternalServerError, "save_failed", err)
 		}
 		if opts.OnReady != nil {
@@ -265,18 +205,11 @@ func runSetupMode(cfg config.Config, logger *slog.Logger, defaultDir string) (st
 		logger.Error("加载初始化页面失败", "err", err)
 		os.Exit(1)
 	}
-	rootDir, err := configRootDir()
-	if err != nil {
-		logger.Error("无法确定配置目录", "err", err)
-		os.Exit(1)
-	}
-
 	chosen := make(chan string, 1)
 	var app *fiber.App
 	app, err = newSetupApp(webFS, setupOptions{
-		BaseURL:      baseURL,
-		DefaultDir:   defaultDir,
-		LocationFile: filepath.Join(rootDir, "location.json"),
+		BaseURL:    baseURL,
+		DefaultDir: defaultDir,
 		OnReady: func(dir string) {
 			select {
 			case chosen <- dir:

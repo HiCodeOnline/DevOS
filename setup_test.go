@@ -12,39 +12,9 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+
+	"devos/internal/datadir"
 )
-
-func TestNormalizeDataDir(t *testing.T) {
-	if _, err := normalizeDataDir("  "); err == nil {
-		t.Fatal("空路径应报错")
-	}
-	if _, err := normalizeDataDir("relative/dir"); err == nil {
-		t.Fatal("相对路径应报错")
-	}
-
-	root := t.TempDir()
-	nested := filepath.Join(root, "data", "devos")
-	got, err := normalizeDataDir(nested)
-	if err != nil {
-		t.Fatalf("创建目录失败: %v", err)
-	}
-	if got != nested {
-		t.Fatalf("目录不匹配: %s", got)
-	}
-	if _, err := os.Stat(nested); err != nil {
-		t.Fatalf("目录未创建: %v", err)
-	}
-}
-
-func TestNormalizeDataDirRejectsVolumeRoot(t *testing.T) {
-	volume := filepath.VolumeName(t.TempDir())
-	if volume == "" {
-		t.Skip("当前系统无盘符概念")
-	}
-	if _, err := normalizeDataDir(volume + string(filepath.Separator)); err == nil {
-		t.Fatal("磁盘根目录应被拒绝")
-	}
-}
 
 func TestResolveDataDirFirstRunAndSavedLocation(t *testing.T) {
 	base := t.TempDir()
@@ -64,7 +34,7 @@ func TestResolveDataDirFirstRunAndSavedLocation(t *testing.T) {
 
 	// 已保存选择：直接使用保存的目录。
 	custom := filepath.Join(base, "custom-data")
-	if err := writeLocation(filepath.Join(base, "DevOS", "location.json"), custom); err != nil {
+	if err := datadir.WriteLocation(custom); err != nil {
 		t.Fatalf("写入位置记录: %v", err)
 	}
 	dir, needSetup, err = resolveDataDir(false)
@@ -105,15 +75,14 @@ func TestResolveDataDirMigratesLegacyInstall(t *testing.T) {
 }
 
 func TestSetupAppChooseDirectory(t *testing.T) {
+	t.Setenv("AppData", t.TempDir())
 	web := fstest.MapFS{
 		"setup.html": &fstest.MapFile{Data: []byte("<!doctype html><title>setup</title>")},
 	}
-	location := filepath.Join(t.TempDir(), "location.json")
 	ready := make(chan string, 1)
 	app, err := newSetupApp(web, setupOptions{
-		BaseURL:      "http://127.0.0.1:7788",
-		DefaultDir:   t.TempDir(),
-		LocationFile: location,
+		BaseURL:    "http://127.0.0.1:7788",
+		DefaultDir: t.TempDir(),
 		OnReady: func(dir string) {
 			ready <- dir
 		},
@@ -151,11 +120,17 @@ func TestSetupAppChooseDirectory(t *testing.T) {
 		t.Fatal("未触发初始化完成回调")
 	}
 
+	location, err := datadir.LocationPath()
+	if err != nil {
+		t.Fatalf("位置记录路径: %v", err)
+	}
 	raw, err := os.ReadFile(location)
 	if err != nil {
 		t.Fatalf("读取位置记录: %v", err)
 	}
-	var loc dataLocation
+	var loc struct {
+		DataDir string `json:"dataDir"`
+	}
 	if err := json.Unmarshal(raw, &loc); err != nil {
 		t.Fatalf("解析位置记录: %v", err)
 	}
