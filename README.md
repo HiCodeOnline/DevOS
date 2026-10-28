@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-DevOS is a local-first developer workspace that runs entirely in your browser. A single Go binary ships a desktop-like shell (dock, start menu, windows, lock screen) plus a set of built-in developer apps — SSH terminal, SFTP client, database client, API tool, notes, toolbox and a secret vault — and can load additional offline web plugins without restarting.
+DevOS is a local-first developer workspace that runs as a native desktop app (Wails v3 + WebView2). A single Go binary ships a desktop-like shell (dock, start menu, windows, lock screen) plus a set of built-in developer apps — SSH terminal, SFTP client, database client, API tool, notes, toolbox and a secret vault — and can load additional offline web plugins without restarting.
 
 Everything is served from `127.0.0.1`; no account, cloud service or external database is involved.
 
@@ -31,8 +31,8 @@ Everything is served from `127.0.0.1`; no account, cloud service or external dat
 ## Requirements
 
 - **Go 1.27+** to build from source.
-- A modern browser (Chrome / Edge / Safari / Firefox).
-- Windows 10/11 is the primary development target; the Go code has no OS-specific desktop-shell dependency, but tray integration is only routinely exercised on Windows.
+- On Windows 10/11 the **WebView2 Runtime** is required (preinstalled on Windows 11; available from Microsoft for Windows 10).
+- The desktop window is hosted by Wails v3; on non-Windows platforms DevOS falls back to opening the page in the default browser.
 
 ## Quick start
 
@@ -43,9 +43,9 @@ go build -o devos.exe .
 ./devos.exe
 ```
 
-On first launch DevOS opens a setup wizard in your browser where you choose the data directory. After confirming, the desktop is served at `http://127.0.0.1:7788`.
+On first launch DevOS shows a setup wizard in a native window where you choose the data directory. After confirming, the same window switches to the desktop (the service still listens on `http://127.0.0.1:7788`).
 
-Release packages for Windows are built with `-H windowsgui`, so double-clicking the executable starts the service and opens the browser without a console window. To reproduce that locally:
+Release packages for Windows are built with `-H windowsgui`, so double-clicking the executable starts the service and shows the desktop window without a console window. To reproduce that locally:
 
 ```bash
 go build -trimpath -ldflags "-s -w -H windowsgui" -o devos.exe .
@@ -62,8 +62,8 @@ go run .
 | Flag | Description |
 | --- | --- |
 | `-port <n>` | Listen port; defaults to `config.json` or `7788` (the next free port is used if busy, up to `maxPortTries`). |
-| `-no-tray` | Do not create the system tray icon; the process runs in the foreground until interrupted. |
-| `-no-browser` | Do not open the browser automatically on startup. |
+| `-no-tray` | Do not create the system tray icon; closing the window quits the app. |
+| `-no-browser` | Do not show the main window on startup (stay in the tray only). |
 | `-setup` | Force the data-directory setup wizard, even if a location has already been chosen. |
 
 ## Configuration
@@ -73,7 +73,7 @@ Settings live in `<data dir>/config.json` and are created with defaults on first
 | Key | Default | Description |
 | --- | --- | --- |
 | `port` | `7788` | Preferred listen port. |
-| `openBrowser` | `true` | Open the desktop in the default browser at startup. |
+| `openBrowser` | `true` | Show the desktop window at startup; when disabled, DevOS stays in the tray and must be opened from the tray menu. |
 | `maxPortTries` | `20` | How many consecutive ports to probe when the preferred one is busy. |
 
 Language, wallpaper and app-password settings are stored separately in `security.json` and changed from the in-app settings panel.

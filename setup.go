@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -182,17 +183,9 @@ func newSetupApp(webFS fs.FS, opts setupOptions) (*fiber.App, error) {
 	return app, nil
 }
 
-// runSetupMode 运行初始化向导：选择目录后关闭向导服务，由主流程初始化数据。
-// 返回选择的数据目录、向导占用的端口以及是否已自动打开浏览器。
-func runSetupMode(cfg config.Config, logger *slog.Logger, defaultDir string) (string, int, bool, bool) {
-	if url, ok := kernel.FindDevOS(cfg.Port, cfg.MaxPortTries); ok {
-		logger.Info("DevOS 已在运行，打开已有实例", "url", url)
-		if cfg.OpenBrowser {
-			_ = kernel.OpenBrowser(url)
-		}
-		return "", 0, false, false
-	}
-
+// startSetupWizard 启动初始化向导服务，并在桌面窗口中展示向导页面。
+// 返回向导地址、向导占用的端口、关闭函数以及数据目录选择结果的通道。
+func startSetupWizard(cfg config.Config, logger *slog.Logger, defaultDir string) (string, int, func(), <-chan string) {
 	ln, port, err := kernel.Listen(cfg.Port, cfg.MaxPortTries)
 	if err != nil {
 		logger.Error("启动初始化向导失败", "err", err)
@@ -224,26 +217,15 @@ func runSetupMode(cfg config.Config, logger *slog.Logger, defaultDir string) (st
 	})
 	if err != nil {
 		logger.Error("初始化向导启动失败", "err", err)
+		_ = ln.Close()
 		os.Exit(1)
 	}
 
+	go func() {
+		if err := app.Listener(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("初始化向导异常退出", "err", err)
+		}
+	}()
 	logger.Info("等待选择数据目录", "url", baseURL, "default", defaultDir, "port", port)
-	if cfg.OpenBrowser {
-		go func() {
-			time.Sleep(600 * time.Millisecond)
-			_ = kernel.OpenBrowser(baseURL)
-		}()
-	}
-	if err := app.Listener(ln); err != nil {
-		logger.Error("初始化向导异常退出", "err", err)
-		os.Exit(1)
-	}
-
-	select {
-	case dir := <-chosen:
-		logger.Info("数据目录已选择，开始初始化数据", "dir", dir)
-		return dir, port, cfg.OpenBrowser, true
-	default:
-		return "", 0, cfg.OpenBrowser, false
-	}
+	return baseURL, port, func() { _ = app.Shutdown() }, chosen
 }
