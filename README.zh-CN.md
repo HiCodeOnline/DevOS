@@ -45,6 +45,12 @@ go build -o devos.exe .
 
 首次启动会在浏览器中打开初始化向导，选择数据目录后桌面即运行在 `http://127.0.0.1:7788`。
 
+Windows 发布包使用 `-H windowsgui` 构建，双击可执行文件会直接启动服务并打开浏览器，不会弹出控制台窗口。本地可比照构建：
+
+```bash
+go build -trimpath -ldflags "-s -w -H windowsgui" -o devos.exe .
+```
+
 开发时也可跳过编译：
 
 ```bash

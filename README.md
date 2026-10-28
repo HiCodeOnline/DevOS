@@ -45,6 +45,12 @@ go build -o devos.exe .
 
 On first launch DevOS opens a setup wizard in your browser where you choose the data directory. After confirming, the desktop is served at `http://127.0.0.1:7788`.
 
+Release packages for Windows are built with `-H windowsgui`, so double-clicking the executable starts the service and opens the browser without a console window. To reproduce that locally:
+
+```bash
+go build -trimpath -ldflags "-s -w -H windowsgui" -o devos.exe .
+```
+
 For development you can skip the build step:
 
 ```bash

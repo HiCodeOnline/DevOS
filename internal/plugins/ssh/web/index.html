@@ -4,19 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SSH 终端</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/assets/vendor/tailwind.js"></script>
   <script>
     tailwind.config = { theme: { extend: { fontFamily: {
       sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'system-ui', 'sans-serif'],
       mono: ['JetBrains Mono', 'Cascadia Code', 'Consolas', 'monospace']
     } } } };
   </script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/vendor/fonts.css" />
   <link rel="stylesheet" href="/assets/ui.css?v=2" />
   <script src="/assets/app-i18n.js?v=3"></script>
   <script src="/assets/locales/apps/ssh.js?v=2"></script>
   <script src="/assets/secure-ui.js?v=2"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" />
+  <link rel="stylesheet" href="/assets/vendor/xterm/xterm.css" />
   <style>
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: rgba(148,163,184,.45); border-radius: 999px; }
@@ -369,9 +369,9 @@
   <div id="menu" class="fixed z-40 hidden w-36 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-[11px] shadow-xl"></div>
   <div id="toasts" class="pointer-events-none fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 flex-col items-center gap-2"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-search@0.15.0/lib/addon-search.js"></script>
+  <script src="/assets/vendor/xterm/xterm.js"></script>
+  <script src="/assets/vendor/xterm/addon-fit.js"></script>
+  <script src="/assets/vendor/xterm/addon-search.js"></script>
   <script>
     const API = "/api/apps/ssh";
     const $ = (id) => document.getElementById(id);

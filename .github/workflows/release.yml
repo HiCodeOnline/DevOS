@@ -61,9 +61,13 @@ jobs:
         run: |
           set -euo pipefail
           version="${VERSION#v}"
+          ldflags="-s -w -X devos/internal/kernel.Version=${version}"
+          # Windows 使用 GUI 子系统，双击启动时不再弹出终端窗口。
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            ldflags="${ldflags} -H windowsgui"
+          fi
           mkdir -p dist/stage
-          go build -trimpath \
-            -ldflags "-s -w -X devos/internal/kernel.Version=${version}" \
+          go build -trimpath -ldflags "${ldflags}" \
             -o "dist/stage/devos${{ matrix.ext }}" .
           cp README.md README.zh-CN.md LICENSE dist/stage/
           echo "VERSION=${version}" >> "$GITHUB_ENV"
@@ -75,12 +79,40 @@ jobs:
           set -euo pipefail
           base="devos_${VERSION}_${{ matrix.name }}"
           cd dist/stage
-          if [ "${EXT}" = ".exe" ]; then
-            zip -q "../${base}.zip" "devos${EXT}" README.md README.zh-CN.md LICENSE
-          else
-            chmod +x devos
-            tar -czf "../${base}.tar.gz" devos README.md README.zh-CN.md LICENSE
-          fi
+          case "${{ matrix.goos }}" in
+            windows)
+              zip -q "../${base}.zip" "devos${EXT}" README.md README.zh-CN.md LICENSE
+              ;;
+            darwin)
+              # 打包为 .app，双击即可从 Finder 启动并自动打开浏览器。
+              mkdir -p DevOS.app/Contents/MacOS
+              mv devos DevOS.app/Contents/MacOS/DevOS
+              cat > DevOS.app/Contents/Info.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>DevOS</string>
+            <key>CFBundleDisplayName</key><string>DevOS</string>
+            <key>CFBundleIdentifier</key><string>dev.devos.app</string>
+            <key>CFBundleExecutable</key><string>DevOS</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleVersion</key><string>${VERSION}</string>
+            <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>LSUIElement</key><true/>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          PLIST
+              chmod +x DevOS.app/Contents/MacOS/DevOS
+              tar -czf "../${base}.tar.gz" DevOS.app README.md README.zh-CN.md LICENSE
+              ;;
+            *)
+              chmod +x devos
+              tar -czf "../${base}.tar.gz" devos README.md README.zh-CN.md LICENSE
+              ;;
+          esac
           cd ..
           rm -rf stage
 
