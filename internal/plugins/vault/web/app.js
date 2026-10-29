@@ -50,6 +50,7 @@
     editorTags: [],
     editingGroupId: '',
     entryGroupId: '',
+    detailId: '',
     groupColor: PALETTE[0],
     pendingConfirm: null,
     idleTimer: null,
@@ -153,6 +154,20 @@
     $('entrySave').addEventListener('click', saveEntry);
     $('entryDelete').addEventListener('click', deleteSecret);
     $('entryCopy').addEventListener('click', function () { copyText($('entryValue').value); });
+    $('detailCopy').addEventListener('click', function () {
+      var secret = currentDetail();
+      if (secret) copyText(secret.value);
+    });
+    $('detailKeyCopy').addEventListener('click', function () {
+      var secret = currentDetail();
+      if (secret && secret.key) copyText(secret.key);
+    });
+    $('detailEdit').addEventListener('click', function () {
+      var secret = currentDetail();
+      if (!secret) return;
+      closeOverlay('detailOverlay');
+      openEntry(secret);
+    });
     $('entryGroupTrigger').addEventListener('click', toggleGroupSelect);
     $('entryName').addEventListener('keydown', function (event) {
       if (event.key === 'Enter') { event.preventDefault(); saveEntry(); }
@@ -499,11 +514,11 @@
     var group = findGroup(secret.groupId);
     var card = el('div', 'secret-card');
     card.tabIndex = 0;
-    card.addEventListener('click', function () { openEntry(secret); });
+    card.addEventListener('click', function () { openDetail(secret); });
     card.addEventListener('keydown', function (event) {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        openEntry(secret);
+        openDetail(secret);
       }
     });
 
@@ -512,6 +527,15 @@
     dot.style.background = group ? group.color : '#94a3b8';
     top.appendChild(dot);
     top.appendChild(el('span', 'card-name', secret.name));
+    var editBtn = el('button', 'card-action');
+    editBtn.type = 'button';
+    editBtn.title = t('vault.secret.edit');
+    editBtn.innerHTML = iconHtml('edit');
+    editBtn.addEventListener('click', function (event) {
+      event.stopPropagation();
+      openEntry(secret);
+    });
+    top.appendChild(editBtn);
     var copyBtn = el('button', 'card-action');
     copyBtn.type = 'button';
     copyBtn.title = t('vault.secret.copy');
@@ -592,6 +616,32 @@
     renderEditorTags();
     showOverlay('entryOverlay');
     setTimeout(function () { $('entryName').focus(); }, 40);
+  }
+
+  function currentDetail() {
+    return state.secrets.filter(function (s) { return s.id === state.detailId; })[0] || null;
+  }
+
+  // openDetail 展示密钥详情：账号、密钥值（可滚动的高区）、备注与标签。
+  function openDetail(secret) {
+    closePopover();
+    state.detailId = secret.id;
+    var group = findGroup(secret.groupId);
+    $('detailDot').style.background = group ? group.color : '#94a3b8';
+    $('detailTitle').textContent = secret.name;
+    $('detailGroup').textContent = group ? group.name : t('vault.group.default');
+    $('detailKey').textContent = secret.key || t('vault.secret.noKey');
+    $('detailValue').textContent = secret.value || t('vault.secret.emptyValue');
+    $('detailNote').textContent = secret.note || '';
+    $('detailNoteRow').classList.toggle('hidden', !secret.note);
+    var tagsBox = $('detailTags');
+    tagsBox.innerHTML = '';
+    var tags = secret.tags || [];
+    tags.forEach(function (tag) { tagsBox.appendChild(el('span', 'mini-tag', tag)); });
+    $('detailTagsRow').classList.toggle('hidden', !tags.length);
+    var updated = relativeTime(secret.updatedAt);
+    $('detailUpdated').textContent = updated ? t('vault.secret.updated', { time: updated }) : '';
+    showOverlay('detailOverlay');
   }
 
   function currentEntryGroup() {

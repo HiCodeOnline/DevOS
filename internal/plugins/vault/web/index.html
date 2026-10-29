@@ -255,6 +255,32 @@
     .empty-state p { margin: 0; max-width: 320px; font-size: 11px; line-height: 1.65; }
     .empty-state .btn-primary { margin-top: 8px; }
 
+    /* ---------- 密钥详情 ---------- */
+    .modal.detail { max-width: 560px; }
+    .detail-text {
+      min-height: 30px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+      background: #fbfcfe; font-size: 11.5px; line-height: 1.6; color: var(--text); word-break: break-all;
+    }
+    .detail-text.mono { font-family: "JetBrains Mono", Consolas, monospace; }
+    .detail-text.is-empty { color: var(--muted); }
+    .detail-inline { display: flex; align-items: center; gap: 4px; }
+    .detail-inline .detail-text { flex: 1; min-width: 0; }
+    .detail-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+    .detail-label-row .field-label { margin: 0; }
+    .detail-copy {
+      display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px;
+      border-radius: 6px; font-size: 10.5px; color: var(--accent-strong);
+    }
+    .detail-copy:hover { background: var(--accent-soft); }
+    .detail-copy svg { width: 11px; height: 11px; }
+    /* 密钥值可能很长，详情区给足高度并在超出时滚动 */
+    .detail-value {
+      min-height: 220px; max-height: 46vh; overflow: auto; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 8px; background: #f7f8fd;
+      font-family: "JetBrains Mono", Consolas, monospace; font-size: 11.5px; line-height: 1.75;
+      color: var(--text); white-space: pre-wrap; word-break: break-all;
+    }
+
     /* ---------- 浮层 ---------- */
     .overlay {
       position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-start; justify-content: center;
@@ -516,6 +542,59 @@
         <span class="spacer"></span>
         <button type="button" class="btn-plain" data-close="entryOverlay" data-i18n="vault.common.cancel">取消</button>
         <button type="button" id="entrySave" class="btn-primary" data-i18n="vault.common.save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="detailOverlay" class="overlay hidden">
+    <div class="modal detail">
+      <div class="modal-head">
+        <span id="detailDot" class="card-dot"></span>
+        <span id="detailTitle" class="modal-title"></span>
+        <button type="button" class="icon-btn" data-close="detailOverlay">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-row">
+            <span class="field-label" data-i18n="vault.secret.group">分组</span>
+            <div id="detailGroup" class="detail-text"></div>
+          </div>
+          <div class="form-row">
+            <span class="field-label" data-i18n="vault.secret.key">账号 / Key ID</span>
+            <div class="detail-inline">
+              <span id="detailKey" class="detail-text mono"></span>
+              <button type="button" class="icon-btn" id="detailKeyCopy" data-i18n-title="vault.secret.copy" title="复制">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5H6a1 1 0 0 0-1 1v9"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="detail-label-row">
+            <span class="field-label" data-i18n="vault.secret.value">密钥值</span>
+            <button type="button" class="detail-copy" id="detailCopy">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 5H6a1 1 0 0 0-1 1v9"/></svg>
+              <span data-i18n="vault.secret.copy">复制</span>
+            </button>
+          </div>
+          <div id="detailValue" class="detail-value"></div>
+        </div>
+        <div class="form-row hidden" id="detailNoteRow">
+          <span class="field-label" data-i18n="vault.secret.note">备注</span>
+          <div id="detailNote" class="detail-text"></div>
+        </div>
+        <div class="form-row hidden" id="detailTagsRow">
+          <span class="field-label" data-i18n="vault.secret.tags">标签</span>
+          <div id="detailTags" class="card-tags"></div>
+        </div>
+        <div id="detailUpdated" class="form-note"></div>
+      </div>
+      <div class="modal-foot">
+        <span class="spacer"></span>
+        <button type="button" class="btn-plain" data-close="detailOverlay" data-i18n="vault.common.close">关闭</button>
+        <button type="button" id="detailEdit" class="btn-primary" data-i18n="vault.common.edit">编辑</button>
       </div>
     </div>
   </div>

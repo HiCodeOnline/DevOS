@@ -77,6 +77,9 @@ window.DevOSAppI18n.registerAll({
     "vault.common.cancel": "取消",
     "vault.common.save": "保存",
     "vault.common.delete": "删除",
+    "vault.common.close": "关闭",
+    "vault.common.edit": "编辑",
+    "vault.secret.updated": "更新于 {time}",
 
     "vault.empty.title": "还没有密钥",
     "vault.empty.desc": "把 API Key、密码和配置收进这里，按分组与标签整理。",
@@ -194,6 +197,9 @@ window.DevOSAppI18n.registerAll({
     "vault.common.cancel": "Cancel",
     "vault.common.save": "Save",
     "vault.common.delete": "Delete",
+    "vault.common.close": "Close",
+    "vault.common.edit": "Edit",
+    "vault.secret.updated": "Updated {time}",
 
     "vault.empty.title": "No secrets yet",
     "vault.empty.desc": "Keep API keys, passwords and configs here, organized by groups and tags.",
@@ -311,6 +317,9 @@ window.DevOSAppI18n.registerAll({
     "vault.common.cancel": "取消",
     "vault.common.save": "儲存",
     "vault.common.delete": "刪除",
+    "vault.common.close": "關閉",
+    "vault.common.edit": "編輯",
+    "vault.secret.updated": "更新於 {time}",
 
     "vault.empty.title": "還沒有密鑰",
     "vault.empty.desc": "把 API Key、密碼和設定收進這裡，按分組與標籤整理。",
