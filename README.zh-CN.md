@@ -34,6 +34,18 @@ DevOS 是一个本地优先的开发者工作台，以原生桌面应用形式�
 - Windows 10/11 需要 **WebView2 Runtime**（Windows 11 已预装；Windows 10 可安装 Microsoft Edge WebView2 Runtime）。
 - 桌面窗口由 Wails v3 承载；非 Windows 平台回退为在系统默认浏览器中打开页面。
 
+## 发布包选择
+
+| 安装包 | 适用环境 |
+| --- | --- |
+| `devos_*_windows-x64.zip` / `windows-arm64.zip` | Windows 10/11 |
+| `devos_*_macos-arm64.tar.gz` / `macos-intel.tar.gz` | macOS 11+ |
+| `devos_*_linux-amd64.tar.gz` / `linux-arm64.tar.gz` | 现代发行版（Ubuntu 24.04+、Debian 12+、RHEL 9+ 等） |
+| `devos_*_linux-amd64-legacy.tar.gz` / `linux-arm64-legacy.tar.gz` | 旧版发行版兜底（Ubuntu 18.04/20.04、Debian 10/11、CentOS 7/8 等） |
+| `devos_*_web-linux-amd64.tar.gz` / `arm64.tar.gz` | Linux 服务器上以 `-web` 模式运行，无需桌面环境 |
+
+标准包在最新的 Ubuntu 运行器上编译；`-legacy` 包在更旧的构建环境中编译，作为旧系统安装时的保守选择。Linux 包均为关闭 cgo 的纯 Go 静态二进制，不依赖目标机的 glibc、GTK 或 WebKit，两者在绝大多数发行版上都能直接运行。
+
 ## 快速开始
 
 ```bash

@@ -34,6 +34,18 @@ Everything is served from `127.0.0.1`; no account, cloud service or external dat
 - On Windows 10/11 the **WebView2 Runtime** is required (preinstalled on Windows 11; available from Microsoft for Windows 10).
 - The desktop window is hosted by Wails v3; on non-Windows platforms DevOS falls back to opening the page in the default browser.
 
+## Which package should I download?
+
+| Package | Target |
+| --- | --- |
+| `devos_*_windows-x64.zip` / `windows-arm64.zip` | Windows 10/11 |
+| `devos_*_macos-arm64.tar.gz` / `macos-intel.tar.gz` | macOS 11+ |
+| `devos_*_linux-amd64.tar.gz` / `linux-arm64.tar.gz` | Modern distributions (Ubuntu 24.04+, Debian 12+, RHEL 9+) |
+| `devos_*_linux-amd64-legacy.tar.gz` / `linux-arm64-legacy.tar.gz` | Conservative build for older distributions (Ubuntu 18.04/20.04, Debian 10/11, CentOS 7/8) |
+| `devos_*_web-linux-amd64.tar.gz` / `arm64.tar.gz` | Headless Linux servers running in `-web` mode, no desktop environment needed |
+
+The standard packages are built on the latest Ubuntu runner; the `-legacy` packages are built in an older environment as a conservative choice for older systems. All Linux packages are pure-Go static binaries (cgo disabled) and do not depend on the target machine's glibc, GTK or WebKit, so both variants run on the vast majority of distributions.
+
 ## Quick start
 
 ```bash

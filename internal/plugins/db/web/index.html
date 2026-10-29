@@ -88,6 +88,9 @@
     .sql-code { position: relative; flex: 1 1 auto; min-width: 0; overflow: hidden; }
     .sql-highlight, .sql-input { position: absolute; inset: 0; margin: 0; padding: 12px; border: 0; outline: none; white-space: pre; }
     .sql-highlight { overflow: hidden; pointer-events: none; color: #334155; }
+    /* <code> 默认使用浏览器内置 monospace（Windows 上为 Courier New），
+       与输入框使用的 Consolas 等宽度不同，逐行累积后文字与光标会错位。 */
+    .sql-highlight code { font: inherit; }
     .sql-input { overflow: auto; resize: none; background: transparent; color: transparent; caret-color: #0f172a; }
     .sql-input::placeholder { color: #94a3b8; }
     .sql-input::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -358,6 +361,25 @@
     </form>
   </div>
 
+  <!-- 页面内确认弹窗：用于查询保护等需要二次确认的操作 -->
+  <div id="confirmModal" class="modal hidden bg-slate-900/30 p-4 backdrop-blur-sm">
+    <div class="w-[420px] max-w-[92vw] overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div class="flex items-start gap-3 px-5 pt-5">
+        <span id="confirmIcon" class="grid h-9 w-9 flex-none place-items-center rounded-xl bg-amber-50 text-amber-600">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3l-8.5-14.1a2 2 0 0 0-3.4 0z" /></svg>
+        </span>
+        <div class="min-w-0">
+          <div id="confirmTitle" class="text-[13px] font-semibold text-slate-800" data-i18n="db.query.guardTitle">查询保护</div>
+          <p id="confirmMessage" class="mt-1.5 whitespace-pre-line text-[11.5px] leading-6 text-slate-500"></p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 px-5 py-4">
+        <button type="button" id="confirmCancel" class="rounded-lg border border-slate-200 px-4 py-2 text-[11.5px] text-slate-600 hover:bg-slate-50" data-i18n="db.common.cancel">取消</button>
+        <button type="button" id="confirmOk" class="rounded-lg bg-amber-500 px-5 py-2 text-[11.5px] font-semibold text-white hover:bg-amber-400" data-i18n="db.query.guardContinue">继续执行</button>
+      </div>
+    </div>
+  </div>
+
   <input id="csvFile" type="file" accept=".csv,text/csv" class="hidden" />
   <input id="sqlFile" type="file" accept=".sql,text/plain" class="hidden" />
 
@@ -413,6 +435,29 @@ function toast(msg, type = 'ok') {
     (type === 'err' ? 'bg-rose-600' : 'bg-slate-900');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.add('hidden'), 2600);
+}
+
+// 页面内确认弹窗，替代原生 confirm：与应用其余弹窗保持一致的视觉风格。
+let confirmResolve = null;
+function confirmDialog(message, options = {}) {
+  const modal = $('#confirmModal');
+  $('#confirmTitle').textContent = options.title || tr('db.query.guardTitle');
+  $('#confirmMessage').textContent = message;
+  $('#confirmOk').textContent = options.okText || tr('db.query.guardContinue');
+  $('#confirmCancel').textContent = options.cancelText || tr('db.common.cancel');
+  modal.classList.remove('hidden');
+  $('#confirmOk').focus();
+  return new Promise((resolve) => { confirmResolve = resolve; });
+}
+
+function settleConfirm(ok) {
+  if (!confirmResolve) {
+    return;
+  }
+  const resolve = confirmResolve;
+  confirmResolve = null;
+  $('#confirmModal').classList.add('hidden');
+  resolve(ok);
 }
 
 // 状态栏文案保存为可重新求值的函数，语言切换后按当前语言重算。
@@ -1645,7 +1690,8 @@ async function execScript(tab, confirmed = false) {
     $('.run-file-btn', el).disabled = false;
   }
   if (needsConfirm) {
-    if (confirm(tr('db.query.guardPrompt', { reason: needsConfirm }))) execScript(tab, true);
+    const ok = await confirmDialog(tr('db.query.guardPrompt', { reason: needsConfirm }));
+    if (ok) execScript(tab, true);
     else setStatus(tab, () => tr('db.query.guardCanceled'));
   }
 }
@@ -1745,7 +1791,8 @@ async function execQuery(tab, confirmed = false) {
   }
   // 查询保护：提示风险，确认后按已确认状态重新执行。
   if (needsConfirm) {
-    if (confirm(tr('db.query.guardPrompt', { reason: needsConfirm }))) execQuery(tab, true);
+    const ok = await confirmDialog(tr('db.query.guardPrompt', { reason: needsConfirm }));
+    if (ok) execQuery(tab, true);
     else setStatus(tab, () => tr('db.query.guardCanceled'));
   }
 }
@@ -3149,6 +3196,15 @@ $('#closeRowModal').addEventListener('click', closeRowModal);
 $('#cancelRowBtn').addEventListener('click', closeRowModal);
 $('#rowForm').addEventListener('submit', (ev) => { ev.preventDefault(); submitRow(); });
 $('#closeAlterModal').addEventListener('click', () => { $('#alterModal').classList.add('hidden'); alterCtx = null; });
+
+$('#confirmOk').addEventListener('click', () => settleConfirm(true));
+$('#confirmCancel').addEventListener('click', () => settleConfirm(false));
+$('#confirmModal').addEventListener('click', (ev) => { if (ev.target === $('#confirmModal')) settleConfirm(false); });
+document.addEventListener('keydown', (ev) => {
+  if (!confirmResolve) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); settleConfirm(false); }
+  else if (ev.key === 'Enter') { ev.preventDefault(); settleConfirm(true); }
+});
 $('#cancelAlterBtn').addEventListener('click', () => { $('#alterModal').classList.add('hidden'); alterCtx = null; });
 $('#alterOp').addEventListener('change', syncAlterFields);
 $('#previewAlterBtn').addEventListener('click', () => runAlter(true));
