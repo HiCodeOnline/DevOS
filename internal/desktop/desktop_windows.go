@@ -74,9 +74,9 @@ func New(opts Options) *Desktop {
 			// macOS 保留系统圆角与窗口阴影，内容铺满整窗。
 			CornerType: application.MacWindowCornerTypeRounded,
 			TitleBar: application.MacTitleBar{
-				Hide:            true,
+				Hide:               true,
 				AppearsTransparent: true,
-				FullSizeContent: true,
+				FullSizeContent:    true,
 			},
 		},
 		Windows: application.WindowsWindow{

@@ -65,6 +65,7 @@ go run .
 | `-no-tray` | Do not create the system tray icon; closing the window quits the app. |
 | `-no-browser` | Do not show the main window on startup (stay in the tray only). |
 | `-setup` | Force the data-directory setup wizard, even if a location has already been chosen. |
+| `-web` | Web mode: no window or tray, serves the UI on `127.0.0.1` only and prints the URL; suits server deployments reached through an SSH tunnel. |
 
 ## Configuration
 

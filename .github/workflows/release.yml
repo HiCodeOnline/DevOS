@@ -123,9 +123,61 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  web:
+    name: Build web (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - amd64
+          - arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: ${{ matrix.arch }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${VERSION#v}"
+          ldflags="-s -w -X devos/internal/kernel.Version=${version}"
+          mkdir -p dist/stage
+          # Web 版使用 Wails v3 的 server 构建标签（无 GUI），配合运行时 -web 参数：
+          # 只提供 HTTP 服务，不创建窗口与托盘，页面通过浏览器访问。
+          go build -trimpath -tags server -ldflags "${ldflags}" \
+            -o dist/stage/devos .
+          cp README.md README.zh-CN.md LICENSE dist/stage/
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+
+      - name: Package archive
+        run: |
+          set -euo pipefail
+          base="devos_${VERSION}_web-linux-${{ matrix.arch }}"
+          tar -czf "dist/${base}.tar.gz" -C dist/stage devos README.md README.zh-CN.md LICENSE
+          rm -rf dist/stage
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-linux-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
   release:
     name: Publish release
-    needs: build
+    needs: [build, web]
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
