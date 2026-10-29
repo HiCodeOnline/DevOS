@@ -25,6 +25,13 @@ import (
 // Version 是应用版本号，发布构建时通过 -ldflags "-X devos/internal/kernel.Version=..." 覆盖。
 var Version = "0.1.0"
 
+// BuildRelease 由发布流水线通过 -ldflags "-X devos/internal/kernel.BuildRelease=1" 注入。
+// 自动更新只在正式发布构建中启用，开发构建不会替换本地调试产物。
+var BuildRelease = ""
+
+// IsReleaseBuild 判断当前是否为发布构建。
+func IsReleaseBuild() bool { return BuildRelease != "" }
+
 // Kernel 持有内核运行时状态。
 type Kernel struct {
 	app     *fiber.App

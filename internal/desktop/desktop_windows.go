@@ -106,6 +106,8 @@ func New(opts Options) *Desktop {
 		d.refreshMenu()
 	}
 
+	d.startUpdater()
+
 	return d
 }
 

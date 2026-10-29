@@ -9,6 +9,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/wailsapp/wails/v3/pkg/updater"
+
 	"devos/internal/config"
 	"devos/internal/datadir"
 	"devos/internal/desktop"
@@ -108,6 +110,10 @@ func (s *runtimeState) stopKernel() {
 }
 
 func main() {
+	// 更新助手模式：由自动更新流程以子进程方式启动，负责替换二进制后重启应用。
+	// 必须在任何初始化之前处理，否则会先占用端口或触发单实例检查。
+	updater.HandleHelperMode()
+
 	portFlag := flag.Int("port", 0, "指定监听端口（默认读取 config.json，7788）")
 	noTray := flag.Bool("no-tray", false, "不创建任务栏托盘图标")
 	noWindow := flag.Bool("no-browser", false, "启动后不自动显示主窗口（仅驻留托盘）")

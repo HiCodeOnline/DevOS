@@ -61,7 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${VERSION#v}"
-          ldflags="-s -w -X devos/internal/kernel.Version=${version}"
+          ldflags="-s -w -X devos/internal/kernel.Version=${version} -X devos/internal/kernel.BuildRelease=1"
           # Windows 使用 GUI 子系统，双击启动时不再弹出终端窗口。
           if [ "${{ matrix.goos }}" = "windows" ]; then
             ldflags="${ldflags} -H windowsgui"
@@ -82,6 +82,9 @@ jobs:
           case "${{ matrix.goos }}" in
             windows)
               zip -q "../${base}.zip" "devos${EXT}" README.md README.zh-CN.md LICENSE
+              # 自动更新专用：Wails 更新器要求归档内只有一个顶层条目，
+              # 因此额外发布裸 exe 资产（与 zip 同名同架构）。
+              cp "devos${EXT}" "../${base}.exe"
               ;;
             darwin)
               # 打包为 .app，双击即可从 Finder 启动并自动打开浏览器。
