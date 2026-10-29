@@ -109,6 +109,7 @@ func verifySetupRequest(c *fiber.Ctx, baseURL string) error {
 type setupOptions struct {
 	BaseURL    string
 	DefaultDir string
+	WindowHost func() kernel.WindowHost
 	OnReady    func(dataDir string)
 }
 
@@ -139,6 +140,20 @@ func newSetupApp(webFS fs.FS, opts setupOptions) (*fiber.App, error) {
 	app.Get("/favicon.ico", func(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusNoContent)
 	})
+	// 向导页复用桌面的标题栏样式与脚本。
+	for _, asset := range []string{"titlebar.css", "titlebar.js"} {
+		name := asset
+		app.Get("/assets/"+name, func(c *fiber.Ctx) error {
+			data, err := fs.ReadFile(webFS, "assets/"+name)
+			if err != nil {
+				return c.SendStatus(fiber.StatusNotFound)
+			}
+			c.Set("Cache-Control", "no-store")
+			c.Type(strings.TrimPrefix(filepath.Ext(name), "."), "utf-8")
+			return c.Send(data)
+		})
+	}
+	kernel.RegisterWindowRoutes(app, opts.WindowHost, opts.BaseURL)
 
 	api := app.Group("/api/setup")
 	api.Get("/status", func(c *fiber.Ctx) error {
@@ -184,8 +199,9 @@ func newSetupApp(webFS fs.FS, opts setupOptions) (*fiber.App, error) {
 }
 
 // startSetupWizard 启动初始化向导服务，并在桌面窗口中展示向导页面。
-// 返回向导地址、向导占用的端口、关闭函数以及数据目录选择结果的通道。
-func startSetupWizard(cfg config.Config, logger *slog.Logger, defaultDir string) (string, int, func(), <-chan string) {
+// host 用于在窗口创建后提供标题栏操作，返回向导地址、向导占用的端口、
+// 关闭函数以及数据目录选择结果的通道。
+func startSetupWizard(cfg config.Config, logger *slog.Logger, defaultDir string, host func() kernel.WindowHost) (string, int, func(), <-chan string) {
 	ln, port, err := kernel.Listen(cfg.Port, cfg.MaxPortTries)
 	if err != nil {
 		logger.Error("启动初始化向导失败", "err", err)
@@ -203,6 +219,7 @@ func startSetupWizard(cfg config.Config, logger *slog.Logger, defaultDir string)
 	app, err = newSetupApp(webFS, setupOptions{
 		BaseURL:    baseURL,
 		DefaultDir: defaultDir,
+		WindowHost: host,
 		OnReady: func(dir string) {
 			select {
 			case chosen <- dir:

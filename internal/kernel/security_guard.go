@@ -2,7 +2,6 @@ package kernel
 
 import (
 	"fmt"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -75,27 +74,16 @@ func isPublicSecurityPath(path string) bool {
 	case "/api/health", "/api/security/status", "/api/security/unlock":
 		return true
 	}
+	// 标题栏窗口操作在锁屏时仍需可用（最小化、最大化、关闭）。
+	if strings.HasPrefix(path, "/api/window/") {
+		return true
+	}
 	return strings.HasPrefix(path, "/api/security/wallpaper/file/")
 }
 
 // verifyRequestOrigin 校验安全类写操作来自同源的 DevOS 桌面，降低 CSRF 风险。
 func (k *Kernel) verifyRequestOrigin(c *fiber.Ctx) error {
-	if c.Get("X-DevOS-Request") != "1" {
-		return fiber.NewError(fiber.StatusBadRequest, "缺少请求标识，请从 DevOS 桌面操作")
-	}
-	origin := strings.TrimSpace(c.Get("Origin"))
-	if origin == "" {
-		return nil
-	}
-	base, err := url.Parse(k.baseURL)
-	if err != nil {
-		return fiber.NewError(fiber.StatusForbidden, "请求来源不受信任")
-	}
-	parsed, err := url.Parse(origin)
-	if err != nil || !strings.EqualFold(parsed.Scheme, base.Scheme) || !strings.EqualFold(parsed.Host, base.Host) {
-		return fiber.NewError(fiber.StatusForbidden, "请求来源不受信任")
-	}
-	return nil
+	return verifyRequestOrigin(c, k.baseURL)
 }
 
 // issueSession 为当前浏览器签发解锁 Cookie。

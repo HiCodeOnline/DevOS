@@ -1,0 +1,310 @@
+/* 自绘标题栏：去掉系统标题栏，仅保留最小化 / 最大化（还原）/ 关闭，并适配 Windows、Linux、macOS 三端样式 */
+
+:root {
+  --tb-h: 38px;
+  --tb-text: #0f172a;
+  --tb-sub: #64748b;
+  --tb-glass: rgba(255, 255, 255, 0.42);
+  --tb-glass-edge: rgba(15, 23, 42, 0.08);
+  --tb-blur: blur(18px) saturate(170%);
+}
+
+.titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  height: var(--tb-h);
+  color: var(--tb-text);
+  font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  /* 标题栏本身透明，让壁纸透出，只让按钮区域做毛玻璃 */
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Windows：使用 WebView2 原生非客户区命中测试拖动窗口（无需脚本） */
+.titlebar[data-platform="windows"] {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* macOS / Linux：Wails 运行时标记（仅在页面由 Wails 资源服务端提供时生效） */
+.titlebar:not([data-platform="windows"]) {
+  --wails-draggable: drag;
+}
+
+/* 拖动区域：Windows 走 WebView2 原生非客户区命中测试，macOS / Linux 走 Wails 运行时标记 */
+.titlebar-drag {
+  flex: 1 1 auto;
+  height: 100%;
+  min-width: 12px;
+}
+
+.titlebar-brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  min-width: 0;
+  padding: 0 10px 0 14px;
+}
+
+.titlebar-logo {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  color: #fff;
+  background: linear-gradient(145deg, #6366f1, #38bdf8);
+  box-shadow: 0 6px 14px -6px rgba(79, 70, 229, 0.6);
+}
+
+.titlebar-logo svg {
+  width: 12px;
+  height: 12px;
+}
+
+.titlebar-name {
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.titlebar-sep {
+  flex: none;
+  width: 1px;
+  height: 14px;
+  margin: 0 2px;
+  background: rgba(15, 23, 42, 0.12);
+}
+
+.titlebar-sub {
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--tb-sub);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 按钮区域：默认向上收起，鼠标移入后向下展开并显示高斯模糊背景 */
+.titlebar-controls {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  height: 100%;
+  /* 需要作为鼠标命中区：Windows 原生拖动区不会触发 :hover，因此这里不能参与拖动 */
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  --wails-draggable: no-drag;
+}
+
+.titlebar-controls::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: var(--tb-glass);
+  -webkit-backdrop-filter: var(--tb-blur);
+  backdrop-filter: var(--tb-blur);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.titlebar-controls:hover::before {
+  opacity: 1;
+}
+
+.titlebar-controls .tb-btn {
+  position: relative;
+  z-index: 1;
+  transform: translateY(-40px);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.2s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.16s ease,
+    background-color 0.12s ease, color 0.12s ease;
+}
+
+.titlebar-controls:hover .tb-btn {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.tb-btn {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: #475569;
+  background: transparent;
+  cursor: default;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  /* 按钮可点击，不参与窗口拖动 */
+}
+
+.titlebar[data-platform="windows"] .tb-btn {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+.titlebar:not([data-platform="windows"]) .tb-btn {
+  --wails-draggable: no-drag;
+}
+
+.tb-btn svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+
+.tb-btn:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.6);
+  outline-offset: -2px;
+}
+
+/* 最大化状态下显示「还原」图标 */
+.titlebar[data-maximised="true"] .tb-icon-max,
+.titlebar:not([data-maximised="true"]) .tb-icon-restore {
+  display: none;
+}
+
+/* ---------- Windows：右侧直角按钮，关闭按钮悬停变红 ---------- */
+.titlebar[data-platform="windows"] .titlebar-controls::before {
+  border-left: 1px solid var(--tb-glass-edge);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.3));
+}
+
+.titlebar[data-platform="windows"] .tb-btn {
+  width: 46px;
+  height: 100%;
+}
+
+.titlebar[data-platform="windows"] .tb-btn:hover {
+  background: rgba(15, 23, 42, 0.07);
+}
+
+.titlebar[data-platform="windows"] .tb-btn:active {
+  background: rgba(15, 23, 42, 0.13);
+}
+
+.titlebar[data-platform="windows"] .tb-close:hover {
+  color: #fff;
+  background: #e81123;
+}
+
+.titlebar[data-platform="windows"] .tb-close:active {
+  color: #fff;
+  background: #f1707a;
+}
+
+/* ---------- Linux：右侧圆角胶囊按钮组 ---------- */
+.titlebar[data-platform="linux"] .titlebar-controls {
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  margin-right: 8px;
+  padding: 0 2px;
+  border-radius: 10px;
+}
+
+.titlebar[data-platform="linux"] .titlebar-controls::before {
+  border: 1px solid var(--tb-glass-edge);
+  box-shadow: 0 12px 26px -20px rgba(15, 23, 42, 0.6);
+}
+
+.titlebar[data-platform="linux"] .tb-btn {
+  width: 30px;
+  height: 26px;
+  border-radius: 8px;
+}
+
+.titlebar[data-platform="linux"] .tb-btn:hover {
+  background: rgba(15, 23, 42, 0.09);
+}
+
+.titlebar[data-platform="linux"] .tb-btn:active {
+  background: rgba(15, 23, 42, 0.16);
+}
+
+.titlebar[data-platform="linux"] .tb-close:hover {
+  color: #fff;
+  background: #e01b24;
+}
+
+/* ---------- macOS：左侧交通灯圆点，关闭在左 ---------- */
+.titlebar[data-platform="darwin"] .titlebar-controls {
+  order: -1;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  margin-left: 10px;
+  padding: 0 8px;
+  border-radius: 999px;
+}
+
+.titlebar[data-platform="darwin"] .titlebar-controls::before {
+  border: 1px solid var(--tb-glass-edge);
+}
+
+.titlebar[data-platform="darwin"] .tb-btn {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.titlebar[data-platform="darwin"] .tb-btn svg {
+  width: 7px;
+  height: 7px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.titlebar[data-platform="darwin"]:hover .tb-btn svg {
+  opacity: 1;
+}
+
+.titlebar[data-platform="darwin"] .tb-min {
+  background: #febc2e;
+}
+
+.titlebar[data-platform="darwin"] .tb-max {
+  background: #28c840;
+}
+
+.titlebar[data-platform="darwin"] .tb-close {
+  order: -1;
+  background: #ff5f57;
+}
+
+.titlebar[data-platform="darwin"] .titlebar-brand {
+  padding-left: 10px;
+}
+
+/* ---------- 布局适配 ---------- */
+body #desktop {
+  top: var(--tb-h);
+}
+
+body.no-desktop .titlebar {
+  display: none;
+}
+
+body.no-desktop #desktop {
+  top: 0;
+}
+
+/* 初始化向导页为标题栏预留空间 */
+body.setup-page:not(.no-desktop) {
+  padding-top: calc(var(--tb-h) + 24px);
+}

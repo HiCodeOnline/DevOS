@@ -43,6 +43,8 @@ type Kernel struct {
 	builtinIDs map[string]bool    // 内置插件 ID，禁止被 Web 插件覆盖
 	webMu      sync.RWMutex       // 保护 webApps
 	webApps    map[string]*webApp // 已装载的 Web 插件
+
+	windowHost WindowHost // 原生窗口控制（自绘标题栏使用）
 }
 
 func New(webFS fs.FS, dataDir, baseURL string, log *slog.Logger) *Kernel {
@@ -136,6 +138,7 @@ func (k *Kernel) routes() {
 
 	k.registerSecurityRoutes(app)
 	k.registerStorageRoutes(app)
+	RegisterWindowRoutes(app, func() WindowHost { return k.windowHost }, k.baseURL)
 
 	app.Get("/api/system", func(c *fiber.Ctx) error {
 		host, _ := os.Hostname()

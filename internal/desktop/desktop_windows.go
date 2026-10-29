@@ -68,9 +68,25 @@ func New(opts Options) *Desktop {
 		URL:              opts.InitialURL,
 		Hidden:           !opts.Show,
 		BackgroundColour: application.NewRGB(16, 18, 23),
+		// 自绘标题栏：去掉系统边框与标题栏，由前端提供最小化/最大化/关闭按钮。
+		Frameless: true,
+		Mac: application.MacWindow{
+			// macOS 保留系统圆角与窗口阴影，内容铺满整窗。
+			CornerType: application.MacWindowCornerTypeRounded,
+			TitleBar: application.MacTitleBar{
+				Hide:            true,
+				AppearsTransparent: true,
+				FullSizeContent: true,
+			},
+		},
 		Windows: application.WindowsWindow{
 			DisableMenu: true,
 			Theme:       application.SystemDefault,
+			// 启用 WebView2 原生非客户区命中测试，让标题栏的 app-region: drag 可原生拖动窗口。
+			NonClientRegionSupport: true,
+			// 无边框窗口的 WM_NCHITTEST 需要由宿主处理，才能拿到原生边缘/角落缩放，
+			// 同时让双击标题栏、贴边吸附等系统行为保持可用。
+			WebView2CompositionHosting: true,
 		},
 	})
 
@@ -121,6 +137,37 @@ func (d *Desktop) Open(baseURL string) {
 func (d *Desktop) SetTitle(title string) {
 	if d.win != nil && title != "" {
 		d.win.SetTitle(title)
+	}
+}
+
+// Available 表示当前运行在原生窗口环境中，可提供自绘标题栏的窗口操作。
+func (d *Desktop) Available() bool { return d.win != nil }
+
+// Minimise 最小化主窗口。
+func (d *Desktop) Minimise() {
+	if d.win != nil {
+		d.win.Minimise()
+	}
+}
+
+// ToggleMaximise 在最大化与还原之间切换，返回切换后的最大化状态。
+func (d *Desktop) ToggleMaximise() bool {
+	if d.win == nil {
+		return false
+	}
+	d.win.ToggleMaximise()
+	return d.win.IsMaximised()
+}
+
+// IsMaximised 返回主窗口是否处于最大化。
+func (d *Desktop) IsMaximised() bool {
+	return d.win != nil && d.win.IsMaximised()
+}
+
+// Close 关闭主窗口；启用托盘时窗口仅隐藏，服务继续运行。
+func (d *Desktop) Close() {
+	if d.win != nil {
+		d.win.Close()
 	}
 }
 

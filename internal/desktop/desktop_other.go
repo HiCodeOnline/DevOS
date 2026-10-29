@@ -58,6 +58,21 @@ func (d *Desktop) OpenApp(id string) {
 // SetTitle 在非 Windows 平台无需处理。
 func (d *Desktop) SetTitle(string) {}
 
+// Available 表示非 Windows 平台回退为浏览器访问，不支持自绘标题栏的窗口操作。
+func (d *Desktop) Available() bool { return false }
+
+// Minimise 在浏览器模式下不可用。
+func (d *Desktop) Minimise() {}
+
+// ToggleMaximise 在浏览器模式下不可用。
+func (d *Desktop) ToggleMaximise() bool { return false }
+
+// IsMaximised 在浏览器模式下不可用。
+func (d *Desktop) IsMaximised() bool { return false }
+
+// Close 在浏览器模式下不可用。
+func (d *Desktop) Close() {}
+
 // SetTrayApps 在非 Windows 平台无需处理。
 func (d *Desktop) SetTrayApps([]AppInfo) {}
 

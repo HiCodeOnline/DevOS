@@ -19,17 +19,70 @@ import (
 //go:embed web
 var webAssets embed.FS
 
-// runtimeState 保存内核与数据目录，供托盘等回调并发访问。
+// runtimeState 保存内核、数据目录与桌面窗口，供托盘与标题栏回调并发访问。
 type runtimeState struct {
 	mu      sync.Mutex
 	kernel  *kernel.Kernel
 	dataDir string
+	desk    *desktop.Desktop
 }
 
 func (s *runtimeState) setKernel(k *kernel.Kernel) {
 	s.mu.Lock()
 	s.kernel = k
 	s.mu.Unlock()
+}
+
+func (s *runtimeState) setDesktop(d *desktop.Desktop) {
+	s.mu.Lock()
+	s.desk = d
+	s.mu.Unlock()
+}
+
+// desktop 返回已创建的桌面窗口，尚未创建时返回 nil。
+func (s *runtimeState) desktop() *desktop.Desktop {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.desk
+}
+
+// windowHost 返回供内核注册标题栏接口的窗口控制对象。
+func (s *runtimeState) windowHost() kernel.WindowHost { return s }
+
+// Available 判断是否运行在支持窗口操作的原生桌面窗口中。
+func (s *runtimeState) Available() bool {
+	d := s.desktop()
+	return d != nil && d.Available()
+}
+
+// Minimise 最小化主窗口。
+func (s *runtimeState) Minimise() {
+	if d := s.desktop(); d != nil {
+		d.Minimise()
+	}
+}
+
+// ToggleMaximise 切换最大化并返回切换后的状态。
+func (s *runtimeState) ToggleMaximise() bool {
+	if d := s.desktop(); d != nil {
+		return d.ToggleMaximise()
+	}
+	return false
+}
+
+// IsMaximised 返回主窗口是否最大化。
+func (s *runtimeState) IsMaximised() bool {
+	if d := s.desktop(); d != nil {
+		return d.IsMaximised()
+	}
+	return false
+}
+
+// Close 关闭主窗口；启用托盘时窗口仅隐藏，服务继续运行。
+func (s *runtimeState) Close() {
+	if d := s.desktop(); d != nil {
+		d.Close()
+	}
 }
 
 func (s *runtimeState) setDataDir(dir string) {
@@ -91,7 +144,7 @@ func main() {
 		return
 	}
 
-	k, baseURL, err := startServer(cfg, dir, logger)
+	k, baseURL, err := startServer(cfg, dir, logger, state.windowHost())
 	if err != nil {
 		logger.Error("启动失败", "err", err)
 		os.Exit(1)
@@ -108,6 +161,7 @@ func main() {
 		DataDir:    state.DataDir,
 		OnQuit:     state.stopKernel,
 	})
+	state.setDesktop(desk)
 	desk.SetTrayApps(trayApps(k))
 
 	if err := desk.Run(); err != nil {
@@ -128,7 +182,7 @@ func runSetupWindow(state *runtimeState, logger *slog.Logger, defaultDir string,
 		return
 	}
 
-	wizardURL, setupPort, stopWizard, chosen := startSetupWizard(cfg, logger, defaultDir)
+	wizardURL, setupPort, stopWizard, chosen := startSetupWizard(cfg, logger, defaultDir, state.windowHost)
 	defer stopWizard()
 
 	desk := desktop.New(desktop.Options{
@@ -141,6 +195,7 @@ func runSetupWindow(state *runtimeState, logger *slog.Logger, defaultDir string,
 		DataDir:    state.DataDir,
 		OnQuit:     state.stopKernel,
 	})
+	state.setDesktop(desk)
 
 	// 用户确认目录后，在同一窗口内继续启动正式服务。
 	go func() {
@@ -157,7 +212,7 @@ func runSetupWindow(state *runtimeState, logger *slog.Logger, defaultDir string,
 			return
 		}
 		state.setDataDir(prepared)
-		k, baseURL, err := startServer(loadConfig(logger, prepared, portFlag, setupPort), prepared, logger)
+		k, baseURL, err := startServer(loadConfig(logger, prepared, portFlag, setupPort), prepared, logger, state.windowHost())
 		if err != nil {
 			logger.Error("启动失败", "err", err)
 			desk.Quit()
@@ -214,7 +269,7 @@ func loadConfig(logger *slog.Logger, dataDir string, portFlag, setupPort int) co
 }
 
 // startServer 启动内核服务并返回内核实例与访问地址。
-func startServer(cfg config.Config, dataDir string, logger *slog.Logger) (*kernel.Kernel, string, error) {
+func startServer(cfg config.Config, dataDir string, logger *slog.Logger, host kernel.WindowHost) (*kernel.Kernel, string, error) {
 	ln, port, err := kernel.Listen(cfg.Port, cfg.MaxPortTries)
 	if err != nil {
 		return nil, "", fmt.Errorf("监听端口失败: %w", err)
@@ -228,6 +283,7 @@ func startServer(cfg config.Config, dataDir string, logger *slog.Logger) (*kerne
 	}
 
 	k := kernel.New(webFS, dataDir, baseURL, logger)
+	k.SetWindowHost(host)
 	if err := k.Load(plugins.All()); err != nil {
 		_ = ln.Close()
 		return nil, "", fmt.Errorf("装载插件失败: %w", err)

@@ -198,8 +198,38 @@
         cursor: default;
       }
     </style>
+    <link rel="stylesheet" href="/assets/titlebar.css?v=1" />
   </head>
-  <body>
+  <body class="setup-page">
+    <!-- 自绘标题栏：不使用系统标题栏，仅提供最小化 / 最大化 / 关闭 -->
+    <header id="appTitlebar" class="titlebar" data-platform="windows">
+      <div class="titlebar-brand">
+        <span class="titlebar-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 7l5 5-5 5" /><path d="M13 17h6" />
+          </svg>
+        </span>
+        <span class="titlebar-name">DevOS</span>
+        <span class="titlebar-sep"></span>
+        <span class="titlebar-sub">数据目录初始化</span>
+      </div>
+      <div class="titlebar-drag"></div>
+      <div class="titlebar-controls">
+        <button class="tb-btn tb-min" type="button" data-window-action="minimize" title="最小化" aria-label="最小化">
+          <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M0 5h10" /></svg>
+        </button>
+        <button class="tb-btn tb-max" type="button" data-window-action="maximize" title="最大化" aria-label="最大化">
+          <svg class="tb-icon-max" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><rect x="0.5" y="0.5" width="9" height="9" /></svg>
+          <svg class="tb-icon-restore" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1">
+            <rect x="0.5" y="2.5" width="7" height="7" />
+            <path d="M2.5 2.5V0.5h7v7h-2" />
+          </svg>
+        </button>
+        <button class="tb-btn tb-close" type="button" data-window-action="close" title="关闭" aria-label="关闭">
+          <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1"><path d="M0 0l10 10M10 0L0 10" /></svg>
+        </button>
+      </div>
+    </header>
     <main class="card">
       <div class="brand">
         <span class="logo">
@@ -610,5 +640,6 @@
         });
       })();
     </script>
+    <script defer src="/assets/titlebar.js?v=1"></script>
   </body>
 </html>
