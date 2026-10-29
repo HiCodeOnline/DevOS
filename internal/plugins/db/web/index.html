@@ -588,7 +588,10 @@ function typeOf(conn) {
 // 是否具备 SQL 工作区（NoSQL 与待支持类型使用各自的交互）。
 const hasSQL = (conn) => !!typeOf(conn).sql;
 function objectSchema(conn, database) {
-  return typeOf(conn).family === 'sqlite' ? 'main' : (database || '');
+  const fam = typeOf(conn).family;
+  // SQLite / DuckDB 没有独立的 schema 概念，统一使用 main。
+  if (fam === 'sqlite' || fam === 'duckdb') return 'main';
+  return database || '';
 }
 // NoSQL 连接使用各自的浏览方式。
 const isRedis = (conn) => typeOf(conn).family === 'redis';

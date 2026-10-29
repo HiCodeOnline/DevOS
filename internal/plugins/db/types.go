@@ -5,6 +5,7 @@ const (
 	familyMySQL      = "mysql"
 	familyPostgres   = "postgres"
 	familySQLite     = "sqlite"
+	familyDuckDB     = "duckdb"
 	familyOracle     = "oracle"
 	familySQLServer  = "sqlserver"
 	familyRedis      = "redis"
@@ -85,7 +86,7 @@ var dbTypes = func() []DBType {
 		nt("mariadb", "MariaDB", familyMySQL, groupCommon, 3306, "#00758f", "mysql", SupportProtocol),
 
 		// 关系型
-		nt("duckdb", "DuckDB", familyHTTP, groupRelational, 0, "#f59e0b", "analytics", SupportPlanned),
+		nt("duckdb", "DuckDB", familyDuckDB, groupRelational, 0, "#f59e0b", "analytics", duckdbSupport()),
 		nt("rqlite", "RQLite", familyHTTP, groupRelational, 4001, "#0ea5e9", "database", SupportNative),
 		nt("turso", "Turso", familyHTTP, groupRelational, 443, "#16a34a", "cloud", SupportNative),
 		nt("cloudflare-d1", "Cloudflare D1", familyHTTP, groupRelational, 443, "#f38020", "cloud", SupportNative),
@@ -206,7 +207,7 @@ var dbTypes = func() []DBType {
 // typeHints 说明尚未内置驱动的类型为何不可用，以及可替代的连接方式。
 var typeHints = map[string]string{
 	"h2":       "H2 需以 PostgreSQL 协议模式启动服务端（java -cp h2.jar org.h2.tools.Server -pg -pgPort 5435），这里填 PostgreSQL 端口；H2 兼容模式不支持全部 PostgreSQL 语法与系统视图。",
-	"duckdb":   "DuckDB 官方 Go 驱动依赖 CGO 原生库，交叉编译与免安装包无法内置；可在 DuckDB 中导出数据后改用 SQLite 或 PostgreSQL 连接。",
+	"duckdb":   "DuckDB 依赖 CGO 原生库：官方发布包已内置驱动，直接用纯 Go 方式自行编译时该类型不可用。",
 	"access":   "Microsoft Access 只能通过 ODBC/ACE 驱动访问，Windows 之外无纯 Go 方案；建议先把数据导入 SQLite 或 SQL Server。",
 	"db2":      "IBM DB2 驱动依赖 CGO + IBM 客户端（clidriver），无法内置到免安装构建；可先用 db2look/db2move 导出，再在其他已支持的类型中执行。",
 	"informix": "IBM Informix 依赖 CGO + Informix Client SDK，无纯 Go 驱动；可用 dbexport 导出后在已支持的类型中执行。",
@@ -251,7 +252,7 @@ func supportsConnect(id string) bool { return typeOf(id).Support != SupportPlann
 
 func sqlFamily(family string) bool {
 	switch family {
-	case familyMySQL, familyPostgres, familySQLite, familyOracle, familySQLServer, familyClickHouse,
+	case familyMySQL, familyPostgres, familySQLite, familyDuckDB, familyOracle, familySQLServer, familyClickHouse,
 		familyHive, familyFirebird, familyHana, familyExasol, familyVertica, familyTrino, familySnowflake:
 		return true
 	}
@@ -280,7 +281,7 @@ func databaseLabelFor(t DBType) string {
 		return "默认库号（0-15）"
 	case familyMongo:
 		return "默认数据库（可选）"
-	case familySQLite:
+	case familySQLite, familyDuckDB:
 		return ""
 	case familyOracle:
 		if t.ID == "dameng" {
@@ -333,8 +334,8 @@ func capsFor(t DBType) []string {
 		return []string{"query", "browse", "export"}
 	case familyCassandra:
 		return []string{"query", "browse", "command", "edit", "export"}
-	case familyNebula:
-		return []string{"query", "browse", "export"}
+	case familySQLite, familyDuckDB:
+		return []string{"query", "browse", "export", "sqlfile"}
 	case familyZooKeeper, familyMQTT:
 		return []string{"browse", "command"}
 	}
@@ -349,6 +350,8 @@ func driverImpl(id string) string {
 		return "pgx"
 	case familySQLite:
 		return "sqlite"
+	case familyDuckDB:
+		return "duckdb"
 	case familyOracle:
 		if t.ID == "dameng" {
 			return "dm"

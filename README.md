@@ -46,6 +46,8 @@ Everything is served from `127.0.0.1`; no account, cloud service or external dat
 
 The standard packages are built on the latest Ubuntu runner; the `-legacy` packages are built in an older environment as a conservative choice for older systems. All Linux packages are pure-Go static binaries (cgo disabled) and do not depend on the target machine's glibc, GTK or WebKit, so both variants run on the vast majority of distributions.
 
+The DuckDB driver relies on a CGO native library and is bundled only in the Windows x64 desktop build. On other platforms/architectures DuckDB shows as unsupported; use another database type or build from source with CGO enabled.
+
 ## Quick start
 
 ```bash

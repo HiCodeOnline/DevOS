@@ -42,7 +42,7 @@ require (
 	github.com/ClickHouse/ch-go v0.74.0 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/andybalholm/brotli v1.2.6 // indirect
-	github.com/apache/arrow-go/v18 v18.4.0 // indirect
+	github.com/apache/arrow-go/v18 v18.4.1 // indirect
 	github.com/apache/thrift v0.22.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.38.1 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.2 // indirect
@@ -71,6 +71,12 @@ require (
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/duckdb/duckdb-go-bindings v0.1.21 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.21 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.21 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.21 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.21 // indirect
+	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.21 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/dvsekhvalnov/jose2go v1.7.0 // indirect
 	github.com/elastic/go-sysinfo v1.8.1 // indirect
@@ -81,6 +87,7 @@ require (
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
@@ -109,6 +116,9 @@ require (
 	github.com/klauspost/compress v1.20.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
+	github.com/marcboeker/go-duckdb/arrowmapping v0.0.21 // indirect
+	github.com/marcboeker/go-duckdb/mapping v0.0.21 // indirect
+	github.com/marcboeker/go-duckdb/v2 v2.4.3 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect

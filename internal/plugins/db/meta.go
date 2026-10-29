@@ -36,7 +36,7 @@ type sqlPool struct {
 // 注意：Oracle 族以 schema 作为树上的“数据库”节点，这里必须保持服务名不变。
 func resolveDatabase(c Connection, database string) string {
 	switch familyOf(c.Driver) {
-	case familySQLite:
+	case familySQLite, familyDuckDB:
 		return "main"
 	case familyClickHouse:
 		if database != "" {
@@ -109,6 +109,27 @@ func buildDSN(c Connection, database string) (string, error) {
 			return "", fmt.Errorf("SQLite 数据库文件不能为空")
 		}
 		return c.File, nil
+
+	case familyDuckDB:
+		file := strings.TrimSpace(c.File)
+		if file == "" {
+			return "", fmt.Errorf("DuckDB 数据库文件不能为空")
+		}
+		// go-duckdb 的 DSN 是「文件路径?参数」形式，参数会写入 DuckDB 配置。
+		// 只读模式不在这里下沉到 DuckDB：同一文件被多个连接以不同配置打开时，
+		// go-duckdb 会直接报错；只读限制由应用层 writeAllowed 统一拦截。
+		q := url.Values{}
+		for k, v := range parseParams(c.Params) {
+			q.Set(k, v)
+		}
+		if len(q) == 0 {
+			return file, nil
+		}
+		sep := "?"
+		if strings.Contains(file, "?") {
+			sep = "&"
+		}
+		return file + sep + q.Encode(), nil
 
 	case familyPostgres:
 		if typeOf(c.Driver).ID == "h2" && db == "" {
@@ -338,6 +359,8 @@ func versionSQL(driver string) string {
 		return "SELECT version()"
 	case familySQLite:
 		return "SELECT sqlite_version()"
+	case familyDuckDB:
+		return "SELECT version()"
 	case familyClickHouse:
 		return "SELECT version()"
 	case familyOracle:
@@ -474,7 +497,7 @@ func (p *DB) handleDatabases(c *fiber.Ctx) error {
 		return p.handleRedisDatabases(c)
 	case familyMongo:
 		return p.handleMongoDatabases(c)
-	case familySQLite:
+	case familySQLite, familyDuckDB:
 		return c.JSON([]string{"main"})
 	case familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
 		ns, err := p.nativeDatabases(conn)
@@ -555,7 +578,7 @@ func (p *DB) handleSchemas(c *fiber.Ctx) error {
 	}
 	database := c.Query("database")
 	switch familyOf(conn.Driver) {
-	case familySQLite:
+	case familySQLite, familyDuckDB:
 		return c.JSON([]string{"main"})
 	case familyMySQL:
 		return c.JSON([]string{database})
@@ -633,6 +656,12 @@ func (p *DB) handleObjects(c *fiber.Ctx) error {
 	switch familyOf(conn.Driver) {
 	case familySQLite:
 		query = "SELECT name, type FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name"
+
+	case familyDuckDB:
+		// DuckDB 默认 schema 为 main；system_views 中包含 information_schema 等内部视图，
+		// 这里只取用户表与视图。
+		query = "SELECT table_name, table_type FROM information_schema.tables" +
+			" WHERE table_schema = 'main' AND table_type IN ('BASE TABLE','VIEW') ORDER BY table_name"
 
 	case familyPostgres:
 		if schema == "" {
@@ -744,6 +773,37 @@ func (p *DB) handleColumns(c *fiber.Ctx) error {
 				col.Nullable = "NO"
 			}
 			if pk > 0 {
+				col.Key = "PRI"
+			}
+			out = append(out, col)
+		}
+		return c.JSON(out)
+
+	case familyDuckDB:
+		// DuckDB 的 information_schema.columns 提供类型、可空与默认值；
+		// 主键信息在 information_schema.table_constraints 中，单独补充。
+		pkCols, err := duckdbPrimaryKeys(c.Context(), db, table)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		rows, err := db.QueryContext(c.Context(),
+			`SELECT column_name, data_type, is_nullable, COALESCE(column_default, '')
+			 FROM information_schema.columns
+			 WHERE table_schema = 'main' AND table_name = ?
+			 ORDER BY ordinal_position`, table)
+		if err != nil {
+			return jsonErr(c, fiber.StatusBadGateway, err.Error())
+		}
+		defer rows.Close()
+		out := make([]Column, 0, 16)
+		for rows.Next() {
+			var col Column
+			var nullable string
+			if err := rows.Scan(&col.Name, &col.Type, &nullable, &col.Default); err != nil {
+				continue
+			}
+			col.Nullable = nullable
+			if sameNameFold(pkCols, col.Name) {
 				col.Key = "PRI"
 			}
 			out = append(out, col)
@@ -920,6 +980,40 @@ func isNoTableFamily(driver string) bool {
 	switch familyOf(driver) {
 	case familyHTTP, familyCassandra, familyZooKeeper, familyMQTT, familyNebula:
 		return true
+	}
+	return false
+}
+
+// duckdbPrimaryKeys 查询表的联合主键列名。
+func duckdbPrimaryKeys(ctx context.Context, db *sql.DB, table string) ([]string, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT k.column_name
+		 FROM information_schema.table_constraints t
+		 JOIN information_schema.key_column_usage k
+		   ON t.constraint_name = k.constraint_name AND t.table_schema = k.table_schema AND t.table_name = k.table_name
+		 WHERE t.constraint_type = 'PRIMARY KEY' AND t.table_schema = 'main' AND t.table_name = ?`,
+		table)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]string, 0, 4)
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			continue
+		}
+		out = append(out, name)
+	}
+	return out, rows.Err()
+}
+
+// sameNameFold 判断列名是否在主键列表中出现（忽略大小写）。
+func sameNameFold(names []string, want string) bool {
+	for _, name := range names {
+		if strings.EqualFold(name, want) {
+			return true
+		}
 	}
 	return false
 }

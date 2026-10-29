@@ -52,9 +52,16 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      # DuckDB 依赖 CGO 原生库，只有 windows/amd64 目标启用 CGO；
+      # 从 Linux 交叉编译到 Windows 需要 MinGW 工具链。
+      - name: Install MinGW (Windows amd64)
+        if: matrix.goos == 'windows' && matrix.goarch == 'amd64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64
+
       - name: Build
         env:
-          CGO_ENABLED: '0'
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           VERSION: ${{ github.ref_name }}
@@ -66,8 +73,15 @@ jobs:
           if [ "${{ matrix.goos }}" = "windows" ]; then
             ldflags="${ldflags} -H windowsgui"
           fi
+          # 仅 windows/amd64 开启 CGO 以内置 DuckDB；其余目标保持纯 Go
+          # （Linux 包因此仍是静态二进制，DuckDB 在那些构建里显示为未支持）。
+          cgo=0
+          if [ "${{ matrix.goos }}" = "windows" ] && [ "${{ matrix.goarch }}" = "amd64" ]; then
+            cgo=1
+            export CC=x86_64-w64-mingw32-gcc
+          fi
           mkdir -p dist/stage
-          go build -trimpath -ldflags "${ldflags}" \
+          CGO_ENABLED=${cgo} go build -trimpath -ldflags "${ldflags}" \
             -o "dist/stage/devos${{ matrix.ext }}" .
           cp README.md README.zh-CN.md LICENSE dist/stage/
           echo "VERSION=${version}" >> "$GITHUB_ENV"

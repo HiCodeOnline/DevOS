@@ -52,7 +52,8 @@ func TestTypeAliasKeepsOldConfigs(t *testing.T) {
 		t.Fatalf("驱动映射不正确: dameng=%s clickhouse=%s mariadb=%s",
 			driverImpl("dameng"), driverImpl("clickhouse"), driverImpl("mariadb"))
 	}
-	if supportsConnect("oracle") != true || supportsConnect("duckdb") != false {
+	// DuckDB 是否可用取决于构建是否启用 CGO，这里用始终不可用的 Teradata 做断言。
+	if supportsConnect("oracle") != true || supportsConnect("teradata") != false {
 		t.Fatalf("连接能力标记不正确")
 	}
 }
@@ -93,8 +94,9 @@ func TestH2DSN(t *testing.T) {
 }
 
 func TestPlannedTypeRejected(t *testing.T) {
+	// DuckDB 在 CGO 构建中可用，这里用始终无内置驱动的 Teradata 验证拦截逻辑。
 	p := New()
-	_, err := p.pool(Connection{ID: "x", Driver: "duckdb", Host: "127.0.0.1", Port: 5432}, "")
+	_, err := p.pool(Connection{ID: "x", Driver: "teradata", Host: "127.0.0.1", Port: 1025}, "")
 	if err == nil || !strings.Contains(err.Error(), "未内置驱动") {
 		t.Fatalf("未内置驱动的类型应拒绝连接，err=%v", err)
 	}
